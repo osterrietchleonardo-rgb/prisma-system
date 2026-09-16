@@ -36,12 +36,12 @@ sin responder desde la web, sin indexar el sitio, sin un segundo analizador.
 | Pieza | Qué es |
 |---|---|
 | **El widget** | `widget.js` (una línea en el sitio) que abre un iframe con una página de PRISMA. Alternativa sin script: un link a esa misma página, para sitios que no dejan pegar código |
-| **El agente** | Un endpoint que responde con el motor común (`lib/agente/`), con 4 herramientas y los guardarraíles en código |
+| **El agente** | Un endpoint que responde con el motor común (`lib/agente/`), con 5 herramientas y los guardarraíles en código |
 | **La bandeja** | Una página nueva en PRISMA para el director: lista de chats, la conversación completa, los datos capturados, el estado (nuevo / derivado / atendido), interruptor para pausar al asistente, y el botón para abrir el WhatsApp del lead |
 | **La derivación** | Plantilla de WhatsApp al número que recibe los leads, con los datos y el link directo al chat (§4-bis), más el email de respaldo |
 
-Tres tablas nuevas, nada de lo existente se toca: `web_widgets` (una fila por agencia),
-`web_conversaciones`, `web_mensajes`. Una plantilla nueva por agencia (§4-bis), que se crea por el
+Cuatro tablas nuevas, nada de lo existente se toca: `web_widgets` (una fila por agencia),
+`web_paginas` (el sitio rastreado, §3-bis), `web_conversaciones`, `web_mensajes`. Una plantilla nueva por agencia (§4-bis), que se crea por el
 mismo camino que las del equipo (`plantillasEquipo` en `lib/whatsapp/plantillas-v2.ts`).
 
 ---
@@ -55,19 +55,23 @@ mismo camino que las del equipo (`plantillasEquipo` en `lib/whatsapp/plantillas-
    carga una vez y sirve para los dos canales. Una sola fuente de verdad por agencia.
 2. **La cartera**: búsqueda por significado sobre `properties` de esa agencia (`match_properties_ia`,
    la que ya usa el Buscador).
-3. **Las secciones del sitio, cargadas a mano en el formulario del widget**: nombre, link y dos
-   líneas de qué hay en cada una (Propiedades, Tasaciones, Alquileres, Servicios, Nosotros, Sumate
-   al equipo, Contacto…). Es texto corto, va en el contexto, y con eso el asistente orienta y pasa
-   el link correcto sin que haya que rastrear el sitio con un robot.
-4. **La página desde donde le escribieron** (la URL), para poder decir "veo que estás mirando el
+3. **El sitio de la agencia, rastreado** (Leonardo, 16/9): al guardar el widget, el sistema lee el
+   sitio y guarda el texto de sus páginas para poder responder con lo que dice la web y pasar el
+   link exacto. Cómo se hace y con qué límites, en §3-bis.
+4. **Las secciones cargadas a mano en el formulario**: nombre, link y dos líneas de qué hay en cada
+   una (Propiedades, Tasaciones, Alquileres, Servicios, Nosotros, Sumate al equipo, Contacto…). No
+   reemplazan al rastreo: son **el mapa**, lo que el director considera importante, y mandan sobre
+   lo que encuentre el robot cuando haya que elegir a dónde mandar a alguien.
+5. **La página desde donde le escribieron** (la URL), para poder decir "veo que estás mirando el
    departamento de…".
 
-**Puede** cuatro cosas:
+**Puede** cinco cosas:
 
 | Herramienta | Para qué | Freno |
 |---|---|---|
 | `buscar_propiedades` | mostrar hasta 3 propiedades con su ficha compartible (`/ficha/<token>`, lo que ya existe) | obligatoria antes de nombrar cualquier propiedad, precio o dirección |
-| `consultar_conocimiento` | responder sobre la agencia con el documento cargado | si no está en el documento, lo dice; no inventa |
+| `buscar_en_el_sitio` | buscar en las páginas rastreadas por significado; devuelve título, link y el fragmento | devuelve **el link**, para que el asistente mande a la sección y no reescriba lo que dice la web |
+| `consultar_conocimiento` | responder sobre la agencia con el documento cargado | si no está en el documento ni en el sitio, lo dice; no inventa |
 | `guardar_datos` | nombre, teléfono, email, qué busca, zona, presupuesto | normaliza el teléfono; **vincula o crea el contacto de la agencia** (ver §4) |
 | `pasar_a_whatsapp` | botón "Seguir por WhatsApp" con el resumen prellenado | el visitante es el que escribe: no hace falta plantilla ni permiso de Meta |
 
@@ -105,6 +109,49 @@ Los mismos que el Super Agente, más los propios del canal:
    ¿seguimos por WhatsApp?" con el botón.
 4. Nunca promete ("te averiguo y te aviso"), nunca da porcentajes ni honorarios, nunca pide datos
    de pago.
+
+---
+
+## 3-bis. El rastreo del sitio
+
+**Cuándo.** Al guardar el widget, con un botón "Actualizar el sitio" a mano, y una vez por mes solo.
+No es un robot dando vueltas: son tres momentos y se acabó.
+
+**Cómo.**
+
+1. Se busca `/sitemap.xml` (y los sitemaps que ese índice liste). Es el camino barato y ordenado.
+2. Si no hay sitemap, se recorre desde la home siguiendo links **del mismo dominio**, hasta dos
+   niveles de profundidad.
+3. De cada página se saca el texto con lo que ya existe en PRISMA (`lib/acm/extract.ts`), que cae
+   solo al extractor con navegador (`ACM_EXTRACTOR_URL`) cuando la página no devuelve texto porque
+   se arma con JavaScript. Es el mismo camino que ya usamos para leer avisos de portales.
+4. Cada página se guarda con su título, su link y su texto (hasta 8.000 caracteres; si es más larga,
+   partida), y su vector para poder buscar por significado (`gemini-embedding-001`, el mismo que usa
+   el Buscador).
+
+**Límites duros:** 60 páginas por sitio, 3 minutos de rastreo en total, 10 segundos por página, 2 MB
+por respuesta. Se saltean PDF, imágenes, videos y las fichas de propiedades individuales (esas ya
+están en la cartera, que es mejor fuente y está siempre al día). Se respeta `robots.txt`.
+
+**Si el rastreo falla o el sitio no deja**, no pasa nada grave: el asistente igual funciona con el
+documento de la agencia, las secciones del formulario y la cartera. El director ve "no se pudo leer
+el sitio" en la tarjeta, con el motivo.
+
+**Lo que el director ve al terminar:** cuántas páginas se leyeron y cuáles, para que pueda sacar de
+la lista lo que no quiere que el asistente use (una página vieja, una landing de una campaña
+terminada).
+
+**Cuidados de seguridad de esta parte** (es la única del sistema donde PRISMA abre una dirección que
+escribió otra persona):
+
+- Solo `http` y `https`, solo el dominio declarado y sus subdominios; cualquier redirección a otro
+  dominio se corta.
+- **Prohibidas las direcciones internas**: se resuelve el nombre antes de pedir y se rechaza todo lo
+  que apunte a la red privada o a la propia máquina. Sin esto, un director podría hacer que nuestro
+  servidor lea cosas de adentro de nuestra red.
+- Tamaño y tiempo acotados (arriba), para que una página enorme no cuelgue el proceso.
+- El texto rastreado entra al modelo **como dato, nunca como instrucción**: una página no puede
+  darle órdenes al asistente. Es la misma regla de §3, y acá importa más que en ningún lado.
 
 ---
 
@@ -192,6 +239,7 @@ El widget es un endpoint público que gasta plata. Los frenos son parte del dise
 | Que un script mande miles de mensajes | Límite por visitante (12 mensajes cada 10 minutos), por IP y por agencia (300 por día). **Si el limitador no está configurado, el endpoint no atiende**: falla cerrado, nunca abierto |
 | Que el gasto se dispare | Tope de costo por conversación (US$0,30) y por agencia por día (US$3). Pasado el tope el chat sigue vivo pero sin IA: saluda y ofrece WhatsApp |
 | Que el sitio del cliente le dé órdenes al asistente | Todo contenido entra como dato, nunca como instrucción (§3) |
+| Que el rastreo del sitio se use para espiar adentro de nuestra red | Solo el dominio declarado, sin redirecciones a otro dominio, y direcciones internas prohibidas (§3-bis) |
 | Que el iframe no cargue | Hoy PRISMA manda `X-Frame-Options: DENY` para todo. Se excluye **solo** la ruta del widget y se reemplaza por `frame-ancestors` con los dominios de esa agencia: más preciso y no afloja el resto del sistema |
 | Que se filtren datos entre agencias | La clave resuelve la agencia en el servidor; todas las consultas llevan ese id fijo. RLS en las tres tablas; el visitante nunca habla con la base |
 | Datos personales de terceros | El visitante deja nombre y teléfono: son datos de un cliente de la agencia. Sin modelos que entrenen con ellos (regla del 16/9), sin PII en los registros de error, y **los chats sin actividad se borran a los 90 días** |
@@ -244,7 +292,7 @@ en silencio.
 
 | Sacado | Motivo | Cuándo vuelve |
 |---|---|---|
-| Rastrear e indexar el sitio del cliente (tabla y embeddings propios) | Es un robot con sus fallas, y lo que respondería ya está en el documento de la agencia, en la cartera y en las secciones que el director carga a mano en el formulario (§3), que además son más precisas que lo que sacaría un robot | Cuando un cliente tenga un sitio grande y cargar las secciones a mano se vuelva un trabajo |
+| Rastrear el sitio de forma continua, o entender sitios que se arman entero con JavaScript pesado | El rastreo SÍ va (decisión de Leonardo, 16/9), pero en tres momentos —al guardar, a mano y una vez por mes— y con el extractor que ya tenemos. Un robot dando vueltas todo el día suma costo y formas de romperse | Si un cliente cambia su sitio seguido y se nota que el asistente quedó viejo |
 | El analizador de 45 campos portado de n8n | Duplica un analizador que ya existe y que va a morir cuando el bot de compradores pase a código. El asistente guarda los 6 datos que importan con una herramienta | Junto con la mudanza del bot de compradores |
 | Responder al lead desde PRISMA, y el tiempo real | La bandeja SÍ va (decisión de Leonardo, 16/9), pero para ver: el ida y vuelta se hace por WhatsApp. Sin responder desde la web no hace falta tiempo real: la lista se refresca sola cada 15 segundos | Cuando el equipo pida contestar desde ahí |
 | Mostrar los pasos de pensamiento | Suma trabajo y no cambia la respuesta | Nunca, salvo pedido |
