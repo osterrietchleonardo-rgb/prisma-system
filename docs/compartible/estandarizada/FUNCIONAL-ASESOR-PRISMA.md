@@ -943,13 +943,35 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 
 **Si te faltó una manzana o te pasaste:**
 - **"sumar un pedazo"**: dibujás un trazo más y se suma a la zona (una zona puede tener varios pedazos).
-- **"redibujar"**: el trazo nuevo reemplaza al anterior.
+- **"redibujar"**: el trazo nuevo reemplaza al anterior. **El viejo no queda guardado en ningún lado.** Si ya terminaste con esa zona y vas a trabajar otra, conviene dibujar una zona nueva en vez de reemplazar ésta.
 
 **Compartir la zona:** con **"compartir"** elegís a un colega del desplegable. A él le aparece en su Farming como "zona que comparten conmigo" y la trabajan juntos. Vos seguís siendo el dueño: solo vos podés borrarla o sacar a alguien.
 
-**Borrar:** con **"borrar"**. Ojo: esas cuadras quedan libres para que otro las dibuje.
+**Borrar:** con **"borrar"**. Ojo: **no queda registro de la zona ni de su trazo**, y esas cuadras quedan libres para que otro las dibuje.
 
 **Los topes:** hasta **3 zonas** activas por asesor y **5 km²** por zona (sumando sus pedazos). Farming es para trabajar una zona concreta, no para dispersarse.
 
 > 💡 Si el director **libera** una zona tuya (por ejemplo, porque cambiaste de territorio), desaparece de tu lista y esas cuadras vuelven a estar disponibles. No se pierde nada: queda en el historial.
-> 🔜 Las solapas **"Relevamiento"** (el tablero de direcciones que vas trabajando) y **"A la venta en mi zona"** (los avisos publicados adentro de tu zona) llegan en las próximas etapas.
+
+### "A la venta en mi zona"
+
+Es la segunda solapa de Farming, al lado de "Mis zonas". **No tenés que cargar nada:** te muestra todas las propiedades que hoy están publicadas adentro de tu zona. Si compartís la zona con un colega, los dos ven la misma lista.
+
+**Arriba están los atajos**, que son las cuatro señales que más sirven para captar:
+
+| Atajo | Qué quiere decir |
+|---|---|
+| **Dueño directo** | lo vende el propietario, sin inmobiliaria. Es el que más conviene tocar. |
+| **Se cayó del portal** | lo bajaron sin venderlo: la propiedad sigue disponible y el dueño ya se cansó. |
+| **Lleva +120 días** | hace más de cuatro meses que está publicado y no se mueve. |
+| **Bajó el precio** | el dueño ya aceptó que estaba caro. |
+
+**Un atajo solo aparece si tiene propiedades.** Si no ves "Se cayó del portal", es porque hoy no hay ninguna en tu zona que cumpla eso, no porque esté roto. Tocás un atajo y la lista se achica; lo tocás de nuevo y volvés a ver todas. Abajo del atajo hay un renglón que te recuerda por qué esa señal importa.
+
+**De cada propiedad ves** la foto, el precio, la dirección, los metros, los ambientes y **quién la publica** (acá no se esconde: es tu pantalla de trabajo, no la del cliente). Con **"ver el aviso"** se abre la publicación original en otra pestaña.
+
+**"Descartar"** es para las que ya miraste o no te sirven: desaparecen de la lista y **no vuelven a aparecer**, ni aunque recargues. Si te equivocaste, tenés **"deshacer"** ahí mismo. Ojo: en una zona compartida, lo que descartás vos también desaparece de la lista de tu colega.
+
+**Si movés el trazo, la lista se acomoda sola.** No hay nada guardado: se calcula cada vez que entrás. Si agrandás la zona aparecen las propiedades nuevas, y si sacás una cuadra se van las de esa cuadra.
+
+> 🔜 La solapa **"Relevamiento"** —el tablero donde vas moviendo las direcciones según avanzás— llega en la próxima etapa, junto con el botón para pasar una de estas propiedades al tablero.

@@ -91,6 +91,64 @@ no tocar. Una línea en cada camino.
   copias casi idénticas de `traerPropiedad`; y la placa lee la foto de la tabla sincronizada pero
   el precio de una llamada viva a Tokko, así que pueden no coincidir.
 
+## 2026-09-16 — Farming etapa 2: «A la venta en mi zona»
+
+**Qué se construyó** (rama `feat/farming-avisos-en-mi-zona`, worktree `PRISMA-SYSTEM-farming2`):
+la segunda solapa de Farming, que lista lo que está publicado adentro de la zona del asesor sin
+que él cargue nada. Tabla `farming_avisos_marca` (lo que ya miró), dos funciones PostGIS que
+recortan `mercado_avisos` por el polígono, `GET /api/farming/avisos`, `POST/DELETE
+/api/farming/avisos/marca`, y la solapa con los cuatro atajos de captación.
+
+**Decisiones de Leonardo:**
+- **Un atajo se dibuja solo si tiene datos.** Hoy «se cayó» y «bajó el precio» dan cero en todo
+  el sistema, y un botón que siempre da cero se siente roto. Cuando el pipeline vuelva, aparecen
+  solos.
+- **Trazabilidad de zonas: no se guarda historial.** Preguntó si las zonas quedaban con fecha y
+  filtros para ver la evolución. Verificado ese día: **borrar borra la fila de verdad** y
+  **redibujar pisa el trazo anterior**. Su decisión textual: *«si se borran o se redibujan, no
+  pasa nada, queda lo último y lo visible»*, con un aviso en pantalla y la sugerencia de crear
+  una zona nueva en vez de reemplazar. Se hizo así: dos textos, cero cambios de comportamiento.
+
+**Migración aplicada a producción con su OK.** El clasificador del entorno bloquea «Production
+Deploy» desde el agente (los dos intérpretes): la corrió él con `! node scratch/aplicar-sql.mjs`.
+Verificado después: `authenticated` y `anon` quedan con SELECT y **nada** de escritura, RLS
+encendida, y el **ataque de RLS da 10/10 fallando** (se le sumaron 3 casos + 1 control positivo
+sobre la tabla nueva). El script ahora **no puede terminar en verde si los ataques no corrieron**
+(sale con código 2): antes, correrlo sin la migración aplicada decía «todo bien».
+
+**Dos números corregidos, los dos míos:**
+- Yo había escrito «24,5 ms» en el comentario de la migración. Medido de verdad ya aplicado
+  contra la zona real de Central: **131-136 ms** la función, 91 ms la consulta cruda equivalente
+  (que sí muestra el plan: Index Scan en los dos índices geom de las particiones). Corregido en
+  el archivo.
+- Un brief mío salió corrupto por un `sed` (metió un `&` literal donde iba una aserción). El
+  implementador no lo transcribió; se arregló el plan.
+
+**Encontrado probando en el navegador, no razonando:** las fotos de `mercado_avisos` **no cargan
+ninguna**. La base guarda la URL con el texto `wxh` sin reemplazar —es una plantilla, no una
+dirección—: el CDN da 404 con `wxh` y 200 con `360x266`. Son **70.202 de 70.322** avisos con
+foto. Esta rama es el único lugar de la app que lee `foto_portada`, así que no rompe nada más.
+
+**Verificado en el navegador** (usuario de prueba, zona de 1.097 avisos en Palermo): los atajos
+salen solo los dos que tienen datos; descartar baja el total y el conteo del atajo al instante y
+ofrece deshacer; **lo descartado no vuelve después de recargar**; 120 avisos tras «ver más` sin
+un solo repetido; los 244 elementos tocables miden ≥44 px en 390×844 y ninguna línea se corta.
+
+**Cabos sueltos (en el plan, no perdidos):**
+- El contraste del chip de señal da **2,78** en tema claro (mínimo legible 4,5); en oscuro, 5,84.
+- Descartar y después tocar «ver más» **saltea tantos avisos como los descartados** (confirmado
+  contra la app: 2 descartes → 2 avisos que no aparecen nunca). El offset tiene que ser la
+  cantidad de tarjetas en pantalla, no página × 60.
+- Si el asesor descarta el último aviso del atajo que está mirando, el chip desaparece con el
+  filtro puesto y, con una sola zona, no queda botón para volver a «Todas».
+- El endpoint de marca no valida que el aviso esté dentro de la zona (solo puede ensuciar la
+  lista propia). Para la etapa 3: «convertir» sobre un aviso ya descartado necesita `update`, no
+  el `ON CONFLICT DO NOTHING` de hoy, o no hace nada en silencio.
+- La tarjeta de zona de la solapa 1 todavía no muestra «avisos a la venta hoy», que el spec pide
+  y esta etapa recién ahora hace calculable.
+- **Pendiente de Leonardo:** el tope de Apify (US$100 agotado, gastado US$102,45). El
+  descubrimiento diario está caído desde el 9-sep y por eso dos atajos dan cero.
+
 ## 2026-09-15 — Auditoría del Dashboard del director, tanda 1 de 3
 
 **Qué pidió Leonardo:** revisar cada dato del Dashboard, que sea correcto y que responda al filtro;
