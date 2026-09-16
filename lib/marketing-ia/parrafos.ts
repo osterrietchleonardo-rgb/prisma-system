@@ -104,7 +104,13 @@ export const REGLAS_POST = `FORMA DEL TEXTO (esto se pega tal cual en Instagram 
  * Sale SIEMPRE con la forma {hook, desarrollo, cta}: la base y la pantalla ya leen eso, y los
  * borradores viejos tienen que seguir abriéndose.
  */
-export function sellarContenidoPost(content: any): { hook: string; desarrollo: string; cta: string } {
+export function sellarContenidoPost(content: any): any {
+  // Un guion de video NO se sella: su contenido son bloques, no párrafos. Si alguna vez alguien
+  // mueve esta llamada fuera del `else` del copy_type, sin esto el guion se convertiría en
+  // {hook, desarrollo: "", cta: ""} y el asesor se quedaría con un teleprompter vacío, sin
+  // ningún error. Las rutas ya llaman a esto solo en la rama de post; esto es el cinturón.
+  if (Array.isArray((content as any)?.bloques)) return content;
+
   return {
     // EN LA IMAGEN NO VA NINGUN EMOJI (Leonardo, 16-sep-2026). El hook es lo que se dibuja
     // sobre la placa, asi que se limpia acá y no se confia en que el modelo obedezca.

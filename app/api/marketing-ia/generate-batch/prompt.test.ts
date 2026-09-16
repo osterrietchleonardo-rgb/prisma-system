@@ -27,6 +27,23 @@ describe("el prompt del post pide parrafos", () => {
   });
 });
 
+describe("la rama de video quedó intacta", () => {
+  it("generate-batch sigue sellando estructura y duración en el guion", () => {
+    // El servidor sella esos dos campos porque el modelo no suma bien. Si un refactor de la rama
+    // de post se los lleva puestos, los guiones salen sin duración y nadie lo nota.
+    const src = fuente("generate-batch/route.ts");
+    expect(src).toContain("duracion_estimada");
+    expect(src).toContain("item.content.estructura = estructuraId");
+  });
+
+  it("generate-copy sigue sellando estructura y duración en el guion", () => {
+    // Acá la variable se llama distinto (copyContent, no item.content): son rutas separadas.
+    const src = fuente("generate-copy/route.ts");
+    expect(src).toContain("duracion_estimada");
+    expect(src).toContain("copyContent.estructura = estructuraId");
+  });
+});
+
 describe("sellarContenidoPost", () => {
   it("convierte los parrafos en un desarrollo con renglones en blanco", () => {
     const sellado = sellarContenidoPost({

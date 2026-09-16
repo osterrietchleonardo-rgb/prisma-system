@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { sinEmojis, unEmojiPorParrafo, armarDesarrollo, contarParrafos } from "./parrafos";
+import { sinEmojis, unEmojiPorParrafo, armarDesarrollo, contarParrafos, sellarContenidoPost } from "./parrafos";
 
 describe("sinEmojis", () => {
   it("saca los emojis y no deja doble espacio", () => {
@@ -105,6 +105,24 @@ describe("contarParrafos", () => {
   it("un texto vacio cuenta 0", () => {
     expect(contarParrafos("")).toBe(0);
     expect(contarParrafos("   ")).toBe(0);
+  });
+});
+
+describe("sellarContenidoPost — el guardián del video", () => {
+  it("un guion de video pasa intacto, no se sella", () => {
+    // Si el guion se sellara, sus bloques desaparecerían y el asesor vería un teleprompter vacío.
+    const guion = {
+      estructura: "pas",
+      duracion_estimada: 45,
+      bloques: [{ texto: "Hola", segundos: 5, indicacion: "cálido", por_que: "abre" }],
+    };
+    expect(sellarContenidoPost(guion)).toBe(guion);
+  });
+
+  it("un post con bloques vacíos SÍ se sella", () => {
+    // El guardián mira que `bloques` sea un arreglo, no que exista la clave.
+    const sellado = sellarContenidoPost({ hook: "Hola", parrafos: ["Uno."], cta: "Chau", bloques: undefined });
+    expect(sellado.desarrollo).toBe("Uno.");
   });
 });
 
