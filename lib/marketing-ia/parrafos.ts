@@ -83,3 +83,33 @@ export function contarParrafos(desarrollo: string): number {
     .map((p) => p.trim())
     .filter((p) => p.length > 0).length;
 }
+
+/**
+ * Las reglas de forma del texto de un post, en un solo lugar.
+ *
+ * Viven acá y no adentro de cada ruta porque hasta el 16-sep-2026 habia DOS prompts que decian
+ * cosas distintas —generate-copy pedia "3-5 parrafos cortos" y generate-batch no pedia nada— y
+ * solo corria el que no pedia nada. Un solo texto compartido hace imposible que vuelvan a
+ * separarse.
+ */
+export const REGLAS_POST = `FORMA DEL TEXTO (esto se pega tal cual en Instagram y Facebook):
+- "parrafos" es una LISTA de 6 a 8 párrafos. Cada párrafo, de 1 a 3 renglones. Nunca un bloque largo.
+- Emoji: como mucho UNO al final de ALGUNOS párrafos, jamás en todos y jamás en el medio de una frase. Es un remate visual, no una decoración.
+- El "hook" va SIN emoji: se dibuja adentro de la placa y ahí los emojis no existen.
+- El "cta" sí puede cerrar con un emoji.`;
+
+/**
+ * Lo que devuelve el modelo, convertido a lo que se guarda en `copy_drafts.content`.
+ *
+ * Sale SIEMPRE con la forma {hook, desarrollo, cta}: la base y la pantalla ya leen eso, y los
+ * borradores viejos tienen que seguir abriéndose.
+ */
+export function sellarContenidoPost(content: any): { hook: string; desarrollo: string; cta: string } {
+  return {
+    // EN LA IMAGEN NO VA NINGUN EMOJI (Leonardo, 16-sep-2026). El hook es lo que se dibuja
+    // sobre la placa, asi que se limpia acá y no se confia en que el modelo obedezca.
+    hook: sinEmojis(content?.hook ?? ""),
+    desarrollo: armarDesarrollo(content?.parrafos ?? content?.desarrollo),
+    cta: (content?.cta ?? "").trim(),
+  };
+}
