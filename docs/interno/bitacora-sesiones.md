@@ -16,6 +16,82 @@
 
 ---
 
+## 2026-09-16 — El creador de anuncios: texto que se puede pegar en Meta, y la placa con la foto REAL
+
+**Qué se construyó** (rama `feat/anuncios-texto-y-placa`, worktree `PRISMA-SYSTEM-anuncios`)
+
+Las dos sugerencias de Maximiliano Filoreto que estaban `en_proceso` desde principios de mes:
+
+- **El texto salía en un bloque.** El copy real que él generó el 10-sep (`copy_drafts 30b0f771`)
+  tenía 89 palabras sin un salto de línea ni un emoji. La causa: el prompt de `generate-batch`
+  solo pedía *"cuerpo usando el ángulo pas"* y nunca decía que eso se pega en Instagram. Ahora se
+  le pide `parrafos`, una **lista** que el servidor puede contar, y el servidor la sella. Probado
+  en producción: los 3 borradores salen en **6 párrafos** con un emoji al cierre.
+- **La placa ignoraba la propiedad.** `flow_data.tokko_property_details` está VACÍO en los perfiles
+  reales, así que la imagen no recibía ni la foto ni los datos y caía en *"imagen representativa
+  del mercado inmobiliario argentino premium"*. Ahora la placa se arma con la **foto real de
+  Tokko, sin IA**: foto arriba, panel de marca abajo dibujado por el código.
+
+**Dos prompts decían cosas distintas y solo uno corría.** `generate-copy` pedía "3-5 párrafos
+cortos"; `generate-batch`, que es el que usa la pantalla, no pedía nada. Ahora comparten
+`REGLAS_POST` y no se pueden volver a separar.
+
+**Tres decisiones, todas medidas**
+
+- **Foto + panel, no foto a pantalla completa.** Medí 40 portadas reales: 28 son 4:3, mediana
+  1500 px de ancho, y 7 de 40 son más angostas que la placa. Con la foto típica, a pantalla
+  completa el Reel usa el 42% del ancho y la agranda 1,71×; con panel usa el 76% y la **achica**
+  0,94×. En 4:5 y cuadrado entra entera.
+- **El contenido nunca pisa el aviso legal.** Con el aviso REAL de Central (165 px de franja,
+  319 reservados) el cuadrado metía el precio **abajo** de la franja. El `Math.min` que protegía
+  la foto terminaba pisando lo legal. Palancas nuevas, en orden: soltar casillas → soltar bajada →
+  achicar título → achicar la foto (el 45% pasa a ser preferencia, piso duro 30%). Si ni así entra,
+  sale igual pero **lo avisa** (`desborda`).
+- **La ruta no confía en la `foto_url` que manda el navegador.** Comprueba contra `properties` que
+  la foto sea de esa propiedad **y de esa agencia**. Cierra dos agujeros de una: que el servidor
+  baje cualquier URL, y que un inquilino publique la foto de otra agencia con su logo.
+
+**Errores propios**
+
+- **Afirmé que un emoji en la placa "sale como nada".** Es falso: en esta Inter el `.notdef` es un
+  **cuadrito visible** de 638 caracteres de contorno, y el del contorno vacío es el ESPACIO. O sea
+  al revés. Antes del arreglo el emoji se **dibujaba** y no se contaba, porque el path del cuadrito
+  no tiene ningún `NaN`. Corregido en el spec con la tabla medida.
+- **El regex de emojis que dicté estaba roto y su propia prueba lo delataba.** `⚠️` son dos
+  caracteres; los contaba por separado y "conservaba el último", que es el invisible. Hubo que
+  arreglarlo tres veces: secuencias completas, después keycaps (`3️⃣`) y banderas (`🇦🇷`) que
+  escapaban enteras, y respetar `©®™` que Inter sí sabe dibujar.
+- **La prueba que sostiene todo el diseño no podía fallar.** "LA FOTO NO SE TOCA" muestreaba una
+  foto de color plano: un revisor la desenfocó con `.blur(30)` y **la prueba siguió pasando**.
+  Ahora usa una foto texturada y compara contra el recorte esperado; se probó al revés (con
+  desenfoque el desvío salta de 3,14 a 11,61 y falla).
+- **Casi reporto que la foto había sido alterada.** Mi medición sobre una placa de producción daba
+  18,27. Era MI detección del alto corrida **un píxel** (609 en vez de 608): en una foto llena de
+  follaje eso triplica el número. Con el alto real da 5,56, y la doble compresión JPEG sola explica
+  5,67. La foto está intacta.
+
+**Un hallazgo que salió de mirar, no de medir:** la ruta recomprimía la placa con `.toBuffer()` sin
+formato, y sharp usa calidad 80 por defecto. Duplicaba la pérdida justo en la foto que prometemos
+no tocar. Una línea en cada camino.
+
+**Quedó pendiente**
+
+- **El título de la placa puede ser muy largo.** El hook del post tiene ~150 caracteres, que para un
+  título es mucho. El diseño lo acomoda achicando la letra, pero lo correcto sería pedirle al modelo
+  un título corto aparte. Decidido dejarlo afuera.
+- **El aviso legal de Central son 841 caracteres** y en cuadrado deja la foto en el 33%. No es un
+  bug: la palanca es acortar el aviso, y esa decisión es de él. Kevin ya se había quejado el 31-ago
+  de que no le entraba.
+- **La config de Marketing de PRISMAIA - VAKDOR tiene cargado el aviso legal DE CENTRAL**, con sus
+  matrículas y su dirección. Config vieja de la agencia de prueba; conviene corregirla.
+- **El camino sin propiedad no se generó de punta a punta.** Verifiqué que el paso nuevo no aparece,
+  pero no generé una placa por el camino de Gemini.
+- **Las dos sugerencias siguen `en_proceso`.** Leonardo manda él la respuesta a Maximiliano.
+- **Lo mismo de siempre que sigue abierto:** el `generate-batch` y el `generate-image` tienen dos
+  copias casi idénticas de `traerPropiedad`; y la placa lee la foto de la tabla sincronizada pero
+  el precio de una llamada viva a Tokko, así que pueden no coincidir.
+
+
 ## 2026-09-12 — Farming: el mapa arranca con la manito, lupita, y el director ve cada asesor en su color
 
 **Qué pidió Leonardo:** (1) una lupita en el mapa de Farming para ir a un barrio, zona o dirección;
