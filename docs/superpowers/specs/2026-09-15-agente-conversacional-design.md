@@ -356,3 +356,24 @@ y costo por turno, juntos.
 3. **Duración mínima de la sombra**: 2 semanas (recomendado).
 4. **Orden del encendido**: PRISMAIA y después Central (recomendado).
 5. **Visitas agendadas por el bot**: fuera de la paridad, Fase 5 (hoy no existe).
+
+---
+
+## 9. Cómo retomar esto
+
+Leonardo (15/9): "tengámoslo presente, anotalo en un spec para cuando queramos retomarlo". El plan
+queda en pausa, no descartado. Al volver:
+
+1. **Leer primero** este documento y los cuatro anexos de `docs/interno/agente-conversacional/`.
+2. **Revalidar lo que puede haber cambiado** antes de creerle a los números de acá:
+   - los flujos de n8n (`updatedAt` de `PRISMA`, `Gestion_Handoff`, `Avisar_Asesor`,
+     `Cartera_Propiedades`, `Conocimiento_Contexto`): si alguien los tocó, el inventario envejeció;
+   - el volumen y los tiempos de §1.2 (las consultas están en el inventario del código);
+   - el modelo que corre hoy en el nodo "Agente IA CEO" y el gasto de OpenAI del mes;
+   - cuántas agencias hay: todo el plan está pensado con una sola con tráfico real (Central).
+3. **El primer paso sigue siendo la Fase 0**, y sus dos entregables valen por sí solos aunque el
+   resto no se haga nunca: el set de evaluación (mide el bot que YA está en producción) y la
+   alarma de silencio (hoy nadie se entera si un cliente queda sin respuesta).
+4. **Disparadores para retomarlo antes**: que n8n vuelva a dejar clientes mudos, que entre un
+   segundo cliente (el prompt y las herramientas ya no escalan a mano), o que haga falta una
+   capacidad que n8n no puede dar (agendar visitas, trazabilidad por turno para el director).
