@@ -17,6 +17,12 @@
 --
 -- Aplicar por Management API con el OK de Leonardo.
 -- Rollback: supabase/rollback/20260916_farming_avisos_rollback.sql
+--
+-- Después de aplicar esto en producción hay que volver a correr scripts/farming-rls-ataque.mjs:
+-- "no está hecho hasta que el ataque falla" (cuatro casos nuevos sobre farming_avisos_marca —
+-- la única tabla de esta migración alcanzable por un asesor logueado vía PostgREST: B intenta
+-- insertar, actualizar y borrar una marca de la zona de A, los tres tienen que fallar; y el
+-- control positivo, B viendo la marca de una zona que A le compartió, tiene que pasar).
 
 begin;
 
@@ -27,7 +33,7 @@ create table if not exists public.farming_avisos_marca (
   -- (id, es_dueno_directo) y el crawler reescribe filas. El id se guarda como referencia suelta.
   aviso_id               bigint  not null,
   aviso_es_dueno_directo boolean not null,
-  user_id                uuid    not null,
+  user_id                uuid    not null references auth.users(id) on delete cascade,
   estado                 text    not null default 'descartado'
                                  check (estado in ('descartado', 'convertido')),
   -- ETAPA 3: cuando el aviso se convierte en tarjeta de relevamiento, acá va su dirección.
@@ -91,7 +97,8 @@ as $$
     and m.operacion = 'venta'
     -- El caído entra a propósito, pero solo el reciente: uno de hace un año no se capta.
     and (m.estado = 'activo' or (m.estado = 'caido' and m.caido_en > now() - interval '180 days'))
-    and not (m.id = any (p_excluir))
+    and not (m.id = any (coalesce(p_excluir, '{}'::bigint[])))
+    -- p_senal: null = todas; el endpoint valida las cuatro claves y rechaza cualquier otra con 400.
     and (p_senal is null
          or (p_senal = 'duenos'  and m.es_dueno_directo)
          or (p_senal = 'caidos'  and m.estado = 'caido')
@@ -103,8 +110,10 @@ as $$
            (m.estado = 'caido') desc,
            m.dias_publicado desc nulls last,
            m.id
-  limit greatest(p_limit, 0)
-  offset greatest(p_offset, 0);
+  -- coalesce cubre el null explícito (greatest(null,0) da 0 = cero filas); el techo de 200
+  -- evita que un p_limit disparatado tire abajo la corrida.
+  limit least(greatest(coalesce(p_limit, 60), 0), 200)
+  offset greatest(coalesce(p_offset, 0), 0);
 $$;
 
 comment on function public.farming_avisos_en_zona is
@@ -131,7 +140,7 @@ as $$
     and m.calidad = 'ok'
     and m.operacion = 'venta'
     and (m.estado = 'activo' or (m.estado = 'caido' and m.caido_en > now() - interval '180 days'))
-    and not (m.id = any (p_excluir));
+    and not (m.id = any (coalesce(p_excluir, '{}'::bigint[])));
 $$;
 
 comment on function public.farming_avisos_conteos is

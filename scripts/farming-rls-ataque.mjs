@@ -16,6 +16,13 @@
 // archivo acá: entran por variables de entorno, así no quedan escritas en ningún lado que se
 // versione).
 //
+// Etapa 2 (20260916120000_farming_avisos.sql, revisión "Needs fixes", Important 1): se suman
+// los mismos ataques sobre farming_avisos_marca, la única tabla nueva de esa migración
+// alcanzable por PostgREST con la sesión de un asesor. La marca se siembra con service_role
+// sobre la MISMA zona de A que ya usan los ataques de arriba; si la migración todavía no está
+// aplicada (la tabla no existe) esos cuatro casos se saltean con un aviso, en vez de tirar
+// abajo todo el script.
+//
 // Uso (PowerShell):
 //   $env:A_EMAIL="..."; $env:A_PASS="..."; $env:B_EMAIL="..."; $env:B_PASS="..."; node scripts/farming-rls-ataque.mjs
 //
@@ -118,6 +125,57 @@ if (eFinal) throw new Error(`no se pudo releer la zona: ${eFinal.message}`)
 espera("nombre sin cambios", fila.nombre === original.nombre)
 espera("agency_id sin cambios", fila.agency_id === original.agency_id)
 espera("geojson sin cambios", JSON.stringify(fila.geojson) === original.geojson)
+
+console.log("Seed: se comparte la zona de A con B (para el control positivo de la marca, etapa 2)")
+const { error: eCompartir } = await admin
+  .from("farming_zonas_compartidas")
+  .insert({ zona_id: zona.id, user_id: B.uid, agregado_por: A.uid })
+if (eCompartir) throw new Error(`no se pudo compartir la zona de A con B: ${eCompartir.message}`)
+
+console.log("Seed: se crea con service_role una marca de A en su propia zona (etapa 2, farming_avisos_marca)")
+const marcaSeed = { zona_id: zona.id, aviso_id: 999999999, aviso_es_dueno_directo: false, user_id: A.uid, estado: "descartado" }
+const { error: eSeedMarca } = await admin.from("farming_avisos_marca").insert(marcaSeed)
+
+if (eSeedMarca) {
+  console.warn("No se pudo sembrar la marca de prueba (¿todavía no está aplicada 20260916120000_farming_avisos.sql?):", eSeedMarca.message)
+  console.warn("Se saltean los 4 casos de farming_avisos_marca.")
+} else {
+  console.log("ATAQUE 8: B intenta insertar una marca en la zona de A")
+  const { error: eB5 } = await B.c
+    .from("farming_avisos_marca")
+    .insert({ zona_id: zona.id, aviso_id: 888888888, aviso_es_dueno_directo: false, user_id: B.uid, estado: "descartado" })
+  espera("B NO pudo insertar una marca en la zona de A", !!eB5)
+
+  console.log("ATAQUE 9: B intenta actualizar la marca de A")
+  const { error: eB6 } = await B.c
+    .from("farming_avisos_marca")
+    .update({ estado: "convertido" })
+    .match({ zona_id: zona.id, aviso_id: marcaSeed.aviso_id })
+  espera("B NO pudo actualizar la marca de A", !!eB6)
+
+  console.log("ATAQUE 10: B intenta borrar la marca de A")
+  const { error: eB7, count: countMarca } = await B.c
+    .from("farming_avisos_marca")
+    .delete({ count: "exact" })
+    .match({ zona_id: zona.id, aviso_id: marcaSeed.aviso_id })
+  espera("B NO pudo borrar la marca de A", !!eB7 || countMarca === 0)
+
+  console.log("Control positivo: B SÍ puede ver la marca de A porque la zona está compartida con B")
+  const { data: rMarca } = await B.c
+    .from("farming_avisos_marca")
+    .select("zona_id, aviso_id")
+    .match({ zona_id: zona.id, aviso_id: marcaSeed.aviso_id })
+  espera("B ve la marca de la zona compartida", rMarca?.length === 1)
+
+  console.log("Verificación: la marca sigue exactamente como la sembró el service_role")
+  const { data: filaMarca, error: eFinalMarca } = await admin
+    .from("farming_avisos_marca")
+    .select("estado")
+    .match({ zona_id: zona.id, aviso_id: marcaSeed.aviso_id })
+    .single()
+  if (eFinalMarca) throw new Error(`no se pudo releer la marca: ${eFinalMarca.message}`)
+  espera("estado de la marca sin cambios", filaMarca.estado === marcaSeed.estado)
+}
 
 console.log("Limpieza: se borra con service_role")
 const { error: eLimpieza } = await admin.from("farming_zonas").delete().eq("id", zona.id)
