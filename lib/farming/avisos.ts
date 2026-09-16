@@ -6,7 +6,7 @@
 // 16-sep sobre 67.577 avisos de venta: dueño directo 823, +120 días 13.950, caídos 0 y con baja
 // de precio 20. Por eso un atajo se dibuja SOLO si tiene datos: un botón que siempre da cero se
 // siente roto, y cuando el pipeline de mercado vuelva a marcar caídos aparece solo.
-import { urlFotoRed } from "@/lib/acm/fotos-url"
+import { urlFotoRed, RUTA_FOTO_RED } from "@/lib/acm/fotos-url"
 
 export type Senal = "duenos" | "caidos" | "viejos" | "bajaron"
 
@@ -101,12 +101,17 @@ function urlPublicaSegura(url: string): string | null {
   }
 }
 
-/** La foto ya pasó por `urlFotoRed`, que devuelve la ruta de NUESTRO proxy (`/api/...`) para los
- *  hosts conocidos — pero si el host no está en su allowlist, la deja intacta. Acá se cierra esa
- *  puerta: lo único que llega a un `<img src>` es nuestra propia ruta o una URL `http(s)` real;
- *  cualquier otro esquema (`javascript:`, `data:`, etc.) queda en `null`. */
+/** La foto ya pasó por `urlFotoRed`, que devuelve la ruta de NUESTRO proxy (`RUTA_FOTO_RED`)
+ *  para los hosts conocidos — pero si el host no está en su allowlist, la deja intacta. Acá se
+ *  cierra esa puerta: lo único que llega a un `<img src>` es nuestra propia ruta de proxy real o
+ *  una URL `http(s)` real; cualquier otro esquema (`javascript:`, `data:`, etc.) queda en `null`.
+ *
+ *  El chequeo es contra `RUTA_FOTO_RED + "?"` exacto, no un `startsWith("/api/")` genérico: ese
+ *  genérico dejaba pasar cualquier cosa que un crawler pusiera con ese prefijo, por ejemplo
+ *  `/api/../../x` (que el navegador resuelve a `/x`), forzando un GET same-origin con las
+ *  cookies del asesor sin que sea nuestra ruta real. */
 function fotoSegura(url: string): string | null {
-  if (url.startsWith("/api/")) return url
+  if (url.startsWith(`${RUTA_FOTO_RED}?`)) return url
   try {
     const parsed = new URL(url)
     return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null

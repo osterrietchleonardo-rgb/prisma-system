@@ -10,10 +10,10 @@ import type { Dibujo } from "@/lib/farming/geometria"
 import { contornosParaDibujar } from "@/lib/farming/armar"
 import { pedir } from "@/lib/farming/cliente"
 import type { RespuestaZonas, ZonaFarming } from "@/lib/farming/tipos"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ListaZonas } from "./lista-zonas"
 import { CompartirDialog } from "./compartir-dialog"
 import { MapaFarming, type ModoMapa } from "./mapa-farming"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AvisosEnZona } from "./avisos-en-zona"
 
 export function FarmingPage() {

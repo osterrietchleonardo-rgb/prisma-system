@@ -102,4 +102,20 @@ describe("armarAviso", () => {
     const a = armarAviso(base)
     expect(a.foto).toBe(`/api/foto-red?u=${encodeURIComponent("https://imgar.zonapropcdn.com/avisos/1/x.jpg")}`)
   })
+
+  // El try/catch de urlPublicaSegura es lo único que evita un 500 en todo el endpoint si a
+  // mercado_avisos le llega basura en vez de una URL: estos tres casos tienen que volver null
+  // sin tirar, nunca reventar armarAviso.
+  it("una cadena que no es URL, vacía, o protocol-relative queda en null sin tirar", () => {
+    expect(armarAviso({ ...base, url_publica: "no-es-una-url" }).url_publica).toBeNull()
+    expect(armarAviso({ ...base, url_publica: "" }).url_publica).toBeNull()
+    expect(armarAviso({ ...base, url_publica: "//evil.com" }).url_publica).toBeNull()
+  })
+
+  // El chequeo de la foto es contra RUTA_FOTO_RED exacto, no startsWith("/api/") genérico: sin
+  // eso, un foto_portada como "/api/../../x" (que el navegador resuelve a "/x") colaba porque
+  // "empezaba" con /api/, forzando un GET same-origin con las cookies del asesor.
+  it("una foto que imita nuestra ruta con path traversal no cuela: no es RUTA_FOTO_RED real", () => {
+    expect(armarAviso({ ...base, foto_portada: "/api/../../x" }).foto).toBeNull()
+  })
 })

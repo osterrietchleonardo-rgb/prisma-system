@@ -8,7 +8,7 @@
 //
 // Acá NO se tapa al colega que publica (spec): es la pantalla interna del asesor, no viaja a
 // ningún cliente, y saber quién publica es justamente el dato que necesita.
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { ExternalLink, Loader2, Undo2, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -81,28 +81,67 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
   const [cargando, setCargando] = useState(true)
   const [ultimoDescarte, setUltimoDescarte] = useState<AvisoEnZona | null>(null)
 
+  // Cuenta las cargas: si el asesor cambia de zona o de filtro con un pedido todavía en
+  // vuelo (por ejemplo, tocó «ver más» y después cambió de zona), la respuesta vieja no puede
+  // pisar los datos de la nueva. Cada `traer` se queda con SU número; si al volver ya no es el
+  // último pedido, no toca ningún estado.
+  const gen = useRef(0)
+
+  // Corta el flash de la zona/filtro anterior apenas cambia uno de los dos, antes de que
+  // llegue la respuesta nueva. También se lleva puesto el "deshacer" pendiente: es de la
+  // combinación de zona+filtro anterior, y reinsertarlo bajo la nueva mezclaría dos listas.
+  useEffect(() => {
+    setAvisos([])
+    setDatos(null)
+    setUltimoDescarte(null)
+  }, [zonaId, senal])
+
   const traer = useCallback(async (p: number, reemplazar: boolean) => {
     if (!zonaId) return
+    const mio = ++gen.current
     setCargando(true)
     try {
       const qs = new URLSearchParams({ zona_id: zonaId, pagina: String(p) })
       if (senal) qs.set("senal", senal)
       const d: RespuestaAvisos = await pedir(`/api/farming/avisos?${qs}`)
+      if (gen.current !== mio) return // una carga más nueva ya ganó
       setDatos(d)
       setAvisos((prev) => (reemplazar ? d.avisos : [...prev, ...d.avisos]))
       setPagina(p)
     } catch (e: any) {
+      if (gen.current !== mio) return
       toast.error(e.message)
+      // Una carga que reemplaza (zona nueva, filtro nuevo, primera página) y falla no puede
+      // dejar en pantalla los datos de la ANTERIOR: el asesor la vería bajo el nombre de la
+      // zona nueva, y un descarte ahí escribiría la marca contra la zona equivocada.
+      if (reemplazar) {
+        setAvisos([])
+        setDatos(null)
+      }
     } finally {
+      if (gen.current !== mio) return
       setCargando(false)
     }
   }, [zonaId, senal])
 
   useEffect(() => { traer(0, true) }, [traer])
 
+  // Suma o resta de los conteos ya traídos (el total y el de cada señal del aviso), para que
+  // el encabezado y los chips no mientan entre un descarte/deshacer y el próximo fetch real
+  // (que sí trae el número exacto, porque el RPC de conteos también excluye lo descartado).
+  const ajustarConteos = useCallback((delta: number, senales: Senal[]) => {
+    setDatos((d) => {
+      if (!d) return d
+      const conteos = { ...d.conteos, total: d.conteos.total + delta }
+      for (const s of senales) conteos[s] += delta
+      return { ...d, conteos }
+    })
+  }, [])
+
   const descartar = async (a: AvisoEnZona) => {
     setAvisos((prev) => prev.filter((x) => x.id !== a.id))
     setUltimoDescarte(a)
+    ajustarConteos(-1, a.senales)
     try {
       await pedir("/api/farming/avisos/marca", {
         method: "POST",
@@ -112,6 +151,7 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
       // Si no se pudo guardar, el aviso vuelve a la lista: nada desaparece en silencio.
       setAvisos((prev) => [a, ...prev])
       setUltimoDescarte(null)
+      ajustarConteos(1, a.senales)
       toast.error(e.message)
     }
   }
@@ -123,7 +163,11 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
     try {
       await pedir(`/api/farming/avisos/marca?zona_id=${zonaId}&aviso_id=${a.id}`, { method: "DELETE" })
       setAvisos((prev) => [a, ...prev])
+      ajustarConteos(1, a.senales)
     } catch (e: any) {
+      // Si el DELETE falla, el banner y la posibilidad de reintentar vuelven: sin esto el
+      // asesor se queda sin forma de deshacer y la marca sigue viva del lado del servidor.
+      setUltimoDescarte(a)
       toast.error(e.message)
     }
   }
@@ -139,11 +183,10 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
           <Select
             value={zonaId}
             onValueChange={(v) => {
-              // Sin esto, «deshacer» de la zona anterior escribiría con el zona_id nuevo y
-              // devolvería el aviso descartado a la lista de OTRA zona.
+              // El "deshacer" pendiente y la lista vieja los limpia el useEffect de arriba
+              // (corre con cualquier cambio de zonaId o senal).
               setZonaId(v)
               setSenal(null)
-              setUltimoDescarte(null)
             }}
           >
             <SelectTrigger className="h-10 w-56"><SelectValue /></SelectTrigger>
