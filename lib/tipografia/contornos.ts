@@ -103,3 +103,50 @@ export function comoPaths(paths: string[], fill: string, opacidad = 1): string {
     .map((d) => `<path d="${d}" fill="${fill}"${opacidad < 1 ? ` fill-opacity="${opacidad}"` : ""}/>`)
     .join("");
 }
+
+/**
+ * Reparte un texto en renglones que entren en `anchoUtil` con ese cuerpo de letra.
+ *
+ * Respeta los saltos de linea que ya traiga el texto (en el aviso legal suelen separar el aviso
+ * de la firma de la agencia) y acomoda cada parrafo dentro del ancho disponible.
+ *
+ * Vive acá y no en aviso-legal.ts porque desde el 16-sep-2026 lo usan dos cosas: la franja legal
+ * y el panel de la placa con foto.
+ */
+export function repartirEnRenglones(texto: string, cuerpo: number, anchoUtil: number): string[] {
+  const renglones: string[] = [];
+
+  for (const parrafo of texto.replace(/\r\n?/g, "\n").split("\n")) {
+    const limpio = parrafo.trim().replace(/\s+/g, " ");
+    if (!limpio) continue;
+
+    let actual = "";
+    for (const palabra of limpio.split(" ")) {
+      const tentativa = actual ? `${actual} ${palabra}` : palabra;
+      if (anchoDelTexto(tentativa, cuerpo) <= anchoUtil) {
+        actual = tentativa;
+        continue;
+      }
+      if (actual) renglones.push(actual);
+
+      // Una sola palabra mas larga que el renglon (una URL, por ejemplo): se parte a lo bruto.
+      if (anchoDelTexto(palabra, cuerpo) > anchoUtil) {
+        let trozo = "";
+        for (const ch of palabra) {
+          if (anchoDelTexto(trozo + ch, cuerpo) > anchoUtil && trozo) {
+            renglones.push(trozo);
+            trozo = ch;
+          } else {
+            trozo += ch;
+          }
+        }
+        actual = trozo;
+      } else {
+        actual = palabra;
+      }
+    }
+    if (actual) renglones.push(actual);
+  }
+
+  return renglones;
+}

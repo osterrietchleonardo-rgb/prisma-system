@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { contornosDeTexto, anchoDelTexto } from "./contornos";
+import { contornosDeTexto, anchoDelTexto, repartirEnRenglones } from "./contornos";
 
 describe("contornosDeTexto", () => {
   it("un emoji cuenta como letra sin dibujar", () => {
@@ -24,5 +24,30 @@ describe("contornosDeTexto", () => {
 
   it("anchoDelTexto crece con el cuerpo", () => {
     expect(anchoDelTexto("Belgrano", 40)).toBeGreaterThan(anchoDelTexto("Belgrano", 20));
+  });
+});
+
+describe("repartirEnRenglones", () => {
+  it("corta por palabras sin pasarse del ancho", () => {
+    const rs = repartirEnRenglones("Belgrano lidera la demanda de alquileres", 40, 300);
+    expect(rs.length).toBeGreaterThan(1);
+    for (const r of rs) expect(anchoDelTexto(r, 40)).toBeLessThanOrEqual(300);
+  });
+
+  it("respeta los saltos de linea que ya trae el texto", () => {
+    // El director separa el aviso legal de la firma de la agencia con un salto.
+    const rs = repartirEnRenglones("Primero\nSegundo", 20, 10000);
+    expect(rs).toEqual(["Primero", "Segundo"]);
+  });
+
+  it("parte a lo bruto una palabra mas larga que el renglon", () => {
+    const rs = repartirEnRenglones("www.unaurlmuylargaquenoentra.com.ar", 40, 120);
+    expect(rs.length).toBeGreaterThan(1);
+    expect(rs.join("")).toBe("www.unaurlmuylargaquenoentra.com.ar");
+  });
+
+  it("no devuelve renglones vacios", () => {
+    const rs = repartirEnRenglones("  Hola  \n\n  Chau  ", 20, 10000);
+    expect(rs).toEqual(["Hola", "Chau"]);
   });
 });
