@@ -46,7 +46,7 @@ import { requireTenant } from "@/lib/auth/tenant-validation"
 let base = baseFalsa({})
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => base }))
 
-const { POST } = await import("./route")
+const { GET, POST } = await import("./route")
 const { PATCH, DELETE } = await import("./[pid]/route")
 
 const zonasFixture = () => [
@@ -111,6 +111,12 @@ beforeEach(() => {
   nuevaBase()
 })
 
+const leer = (id: string) =>
+  GET(
+    new Request(`http://localhost/api/farming/direcciones/${id}/propietarios`),
+    { params: { id } },
+  )
+
 const post = (id: string, body: any) =>
   POST(
     new Request(`http://localhost/api/farming/direcciones/${id}/propietarios`, {
@@ -136,6 +142,62 @@ const borrar = (id: string, pid: string) =>
     new Request(`http://localhost/api/farming/direcciones/${id}/propietarios/${pid}`, { method: "DELETE" }),
     { params: { id, pid } },
   )
+
+// La ÚNICA lectura de nombres y teléfonos de personas en esta API. Sus tres hermanas (POST,
+// PATCH, DELETE) tienen su prueba de candado cada una; sin estas, nada avisaría si un refactor
+// de `direccionAccesible` —o sacar el filtro por `agency_id`— abriera la lectura.
+describe("GET /api/farming/direcciones/[id]/propietarios", () => {
+  it("devuelve SOLO las personas de esa tarjeta, no las de la de al lado", async () => {
+    const r = await leer(D_MIA)
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.propietarios.map((p: any) => p.id)).toEqual([P_DE_MIA])
+  })
+
+  it("una tarjeta de la zona de un colega que no comparte: 403 y no devuelve a nadie", async () => {
+    const r = await leer(D_JUAN)
+    const d = await r.json()
+    expect(r.status).toBe(403)
+    expect(d.propietarios).toBeUndefined()
+  })
+
+  it("una tarjeta de otra agencia: 404 y no devuelve a nadie", async () => {
+    const r = await leer(D_AJENA)
+    const d = await r.json()
+    expect(r.status).toBe(404)
+    expect(d.propietarios).toBeUndefined()
+  })
+
+  it("una tarjeta que no existe: 404", async () => {
+    const r = await leer("20000000-0000-0000-0000-000000000099")
+    expect(r.status).toBe(404)
+  })
+
+  // Este test muere si se saca el `.eq("agency_id", agencyId)` del GET. `agency_id` en
+  // farming_propietarios es una columna DENORMALIZADA, sin FK que la ate a la zona: si la app
+  // alguna vez escribe una fila con la agencia equivocada, filtrar también por ella hace que
+  // falle cerrada (no se devuelve) en vez de filtrarse a otra inmobiliaria.
+  it("una fila con el agency_id mal escrito no se devuelve, aunque cuelgue de una tarjeta mía", async () => {
+    nuevaBase({
+      farming_propietarios: [
+        propietarioFixture(P_DE_MIA, D_MIA, AGENCIA),
+        propietarioFixture("30000000-0000-0000-0000-000000000009", D_MIA, OTRA_AGENCIA, { nombre: "De otra agencia" }),
+      ],
+    })
+    const r = await leer(D_MIA)
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.propietarios.map((p: any) => p.id)).toEqual([P_DE_MIA])
+  })
+
+  it("una tarjeta sin nadie cargado: 200 con la lista vacía, no un error", async () => {
+    nuevaBase({ farming_propietarios: [] })
+    const r = await leer(D_MIA)
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.propietarios).toEqual([])
+  })
+})
 
 describe("POST /api/farming/direcciones/[id]/propietarios", () => {
   it("crea un propietario con solo el nombre", async () => {

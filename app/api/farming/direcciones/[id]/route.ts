@@ -110,18 +110,21 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     const c = await candado(admin, params.id, agencyId, userId)
     if (!c.ok) return c.resp
 
-    // De verdad: propietarios y contactos se van por cascada desde la propia tabla
-    // (`on delete cascade` en la migración). El aviso de lo que se pierde lo da la pantalla
-    // con su diálogo de confirmación, no este endpoint.
-    const { error } = await admin.from("farming_direcciones").delete().eq("id", params.id)
-    if (error) throw error
-
     // Si esta tarjeta nació de un aviso, su marca en farming_avisos_marca quedó "convertido".
-    // Sin borrarla acá, quedaría apuntando para siempre a una tarjeta que ya no existe, y con
-    // el fix de app/api/farming/avisos/route.ts (task 6, 16-sep-2026: "convertido" también
+    // Sin borrarla, quedaría apuntando para siempre a una tarjeta que ya no existe, y con el
+    // fix de app/api/farming/avisos/route.ts (task 6, 16-sep-2026: "convertido" también
     // excluye) ese aviso desaparecería de «A la venta en mi zona» PARA SIEMPRE, sin ninguna
     // forma de volver a verlo — la desaparición silenciosa que este proyecto rechaza.
     // zona_id + aviso_id es la PK de esa tabla: no hace falta más candado que ese.
+    //
+    // LA MARCA VA PRIMERO, y el orden es la regla: no hay transacción acá, así que los dos
+    // borrados pueden partirse al medio. Al revés —tarjeta primero— si el segundo fallara, la
+    // tarjeta ya no existe, el reintento del asesor da 404 y esa marca se queda en "convertido"
+    // apuntando a la nada: el aviso queda escondido de «A la venta en mi zona» para siempre y
+    // sin ningún camino para recuperarlo. En este orden, la misma falla deja el aviso VISIBLE
+    // otra vez con su tarjeta todavía en el tablero: incómodo por un rato, visible, y se
+    // arregla solo cuando el asesor vuelve a tocar «borrar». Entre perder algo en silencio y
+    // que quede feo un momento, este proyecto elige lo feo.
     if (c.direccion.aviso_id !== null && c.direccion.aviso_id !== undefined) {
       const { error: eMarca } = await admin
         .from("farming_avisos_marca")
@@ -130,6 +133,12 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
         .eq("aviso_id", c.direccion.aviso_id)
       if (eMarca) throw eMarca
     }
+
+    // De verdad: propietarios y contactos se van por cascada desde la propia tabla
+    // (`on delete cascade` en la migración). El aviso de lo que se pierde lo da la pantalla
+    // con su diálogo de confirmación, no este endpoint.
+    const { error } = await admin.from("farming_direcciones").delete().eq("id", params.id)
+    if (error) throw error
 
     return NextResponse.json({ ok: true })
   } catch (e) {

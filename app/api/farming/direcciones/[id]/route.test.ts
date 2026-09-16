@@ -278,6 +278,38 @@ describe("DELETE /api/farming/direcciones/[id]: la marca del aviso que la origin
     expect(base.tablas.farming_avisos_marca).toHaveLength(0)
   })
 
+  // El ORDEN es la regla, no un detalle: no hay transacción, así que los dos borrados pueden
+  // partirse al medio. Al revés —tarjeta primero— si el segundo fallara, la tarjeta ya no
+  // existe, el reintento del asesor da 404, y la marca se queda en "convertido" apuntando a la
+  // nada: el aviso desaparece de «A la venta en mi zona» PARA SIEMPRE. En este orden la misma
+  // falla deja el aviso visible otra vez, con su tarjeta todavía en el tablero, y se arregla
+  // sola al volver a tocar «borrar». Sin esta prueba, un refactor que reordene las dos líneas
+  // no rompe nada visible y el agujero vuelve.
+  it("borra la marca ANTES que la tarjeta: una falla en el medio deja el aviso visible, no escondido para siempre", async () => {
+    nuevaBase({
+      farming_direcciones: [direccionFixture(D_MIA, Z_MIA, AGENCIA, { aviso_id: 42, origen: "aviso" })],
+      farming_avisos_marca: [
+        { zona_id: Z_MIA, aviso_id: 42, aviso_es_dueno_directo: false, user_id: YO, estado: "convertido", direccion_id: D_MIA, created_at: "" },
+      ],
+    })
+
+    const borrados: string[] = []
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => {
+      const q: any = fromOriginal(tabla)
+      const deleteOriginal = q.delete
+      q.delete = (...args: any[]) => {
+        borrados.push(tabla)
+        return deleteOriginal.apply(q, args)
+      }
+      return q
+    }) as typeof base.from
+
+    const r = await borrar(D_MIA)
+    expect(r.status).toBe(200)
+    expect(borrados).toEqual(["farming_avisos_marca", "farming_direcciones"])
+  })
+
   it("borrar una tarjeta que nunca vino de un aviso (aviso_id null) no toca ninguna marca", async () => {
     nuevaBase({
       farming_direcciones: [direccionFixture(D_MIA, Z_MIA, AGENCIA)], // aviso_id null, origen "caminata"
