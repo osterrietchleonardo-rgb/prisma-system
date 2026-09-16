@@ -122,6 +122,7 @@ describe("DELETE", () => {
     base.tablas.farming_zonas_compartidas.push({ zona_id: "z-mia", user_id: JUAN, agregado_por: YO, created_at: "" })
     const r = await borrar("z-mia")
     expect(r.status).toBe(200)
+    expect((await r.json())).toEqual({ ok: true, accion: "borrada" })
     expect(base.tablas.farming_zonas.find((z) => z.id === "z-mia")).toBeUndefined()
     expect(base.tablas.farming_zonas_compartidas.filter((c) => c.zona_id === "z-mia")).toEqual([])
   })
@@ -135,5 +136,51 @@ describe("DELETE", () => {
     const r = await borrar("z-liberada")
     expect(r.status).toBe(404)
     expect(base.tablas.farming_zonas.find((z) => z.id === "z-liberada")).toBeDefined()
+  })
+
+  // Task 9: la migración pasa farming_direcciones.zona_id a `on delete restrict`, así que
+  // borrar una zona con tarjetas cargadas tiene que archivarla en vez de intentar (y fallar) el
+  // borrado. Spec: "Sin ninguna tarjeta cargada → se borra de verdad. Con tarjetas → pasa a
+  // archivada. Las cuadras se liberan igual, y las tarjetas con su historial quedan accesibles."
+  describe("con tarjetas: archiva en vez de borrar", () => {
+    beforeEach(() => {
+      base.tablas.farming_direcciones = [
+        { id: "d-1", zona_id: "z-mia", agency_id: AGENCIA, calle: "Peron", altura: "100" },
+      ]
+    })
+
+    it("archiva: 200, accion 'archivada', y la fila SIGUE en la base con estado archivada", async () => {
+      const r = await borrar("z-mia")
+      expect(r.status).toBe(200)
+      expect(await r.json()).toEqual({ ok: true, accion: "archivada", tarjetas: 1 })
+      const fila = base.tablas.farming_zonas.find((z) => z.id === "z-mia")
+      expect(fila).toBeDefined()
+      expect(fila!.estado).toBe("archivada")
+    })
+
+    it("la tarjeta no se toca y queda accesible: sigue en farming_direcciones, colgada de una zona que TODAVÍA existe", async () => {
+      await borrar("z-mia")
+      expect(base.tablas.farming_direcciones.find((d) => d.id === "d-1")).toBeDefined()
+      // Si la zona se hubiera borrado (el bug de hoy), la tarjeta quedaría huérfana: no
+      // "accesible" como pide el spec. Por eso esta prueba también exige que z-mia siga.
+      expect(base.tablas.farming_zonas.find((z) => z.id === "z-mia")).toBeDefined()
+    })
+
+    it("archivar libera las cuadras igual: la zona archivada no cuenta como 'activa'", async () => {
+      await borrar("z-mia")
+      const fila = base.tablas.farming_zonas.find((z) => z.id === "z-mia")!
+      // El choque (candidatasParaChoque, vía cargarContexto) solo mira farming_zonas con
+      // estado 'activa': no hace falta ningún código nuevo para "liberar", alcanza con que
+      // la zona deje de ser 'activa'.
+      expect(fila.estado).not.toBe("activa")
+    })
+
+    it("la zona de un colega sigue dando 403 y no se archiva ni se borra", async () => {
+      base.tablas.farming_direcciones.push({ id: "d-2", zona_id: "z-juan", agency_id: AGENCIA, calle: "Lavalle", altura: "200" })
+      const r = await borrar("z-juan")
+      expect(r.status).toBe(403)
+      const fila = base.tablas.farming_zonas.find((z) => z.id === "z-juan")!
+      expect(fila.estado).toBe("activa")
+    })
   })
 })

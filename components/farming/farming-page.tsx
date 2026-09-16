@@ -61,11 +61,16 @@ export function FarmingPage() {
   }
 
   const borrar = async (z: ZonaFarming) => {
-    // ETAPA 3: si la zona tiene tarjetas, el texto cambia: "se archiva, tus tarjetas quedan".
     if (!window.confirm(`¿Borrar «${z.nombre}»? No queda registro de la zona ni de su trazo. Si ya terminaste acá y vas a trabajar otra, dejá ésta como está y dibujá una nueva (podés tener hasta 3 activas). Esas cuadras quedan libres para otro asesor.`)) return
     try {
-      await pedir(`/api/farming/zonas/${z.id}`, { method: "DELETE" })
-      toast.success("Zona borrada")
+      const r = await pedir(`/api/farming/zonas/${z.id}`, { method: "DELETE" })
+      // Si la zona tenía tarjetas cargadas, el servidor no la borró: la archivó (spec, "nunca
+      // se pierde trabajo por apretar un botón"). El mensaje depende de lo que respondió.
+      toast.success(
+        r.accion === "archivada"
+          ? "Zona archivada. Tus tarjetas y su historial quedan guardados; esas cuadras vuelven a estar libres."
+          : "Zona borrada",
+      )
       await recargar()
     } catch (e: any) {
       toast.error(e.message)

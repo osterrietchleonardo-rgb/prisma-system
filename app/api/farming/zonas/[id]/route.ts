@@ -117,8 +117,25 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     if (!zona) return NextResponse.json({ error: "No encontramos esa zona activa" }, { status: 404 })
     if (!mia) return NextResponse.json({ error: "Solo quien dibujó la zona puede borrarla" }, { status: 403 })
 
-    // ETAPA 3: si la zona tiene direcciones cargadas NO se borra: pasa a estado 'archivada'
-    // (spec, "Borrar una zona") y la respuesta dice { ok: true, accion: "archivada" }.
+    // El spec: nunca se pierde trabajo por apretar un botón. Si la zona tiene tarjetas, no se
+    // borra — pasa a `archivada`, que es un estado que farming_zonas ya acepta desde la etapa 1.
+    // Las cuadras se liberan igual, porque el control de choque (cargarContexto) solo trae las
+    // zonas con estado 'activa': no hace falta ningún código nuevo para "liberar".
+    const { count, error: eCuenta } = await admin
+      .from("farming_direcciones")
+      .select("id", { count: "exact", head: true })
+      .eq("zona_id", zona.id)
+    if (eCuenta) throw eCuenta
+
+    if ((count ?? 0) > 0) {
+      const { error } = await admin
+        .from("farming_zonas")
+        .update({ estado: "archivada", updated_at: new Date().toISOString() })
+        .eq("id", zona.id)
+        .eq("owner_user_id", userId)
+      if (error) throw error
+      return NextResponse.json({ ok: true, accion: "archivada", tarjetas: count })
+    }
 
     // La FK con on delete cascade se lleva las compartidas en la base real; el doble de
     // prueba no sabe de cascadas, así que se borran explícito. Es inocuo en producción.
