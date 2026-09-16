@@ -53,15 +53,22 @@ export async function GET(req: Request) {
     if (!zona) return NextResponse.json({ error: "No encontramos esa zona activa" }, { status: 404 })
     if (!puede) return NextResponse.json({ error: "Esa zona es de un colega" }, { status: 403 })
 
-    // Dos claves de orden, como pide el tablero (agrupado por etapa, y dentro de cada una por
-    // el orden que el asesor arrastró). El doble de prueba (lib/farming/base-falsa.ts) solo
-    // respeta el ÚLTIMO .order() de la cadena: contra Postgres real las dos valen.
+    // `agency_id` es una columna denormalizada (ver el comentario de la migración): filtrar por
+    // ella también acá, y no solo confiar en `zona_id`, hace que una fila mal escrita falle
+    // cerrada en vez de filtrarse — la misma defensa que ya tiene `direccionAccesible`.
+    //
+    // Tres claves de orden: etapa y orden, como pide el tablero, y `created_at` de desempate —
+    // toda tarjeta nace con `orden: 0`, así que sin esto el tablero se reordenaría solo en cada
+    // recarga. El doble de prueba (lib/farming/base-falsa.ts) solo respeta el ÚLTIMO .order() de
+    // la cadena: contra Postgres real las tres valen.
     const { data, error } = await admin
       .from("farming_direcciones")
       .select("*")
       .eq("zona_id", zonaId)
+      .eq("agency_id", agencyId)
       .order("etapa", { ascending: true })
       .order("orden", { ascending: true })
+      .order("created_at", { ascending: true })
     if (error) throw error
 
     return NextResponse.json({ zona: { id: zona.id, nombre: zona.nombre }, direcciones: data || [] })
@@ -74,6 +81,15 @@ export async function POST(req: Request) {
   try {
     const { userId, agencyId } = await requireTenant()
     const body = await req.json().catch(() => ({}))
+
+    // Se convierten una sola vez, ACÁ arriba, antes de validar: si `calle` o `altura` llegan
+    // como número JSON (lo que manda cualquier cliente que no castea el formulario),
+    // `.trim()` revienta más abajo con un TypeError. Lo que se valida, lo que se compara contra
+    // los duplicados y lo que se guarda tienen que ser el MISMO string.
+    if (body && typeof body === "object") {
+      if (body.calle != null) body.calle = String(body.calle)
+      if (body.altura != null) body.altura = String(body.altura)
+    }
 
     const zonaId = String(body?.zona_id || "").trim()
     if (!zonaId) return NextResponse.json({ error: "Falta la zona" }, { status: 400 })
@@ -91,7 +107,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: errores.join(" ") }, { status: 400 })
     }
 
-    const avisoId = avisoIdDe(body?.aviso_id)
+    // Un aviso_id que se mandó pero no se puede leer (ej.: "abc") no puede tragarse en
+    // silencio y quedar como "caminata": es un pedido roto, 400.
+    const avisoIdCrudo = body?.aviso_id
+    const sePidioAviso = avisoIdCrudo !== null && avisoIdCrudo !== undefined && String(avisoIdCrudo).trim() !== ""
+    const avisoId = sePidioAviso ? avisoIdDe(avisoIdCrudo) : null
+    if (sePidioAviso && avisoId === null) {
+      return NextResponse.json({ error: "El aviso no es válido" }, { status: 400 })
+    }
     // El origen lo decide el servidor, nunca el body.
     const origen: "aviso" | "caminata" = avisoId !== null ? "aviso" : "caminata"
 
@@ -102,6 +125,7 @@ export async function POST(req: Request) {
         .from("farming_direcciones")
         .select("calle, altura")
         .eq("zona_id", zonaId)
+        .eq("agency_id", agencyId)
       if (eDup) throw eDup
 
       const normalizadaNueva = normalizarDireccion(body.calle, body.altura)
@@ -123,10 +147,15 @@ export async function POST(req: Request) {
 
     // Blanqueada a mano, campo por campo (nunca `...body`): así ninguna clave del body —
     // incluida `unidades_totales`, que es GENERADA y hace fallar el insert— llega a la base.
+    // `etapa` y `orden` se fijan acá EXPLÍCITAMENTE (no se omiten confiando en el default de la
+    // columna): toda tarjeta nueva nace en "relevado", primera en su columna, sin importar qué
+    // mande el body.
     const payload: Record<string, unknown> = {
       zona_id: zonaId,
       agency_id: agencyId,
       creada_por: userId,
+      etapa: "relevado",
+      orden: 0,
       tramo: body?.tramo ?? null,
       calle: body.calle,
       altura: body?.altura ?? null,
@@ -149,8 +178,13 @@ export async function POST(req: Request) {
       aviso_id: avisoId,
       aviso_es_dueno_directo: avisoId !== null ? !!body?.aviso_es_dueno_directo : null,
       origen,
+      // `fuera_de_zona` es un dato cierto y se guarda. `fuera_de_zona_desde` es «cuándo SE
+      // CAYÓ» (el comentario de la migración), y una tarjeta recién creada nunca se cayó: nació
+      // así. Queda en null acá SIEMPRE; solo el redibujado del trazo, en la etapa 3-B, la
+      // estampa. Es la diferencia que esa etapa va a usar para separar las dos poblaciones:
+      // `fuera_de_zona_desde is not null` = se cayó al mover el trazo; `null` = nació afuera.
       fuera_de_zona: fueraDeZona,
-      fuera_de_zona_desde: fueraDeZona ? new Date().toISOString() : null,
+      fuera_de_zona_desde: null,
     }
 
     let direccion: any

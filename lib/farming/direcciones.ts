@@ -97,11 +97,24 @@ export function normalizarDireccion(calle: string, altura?: string | null): stri
 
 const CLAVES_TIPO = TIPOS.map((t) => t.clave) as string[]
 
+const CARTELES_VALIDOS = ["dueno", "inmobiliaria", "sin_cartel"] as const
+const MONEDAS_VALIDAS = ["USD", "ARS"] as const
+
+/** Los mismos topes que los `check` de la migración: un valor afuera de esto ni siquiera
+ *  llegaría a Postgres sin romper con un 23514 crudo. Acá se corta antes, con un mensaje. */
+const RANGOS = {
+  pisos: [1, 200],
+  unidades_por_piso: [1, 200],
+  unidades_manual: [1, 5000],
+} as const
+
 /**
  * Validación en dos niveles: lo que bloquea la guardia y lo que avisa.
  *
- * `errores` vacío = se puede guardar. Nunca vacío = no se guarda.
- * `avisos` nunca bloquean: el asesor está en la vereda con el teléfono, no llena todo de una.
+ * `errores` vacío = se puede guardar. Nunca vacío = no se guarda: son los valores IMPOSIBLES
+ * (violan un `check` de la migración) además de la calle y el tipo.
+ * `avisos` nunca bloquean: el asesor está en la vereda con el teléfono, no llena todo de una —
+ * son datos INCOMPLETOS, que se completan después.
  */
 export function validarDireccion(e: Partial<EntradaDireccion>): { errores: string[]; avisos: string[] } {
   const errores: string[] = []
@@ -116,7 +129,36 @@ export function validarDireccion(e: Partial<EntradaDireccion>): { errores: strin
   if (e.pisos && !e.unidades_por_piso) avisos.push("Pusiste los pisos: falta cuántas unidades hay por piso.")
   if (e.unidades_por_piso && !e.pisos) avisos.push("Pusiste las unidades por piso: faltan los pisos.")
 
+  // Los mismos topes que el `check` de la migración: un dato incompleto se completa después,
+  // uno imposible no existe y bloquea (si no, Postgres lo rechaza con un 23514 crudo).
+  if (e.pisos != null && (!Number.isFinite(e.pisos) || e.pisos < RANGOS.pisos[0] || e.pisos > RANGOS.pisos[1])) {
+    errores.push(`Los pisos van de ${RANGOS.pisos[0]} a ${RANGOS.pisos[1]}.`)
+  }
+  if (
+    e.unidades_por_piso != null &&
+    (!Number.isFinite(e.unidades_por_piso) ||
+      e.unidades_por_piso < RANGOS.unidades_por_piso[0] ||
+      e.unidades_por_piso > RANGOS.unidades_por_piso[1])
+  ) {
+    errores.push(`Las unidades por piso van de ${RANGOS.unidades_por_piso[0]} a ${RANGOS.unidades_por_piso[1]}.`)
+  }
+  if (
+    e.unidades_manual != null &&
+    (!Number.isFinite(e.unidades_manual) ||
+      e.unidades_manual < RANGOS.unidades_manual[0] ||
+      e.unidades_manual > RANGOS.unidades_manual[1])
+  ) {
+    errores.push(`Las unidades van de ${RANGOS.unidades_manual[0]} a ${RANGOS.unidades_manual[1]}.`)
+  }
+
   if (e.precio_pedido != null && !e.moneda) avisos.push("Un precio sin moneda no dice nada: elegí USD o pesos.")
+  if (e.moneda != null && !MONEDAS_VALIDAS.includes(e.moneda as any)) {
+    errores.push("La moneda tiene que ser USD o pesos.")
+  }
+
+  if (e.cartel != null && !CARTELES_VALIDOS.includes(e.cartel as any)) {
+    errores.push("Ese tipo de cartel no existe.")
+  }
   if (e.cartel === "inmobiliaria" && !e.inmobiliaria_cartel?.trim()) {
     avisos.push("Decinos de qué inmobiliaria es el cartel.")
   }

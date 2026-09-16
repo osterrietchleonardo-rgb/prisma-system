@@ -107,6 +107,50 @@ describe("validarDireccion", () => {
     expect(res.errores.length).toBeGreaterThan(0) // calle y tipo
     expect(res.avisos.length).toBeGreaterThan(0) // pisos sin unidades, precio sin moneda
   })
+
+  // Los mismos topes que los `check` de la migración: un valor imposible es un ERROR (bloquea),
+  // no un aviso — si no, llega crudo a Postgres y sale como un 23514 sin traducir.
+  it("pisos afuera de 1-200 bloquea", () => {
+    expect(validarDireccion({ calle: "Conde", tipo: "edificio", pisos: 0, unidades_por_piso: 1 }).errores.length).toBeGreaterThan(0)
+    expect(validarDireccion({ calle: "Conde", tipo: "edificio", pisos: 300, unidades_por_piso: 1 }).errores.length).toBeGreaterThan(0)
+  })
+
+  it("pisos en el borde (1 y 200) no bloquea", () => {
+    expect(validarDireccion({ calle: "Conde", tipo: "edificio", pisos: 1, unidades_por_piso: 1 }).errores).toEqual([])
+    expect(validarDireccion({ calle: "Conde", tipo: "edificio", pisos: 200, unidades_por_piso: 1 }).errores).toEqual([])
+  })
+
+  it("unidades_por_piso afuera de 1-200 bloquea", () => {
+    const res = validarDireccion({ calle: "Conde", tipo: "edificio", pisos: 1, unidades_por_piso: 500 })
+    expect(res.errores.length).toBeGreaterThan(0)
+  })
+
+  it("unidades_manual afuera de 1-5000 bloquea", () => {
+    expect(validarDireccion({ calle: "Conde", tipo: "casa", unidades_manual: 0 }).errores.length).toBeGreaterThan(0)
+    expect(validarDireccion({ calle: "Conde", tipo: "casa", unidades_manual: 99999 }).errores.length).toBeGreaterThan(0)
+  })
+
+  it("unidades_manual en el borde (1 y 5000) no bloquea", () => {
+    expect(validarDireccion({ calle: "Conde", tipo: "casa", unidades_manual: 1 }).errores).toEqual([])
+    expect(validarDireccion({ calle: "Conde", tipo: "casa", unidades_manual: 5000 }).errores).toEqual([])
+  })
+
+  it("una moneda que no es USD ni ARS bloquea, aunque haya precio", () => {
+    const res = validarDireccion({ calle: "Conde", tipo: "casa", precio_pedido: 100, moneda: "EUR" as any })
+    expect(res.errores.length).toBeGreaterThan(0)
+    expect(res.errores.some((x) => /moneda/i.test(x))).toBe(true)
+  })
+
+  it("un cartel que no existe bloquea", () => {
+    const res = validarDireccion({ calle: "Conde", tipo: "casa", cartel: "cualquiera" as any })
+    expect(res.errores.length).toBeGreaterThan(0)
+  })
+
+  it("los carteles válidos (dueno, inmobiliaria con nombre, sin_cartel) no bloquean", () => {
+    expect(validarDireccion({ calle: "Conde", tipo: "casa", cartel: "dueno" }).errores).toEqual([])
+    expect(validarDireccion({ calle: "Conde", tipo: "casa", cartel: "sin_cartel" }).errores).toEqual([])
+    expect(validarDireccion({ calle: "Conde", tipo: "casa", cartel: "inmobiliaria", inmobiliaria_cartel: "Vakdor" }).errores).toEqual([])
+  })
 })
 
 describe("las listas cerradas", () => {

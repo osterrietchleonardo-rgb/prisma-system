@@ -72,15 +72,16 @@ const pedirPOST = (body: any) =>
 
 describe("GET /api/farming/direcciones", () => {
   it("devuelve las direcciones de mi zona ordenadas (por orden, dentro de la misma etapa)", async () => {
-    // Insertadas fuera de orden a propósito: si se saca el .order() de producción esto falla.
+    // Insertadas fuera de orden a propósito: si se sacan los .order() de producción esto falla.
     // El doble de prueba solo respeta el ÚLTIMO .order() de la cadena (ver el comentario en
-    // route.ts), así que las tres filas comparten "etapa" para que ordenar por "orden" alcance
-    // como prueba de que el orden se pide de verdad.
+    // route.ts) — hoy es "created_at" (el desempate) — así que las tres filas comparten
+    // "etapa" y tienen un "created_at" que coincide con el "orden" esperado: alcanza para
+    // probar que el orden se pide de verdad, aunque el doble no pueda verificar las tres claves.
     nuevaBase({
       farming_direcciones: [
-        { id: "d3", zona_id: Z_MIA, agency_id: AGENCIA, calle: "Tercera", altura: "3", tipo: "casa", etapa: "relevado", orden: 3, creada_por: YO },
-        { id: "d1", zona_id: Z_MIA, agency_id: AGENCIA, calle: "Primera", altura: "1", tipo: "casa", etapa: "relevado", orden: 1, creada_por: YO },
-        { id: "d2", zona_id: Z_MIA, agency_id: AGENCIA, calle: "Segunda", altura: "2", tipo: "casa", etapa: "relevado", orden: 2, creada_por: YO },
+        { id: "d3", zona_id: Z_MIA, agency_id: AGENCIA, calle: "Tercera", altura: "3", tipo: "casa", etapa: "relevado", orden: 3, created_at: "2026-01-03T00:00:00.000Z", creada_por: YO },
+        { id: "d1", zona_id: Z_MIA, agency_id: AGENCIA, calle: "Primera", altura: "1", tipo: "casa", etapa: "relevado", orden: 1, created_at: "2026-01-01T00:00:00.000Z", creada_por: YO },
+        { id: "d2", zona_id: Z_MIA, agency_id: AGENCIA, calle: "Segunda", altura: "2", tipo: "casa", etapa: "relevado", orden: 2, created_at: "2026-01-02T00:00:00.000Z", creada_por: YO },
       ],
     })
     const r = await pedirGET(`zona_id=${Z_MIA}`)
@@ -231,10 +232,102 @@ describe("POST /api/farming/direcciones", () => {
     expect(base.tablas.farming_direcciones[0].fuera_de_zona).toBe(true)
   })
 
+  it("una tarjeta que nace afuera NUNCA tiene fuera_de_zona_desde: esa columna es «cuándo se cayó», y una que nace afuera no se cayó (solo el redibujado de zona en 3-B la estampa)", async () => {
+    const r = await pedirPOST({ zona_id: Z_MIA, calle: "Lejos", tipo: "casa", lat: -34.40, lng: -58.30 })
+    await r.json()
+    expect(base.tablas.farming_direcciones[0].fuera_de_zona_desde).toBeNull()
+  })
+
   it("lat/lng adentro del polígono: no avisa fuera_de_zona", async () => {
     const r = await pedirPOST({ zona_id: Z_MIA, calle: "Cerca", tipo: "casa", lat: -34.555, lng: -58.455 })
     const d = await r.json()
     expect(r.status).toBe(201)
     expect(d.fuera_de_zona).toBeUndefined()
+  })
+
+  it("la lista blanca del payload: ninguna clave prohibida del body llega a la fila guardada", async () => {
+    // `unidades_totales` es la trampa más ruidosa (columna GENERADA: mandarla rompe el insert
+    // con 428C9). `etapa`, `orden`, `id` y `created_at` tampoco los decide el body.
+    const r = await pedirPOST({
+      zona_id: Z_MIA, calle: "Peron", tipo: "casa",
+      unidades_totales: 999, etapa: "captada", fuera_de_zona: true, orden: 77,
+      id: "yo-elijo-mi-id", created_at: "2000-01-01T00:00:00.000Z",
+    })
+    const d = await r.json()
+    expect(r.status).toBe(201)
+    const fila = base.tablas.farming_direcciones[0]
+    expect(fila).not.toHaveProperty("unidades_totales")
+    expect(fila.etapa).toBe("relevado")
+    expect(fila.orden).toBe(0)
+    expect(fila.id).not.toBe("yo-elijo-mi-id")
+    expect(fila.created_at).not.toBe("2000-01-01T00:00:00.000Z")
+    expect(d.direccion.id).toBe(fila.id)
+  })
+
+  it("un aviso_id impresentable (\"abc\"): 400, no se traga en silencio como caminata", async () => {
+    const r = await pedirPOST({ zona_id: Z_MIA, calle: "Peron", tipo: "casa", aviso_id: "abc" })
+    expect(r.status).toBe(400)
+    expect(base.tablas.farming_direcciones).toHaveLength(0)
+  })
+
+  it("un valor imposible (pisos: 300) es 400, no un 500 con el mensaje crudo de Postgres", async () => {
+    const r = await pedirPOST({ zona_id: Z_MIA, calle: "Torre", tipo: "edificio", pisos: 300, unidades_por_piso: 4 })
+    expect(r.status).toBe(400)
+    expect(base.tablas.farming_direcciones).toHaveLength(0)
+  })
+
+  it("una moneda que no existe (EUR) es 400, no 500", async () => {
+    const r = await pedirPOST({ zona_id: Z_MIA, calle: "Torre", tipo: "casa", precio_pedido: 100, moneda: "EUR" })
+    expect(r.status).toBe(400)
+  })
+
+  it("un cartel que no existe es 400, no 500", async () => {
+    const r = await pedirPOST({ zona_id: Z_MIA, calle: "Torre", tipo: "casa", cartel: "cualquiera" })
+    expect(r.status).toBe(400)
+  })
+
+  it("altura numérica (1200 sin comillas, lo que manda un cliente sin castear): no revienta, se guarda y compara como string", async () => {
+    const r = await pedirPOST({ zona_id: Z_MIA, calle: "Callao", altura: 1200, tipo: "casa" })
+    const d = await r.json()
+    expect(r.status).toBe(201)
+    expect(d.direccion.altura).toBe("1200")
+  })
+
+  it("una altura numérica choca con la misma puerta ya cargada como string", async () => {
+    nuevaBase({
+      farming_direcciones: [
+        { id: "existente", zona_id: Z_MIA, agency_id: AGENCIA, calle: "Callao", altura: "1200", tipo: "casa", etapa: "relevado", orden: 0, creada_por: YO },
+      ],
+    })
+    const r = await pedirPOST({ zona_id: Z_MIA, calle: "Callao", altura: 1200, tipo: "casa" })
+    expect(r.status).toBe(409)
+  })
+
+  it("un 23505 real de Postgres (dos pedidos concurrentes que pasan el chequeo previo) también da 409", async () => {
+    // El chequeo de arriba no encuentra nada (tabla vacía): esto simula la carrera donde el
+    // índice único de Postgres frena lo que el chequeo en JS no llegó a ver.
+    //
+    // OJO: `select()`/`single()` del doble siempre devuelven el MISMO objeto `q` (no `this` de
+    // una copia), así que para forzar el error hay que MUTAR el `then` de ese `q` adentro de
+    // `insert` — envolver el objeto que devuelve `insert` en uno nuevo no alcanza, porque el
+    // `.select()` siguiente en la cadena igual devuelve el `q` original, sin la mutación.
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => {
+      const q = fromOriginal(tabla)
+      if (tabla === "farming_direcciones") {
+        const insertReal = q.insert
+        q.insert = (payload: any) => {
+          const encadenado = insertReal(payload) // es el mismo `q`, con op="insert" ya seteado
+          encadenado.then = (resolve: any) => resolve({ data: null, error: { code: "23505", message: "duplicate key" } })
+          return encadenado
+        }
+      }
+      return q
+    }) as typeof base.from
+
+    const r = await pedirPOST({ zona_id: Z_MIA, calle: "Carrera", tipo: "casa" })
+    const d = await r.json()
+    expect(r.status).toBe(409)
+    expect(d.error).toContain("ya está cargada")
   })
 })
