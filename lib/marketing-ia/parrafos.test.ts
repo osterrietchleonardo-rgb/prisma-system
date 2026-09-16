@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { sinEmojis, unEmojiPorParrafo, armarDesarrollo, contarParrafos } from "./parrafos";
 
 describe("sinEmojis", () => {
@@ -103,5 +105,18 @@ describe("contarParrafos", () => {
   it("un texto vacio cuenta 0", () => {
     expect(contarParrafos("")).toBe(0);
     expect(contarParrafos("   ")).toBe(0);
+  });
+});
+
+describe("el regex está escrito con escapes, no con caracteres invisibles", () => {
+  it("la línea del regex es ASCII puro", () => {
+    // Esta es la única línea del repo cuyo trabajo es sacar caracteres invisibles. Si alguna vez
+    // se guarda con los invisibles adentro, un re-guardado en otra codificación la corrompe sin
+    // que se vea nada en el diff. Ya pasó dos veces escribiendo este archivo.
+    const fuente = readFileSync(join(process.cwd(), "lib/marketing-ia/parrafos.ts"), "utf8");
+    const linea = fuente.split("\n").find((l) => l.includes("const EMOJI"));
+    expect(linea, "no se encontró la línea del regex").toBeDefined();
+    const noAscii = [...linea!].filter((c) => c.codePointAt(0)! > 127);
+    expect(noAscii, `caracteres no-ASCII en la línea: ${JSON.stringify(noAscii)}`).toHaveLength(0);
   });
 });
