@@ -29,8 +29,12 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}))
 
     const zonaId = String(body?.zona_id || "").trim()
-    const avisoId = Number(body?.aviso_id)
-    if (!zonaId || !Number.isInteger(avisoId)) {
+    // Mismo `idEntero` que usa el DELETE: sobre el string crudo, no `Number(body?.aviso_id)`
+    // directo, porque `Number(null)` es 0, `Number([])` es 0 y `Number(false)` es 0 (y
+    // `Number(true)` es 1) — un body corrupto o mal armado terminaría marcando el aviso 0 o 1
+    // en vez de rechazarse con un 400.
+    const avisoId = idEntero(body?.aviso_id === null || body?.aviso_id === undefined ? null : String(body.aviso_id))
+    if (!zonaId || avisoId === null) {
       return NextResponse.json({ error: "Falta la zona o el aviso" }, { status: 400 })
     }
 

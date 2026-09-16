@@ -12,7 +12,10 @@ import { baseFalsa } from "@/lib/farming/base-falsa"
  *  4. Una señal desconocida es 400, no una consulta sin filtro.
  *  5. La 61ª fila es una sonda para saber si hay más: nunca llega al cliente.
  *  6. Una sesión rota (401) o una función SQL caída (500) no devuelven una lista a medias.
- *  7. Un zona_id o una página con forma rara no llegan a Postgres ni rompen el endpoint.
+ *  7. Un zona_id o un desde con forma rara no llegan a Postgres ni rompen el endpoint.
+ *  8. El offset (`p_offset`) es el `desde` que manda el cliente tal cual (saneado), NUNCA
+ *     página×60: la lista de excluidos cambia con cada descarte, así que un offset fijo por
+ *     página se corre y saltea avisos (bug real, confirmado en producción).
  *
  * Los ids de zona son UUIDs de mentira (con forma real) porque la columna en producción es
  * `uuid`: un id sin esa forma se corta ANTES de consultar (ver el test de zona_id malformado).
@@ -148,12 +151,26 @@ describe("GET /api/farming/avisos", () => {
     expect(espia.rpc).toEqual([])
   })
 
-  it("una señal válida viaja tal cual, y la página se traduce a offset", async () => {
-    await pedir(`zona_id=${Z_MIA}&senal=duenos&pagina=2`)
+  it("una señal válida viaja tal cual, y desde pasa DIRECTO a p_offset (no ×60)", async () => {
+    await pedir(`zona_id=${Z_MIA}&senal=duenos&desde=120`)
     const lista = espia.rpc.find((x) => x.fn === "farming_avisos_en_zona")!
     expect(lista.args.p_senal).toBe("duenos")
     expect(lista.args.p_offset).toBe(120)
     expect(lista.args.p_limit).toBe(61)
+  })
+
+  it("con avisos ya excluidos, la tanda siguiente arranca en cuántas tarjetas hay en PANTALLA, no en página×60 (regresión del bug real)", async () => {
+    // Bug real confirmado en producción: se trajo la página 0 (60 avisos), se descartaron 2
+    // (quedan 58 tarjetas en pantalla) y al pedir "ver más" con el offset VIEJO (pagina×60 =
+    // 60) los dos avisos que estaban al tope de la tanda siguiente (57734006 y 57736451) se
+    // saltearon para siempre: la lista de excluidos creció en 2, así que todo lo que venía
+    // después del offset 60 en la numeración SIN excluir se corrió 2 lugares hacia atrás en
+    // la numeración YA excluida que arma el RPC. Mandar `desde=avisos.length` (58, no 60) es
+    // lo que evita el salto: si algún día el endpoint vuelve a multiplicar por POR_PAGINA en
+    // vez de usar `desde` tal cual, este test lo detecta.
+    await pedir(`zona_id=${Z_MIA}&desde=58`)
+    const lista = espia.rpc.find((x) => x.fn === "farming_avisos_en_zona")!
+    expect(lista.args.p_offset).toBe(58)
   })
 
   it("hay_mas es true solo si vino una fila de más", async () => {
@@ -204,13 +221,13 @@ describe("GET /api/farming/avisos", () => {
     expect(r.status).toBe(401)
   })
 
-  it("una pagina con forma rara (Infinity o no entera) se toma como 0, no rompe ni miente", async () => {
-    const d1 = await (await pedir(`zona_id=${Z_MIA}&pagina=1e400`)).json()
+  it("un desde con forma rara (Infinity o no entero) se toma como 0, no rompe ni miente", async () => {
+    const d1 = await (await pedir(`zona_id=${Z_MIA}&desde=1e400`)).json()
     expect(d1.pagina).toBe(0)
     expect(espia.rpc.find((x) => x.fn === "farming_avisos_en_zona")!.args.p_offset).toBe(0)
 
     espia.rpc = []
-    const d2 = await (await pedir(`zona_id=${Z_MIA}&pagina=0.01`)).json()
+    const d2 = await (await pedir(`zona_id=${Z_MIA}&desde=0.01`)).json()
     expect(d2.pagina).toBe(0)
     expect(espia.rpc.find((x) => x.fn === "farming_avisos_en_zona")!.args.p_offset).toBe(0)
   })

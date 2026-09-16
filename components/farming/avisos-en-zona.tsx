@@ -42,7 +42,12 @@ function Tarjeta({ aviso, onDescartar }: { aviso: AvisoEnZona; onDescartar: (a: 
         {aviso.senales.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
             {aviso.senales.map((s) => (
-              <span key={s} className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
+              // `text-primary` (no `text-accent`): sobre fondo claro `--accent` mide 2,78:1,
+              // por debajo del piso legible de 4,5. `--primary` es el mismo cobre pero ya
+              // resuelto para texto en las dos superficies (comentario de app/globals.css),
+              // y es el token que ya usa este mismo patrón de chip en
+              // components/whatsapp/ConversationsList.tsx — no un color inventado acá.
+              <span key={s} className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
                 {SENALES.find((x) => x.clave === s)?.etiqueta}
               </span>
             ))}
@@ -77,7 +82,6 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
   const [senal, setSenal] = useState<Senal | null>(null)
   const [datos, setDatos] = useState<RespuestaAvisos | null>(null)
   const [avisos, setAvisos] = useState<AvisoEnZona[]>([])
-  const [pagina, setPagina] = useState(0)
   const [cargando, setCargando] = useState(true)
   const [ultimoDescarte, setUltimoDescarte] = useState<AvisoEnZona | null>(null)
 
@@ -96,18 +100,21 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
     setUltimoDescarte(null)
   }, [zonaId, senal])
 
-  const traer = useCallback(async (p: number, reemplazar: boolean) => {
+  const traer = useCallback(async (desde: number, reemplazar: boolean) => {
     if (!zonaId) return
     const mio = ++gen.current
     setCargando(true)
     try {
-      const qs = new URLSearchParams({ zona_id: zonaId, pagina: String(p) })
+      // El offset es cuántas tarjetas ya hay en pantalla (avisos.length), no una página×60:
+      // la lista de excluidos crece con cada descarte, así que un offset fijo por página se
+      // corre y saltea avisos (bug real, confirmado en producción). avisos.length siempre es
+      // un prefijo del resultado ya filtrado, así que también absorbe un deshacer.
+      const qs = new URLSearchParams({ zona_id: zonaId, desde: String(desde) })
       if (senal) qs.set("senal", senal)
       const d: RespuestaAvisos = await pedir(`/api/farming/avisos?${qs}`)
       if (gen.current !== mio) return // una carga más nueva ya ganó
       setDatos(d)
       setAvisos((prev) => (reemplazar ? d.avisos : [...prev, ...d.avisos]))
-      setPagina(p)
     } catch (e: any) {
       if (gen.current !== mio) return
       toast.error(e.message)
@@ -168,7 +175,7 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
     const mio = gen.current
     setUltimoDescarte(null)
     try {
-      await pedir(`/api/farming/avisos/marca?zona_id=${zonaId}&aviso_id=${a.id}`, { method: "DELETE" })
+      await pedir(`/api/farming/avisos/marca?zona_id=${encodeURIComponent(zonaId)}&aviso_id=${a.id}`, { method: "DELETE" })
       // Si mientras el DELETE estaba en vuelo cambió de zona o de filtro, reinsertar acá
       // metería el aviso de la zona VIEJA en la lista de la que se está mirando ahora.
       if (gen.current !== mio) return
@@ -218,8 +225,12 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
 
       {/* Los atajos: solo los que tienen avisos AHORA, no los que tenía la última respuesta del
           servidor — `ajustarConteos` los mueve en vivo con cada descarte/deshacer, y un atajo
-          en cero se siente roto (la regla de Leonardo, 16-sep). */}
-      {datos && atajosAhora.length > 0 && (
+          en cero se siente roto (la regla de Leonardo, 16-sep).
+          La fila se dibuja igual si el filtro activo se quedó sin chip (cayó a cero, por
+          ejemplo el único «dueño directo» de la zona se acaba de descartar): sin esto el
+          asesor queda mirando una lista vacía con el filtro puesto y sin ningún control para
+          salir — «Todas» tiene que seguir ahí siempre que haya un filtro activo. */}
+      {datos && (atajosAhora.length > 0 || senal !== null) && (
         <div className="flex flex-wrap gap-2">
           <Button variant={senal === null ? "default" : "outline"} size="sm" className="h-9" onClick={() => setSenal(null)}>
             Todas ({datos.conteos.total})
@@ -270,7 +281,7 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
       </div>
 
       {datos?.hay_mas && (
-        <Button variant="outline" className="h-10 w-full" disabled={cargando} onClick={() => traer(pagina + 1, false)}>
+        <Button variant="outline" className="h-10 w-full" disabled={cargando} onClick={() => traer(avisos.length, false)}>
           {cargando ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ver más"}
         </Button>
       )}

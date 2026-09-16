@@ -25,10 +25,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "No conozco ese filtro" }, { status: 400 })
     }
 
-    // Number("1e400") da Infinity, y Infinity * POR_PAGINA no es un offset válido: se
-    // sanea a página 0 en vez de mentir con "pagina": null o romper con un offset no entero.
-    const paginaCruda = Number(q.get("pagina") ?? 0)
-    const pagina = Number.isFinite(paginaCruda) ? Math.max(0, Math.floor(paginaCruda)) : 0
+    // El offset es CUÁNTAS tarjetas ya tiene el asesor en pantalla (avisos.length del
+    // componente), no pagina×60: la lista de excluidos se recalcula en cada pedido, así que
+    // un offset fijo por página se corre cuando de por medio hubo un descarte (bug real:
+    // "Ver más" salteaba avisos después de descartar). avisos.length absorbe también un
+    // deshacer, porque siempre es un prefijo del resultado ya filtrado.
+    //
+    // Number("1e400") da Infinity, y Infinity no es un offset válido: se sanea a 0 en vez de
+    // mentir con "pagina": null o romper con un offset no entero.
+    const desdeCruda = Number(q.get("desde") ?? 0)
+    const desde = Number.isFinite(desdeCruda) ? Math.max(0, Math.floor(desdeCruda)) : 0
 
     const admin = createAdminClient()
     const { zona, puede } = await zonaAccesible(admin, zonaId, agencyId, userId)
@@ -54,7 +60,7 @@ export async function GET(req: Request) {
         p_senal: senal,
         p_excluir: excluir,
         p_limit: POR_PAGINA + 1,
-        p_offset: pagina * POR_PAGINA,
+        p_offset: desde,
       }),
       admin.rpc("farming_avisos_conteos", { p_geojson: geojson, p_excluir: excluir }),
     ])
@@ -82,7 +88,9 @@ export async function GET(req: Request) {
         bajaron: Number(c.bajaron) || 0,
       }) as Senal[],
       avisos: filas.slice(0, POR_PAGINA).map(armarAviso),
-      pagina,
+      // Campo de contrato (ver el comentario en RespuestaAvisos.pagina): ya no maneja la
+      // paginación, solo informa cuántas tandas de POR_PAGINA representa este `desde`.
+      pagina: Math.floor(desde / POR_PAGINA),
       hay_mas: hayMas,
     })
   } catch (e) {

@@ -70,8 +70,15 @@ export interface AvisoEnZona {
 export interface RespuestaAvisos {
   zona: { id: string; nombre: string }
   conteos: ConteosSenales
+  /** Contrato del endpoint (cubierto por un test), NO lo que lee la pantalla: la pantalla
+   *  recalcula en vivo con `atajosVisibles(conteos)` (avisos-en-zona.tsx) para que un atajo
+   *  que cae a cero por un descarte se saque al instante, sin esperar el próximo fetch. */
   atajos: Senal[]
   avisos: AvisoEnZona[]
+  /** Contrato del endpoint, NO lo que lee la pantalla: la pantalla pagina mandando
+   *  `desde=avisos.length` (cuántas tarjetas ya tiene en pantalla) — ver
+   *  app/api/farming/avisos/route.ts. Este campo es informativo (cuántas tandas de
+   *  POR_PAGINA representa ese `desde`), no dispara ninguna lógica del lado del cliente. */
   pagina: number
   hay_mas: boolean
 }

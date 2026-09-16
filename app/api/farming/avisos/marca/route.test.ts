@@ -89,8 +89,18 @@ describe("POST (descartar)", () => {
     ["sin zona", { aviso_id: 42, es_dueno_directo: false }],
     ["sin aviso", { zona_id: Z_MIA, es_dueno_directo: false }],
     ["aviso que no es número", { zona_id: Z_MIA, aviso_id: "x", es_dueno_directo: false }],
+    // POST usaba `Number(body?.aviso_id)` directo, no el `idEntero` que ya usa el DELETE:
+    // `Number(null)`, `Number([])` y `Number(false)` dan 0 (marcaría el aviso 0), y
+    // `Number(true)` da 1 (marcaría el aviso 1) — un body corrupto terminaba guardando una
+    // marca de verdad en vez de rechazarse. Estos cuatro tienen que ser 400, no 200.
+    ["aviso null", { zona_id: Z_MIA, aviso_id: null, es_dueno_directo: false }],
+    ["aviso como arreglo vacío", { zona_id: Z_MIA, aviso_id: [], es_dueno_directo: false }],
+    ["aviso false", { zona_id: Z_MIA, aviso_id: false, es_dueno_directo: false }],
+    ["aviso true", { zona_id: Z_MIA, aviso_id: true, es_dueno_directo: false }],
   ])("%s: 400", async (_, body) => {
-    expect((await descartar(body)).status).toBe(400)
+    const r = await descartar(body)
+    expect(r.status).toBe(400)
+    expect(base.tablas.farming_avisos_marca).toEqual([])
   })
 })
 
