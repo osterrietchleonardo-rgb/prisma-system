@@ -16,6 +16,41 @@
 
 ---
 
+## 2026-09-16 — ACM: el link ya no puede abrir direcciones internas, y el barrio de los links
+
+**Link seguro (pedido de Leonardo, con el requisito "si el ataque no falla, no está hecho").**
+`extractFromUrl` abría cualquier `http(s)` con `redirect:"follow"` desde el 25-jun: con sesión se
+podía hacer que el servidor abriera `169.254.169.254`, `127.0.0.1:3000` o un link que redirigía
+adentro. Decisión: cualquier host público, nada interno. `lib/acm/url-segura.ts` (detalle en
+TECNICO §10.6): forma del link, DNS (todas públicas) y control AL CONECTAR, en cada salto.
+
+- **Por qué no alcanzaba con validar y después `fetch`:** el `fetch` global de Node no deja
+  controlar la IP al conectar, y un DNS que responde público y después interno se lo saltea. Por
+  eso `node:http(s)` con `lookup` propio. La prueba del DNS cambiante lo demuestra (2 consultas,
+  0 pedidos al servidor interno).
+- **Verificación:** ataques en pruebas + servidor real en 127.0.0.1 que cuenta pedidos (0, con
+  control que prueba que responde); 10 mutantes muertos, incluido reponer el `fetch` original;
+  internet real (redirectores de httpbin hacia 169.254.169.254 y 127.0.0.1, `localtest.me`)
+  rechazados; navegador: el link de metadatos muestra "Ese link no se puede abrir…", Argenprop
+  carga igual. 2.340 pruebas.
+- **Abierto:** el navegador del extractor de EasyPanel sigue redirecciones que haga la página,
+  dentro de la red de n8n. Ya no recibe links internos; cerrarlo del todo es otro cambio + redeploy.
+
+**Barrio de los links.** Argenprop y Zonaprop ponen la ciudad en `addressLocality` y el barrio
+en `addressRegion`; Tier 1 se quedaba con "CABA, Argentina". `elegirBarrio` (puerto de la regla
+del extractor con navegador). Navegador: "Desde un link" da "Palermo Chico" + "Barrio reconocido".
+4 mutantes muertos.
+
+**Hecho también hoy (con OK):** redeploy del extractor en EasyPanel (`98ae1df`, Argenprop con 5
+fotos) y las 2 sugerencias de Carolina Etcheverry resueltas en admin-vakdor (las otras 3 ya las
+había marcado Leonardo). Datos de prueba en PRISMAIA - VAKDOR: ACM `1bd60870`, `c1fe5f5d`, ficha
+`lTb19sULahAu` (sin borrar).
+
+**Trampa:** `git stash list` en un worktree muestra los stash de TODOS (hay uno "bitacora en
+progreso, no es mia"). No tocarlos.
+
+---
+
 ## 2026-09-16 — Sofía: cuando derivaba, el cliente no recibía ningún mensaje
 
 **Qué pasaba:** `/api/n8n/reply` descarta toda respuesta si el bot está apagado (existe desde abril
