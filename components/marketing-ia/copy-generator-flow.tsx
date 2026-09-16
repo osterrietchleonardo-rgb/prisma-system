@@ -37,7 +37,24 @@ export function CopyGeneratorFlow() {
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [progressText, setProgressText] = useState("")
-  
+
+  // ── La foto real de la propiedad para la placa ─────────────────────
+  // Solo tiene sentido si el perfil IPC está atado a una propiedad de cartera. Si no, la placa
+  // sale como salía antes (la imagen la inventa Gemini) y este paso ni aparece.
+  const [fotos, setFotos] = useState<{ thumb: string; image: string }[]>([])
+  const [fotoElegida, setFotoElegida] = useState<string | null>(null)
+  const [cargandoFotos, setCargandoFotos] = useState(false)
+  // Cuáles son demasiado chicas para la placa. El ancho NO viene del endpoint: se lo pregunta al
+  // navegador cuando ya cargó la miniatura (`naturalWidth`). Así no hay que tocar ni la base ni
+  // el sincronizador para avisar algo que es puramente visual. 7 de cada 40 portadas de Central
+  // miden menos de 1080 px, así que el aviso se va a ver seguido.
+  const [fotosChicas, setFotosChicas] = useState<Record<string, boolean>>({})
+
+  // `propiedad_tokko_id` es un campo propio de IpcProfile (no vive en flow_data), así que no
+  // hace falta ningún `as any` ni fallback: si el perfil no está atado a una propiedad, es
+  // undefined y acá queda null.
+  const propiedadDelIpc = selectedIpc?.propiedad_tokko_id ?? null
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -70,6 +87,28 @@ export function CopyGeneratorFlow() {
     }
   }, [selectedIpcId, ipcs])
 
+  // Trae las fotos de la propiedad cuando el perfil elegido tiene una atada. Se resetea todo
+  // (incluido el mapa de "poco nítida") cada vez que cambia el perfil, para no arrastrar el
+  // estado de una propiedad a la siguiente.
+  useEffect(() => {
+    setFotos([])
+    setFotoElegida(null)
+    setFotosChicas({})
+    if (!propiedadDelIpc || copyType !== 'post') return
+
+    setCargandoFotos(true)
+    fetch(`/api/marketing-ia/fotos-propiedad?tokko_id=${propiedadDelIpc}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        const lista = data?.fotos ?? []
+        setFotos(lista)
+        // La portada viene elegida: es la que la inmobiliaria ya eligió como la mejor.
+        if (lista[0]) setFotoElegida(lista[0].image)
+      })
+      .catch(() => { /* Sin fotos, la placa sale como antes. */ })
+      .finally(() => setCargandoFotos(false))
+  }, [propiedadDelIpc, copyType])
+
   const handleGenerateBatch = async () => {
     if (!selectedIpcId || !selectedIpc) return toast.error("Seleccione un IPC")
     const esGuion = copyType === 'video'
@@ -100,8 +139,6 @@ export function CopyGeneratorFlow() {
 
       if (!esGuion) setProgressText("Se está generando la imagen...")
 
-      const tokkoProperty = selectedIpc.tipo_ipc === 'vender' ? (selectedIpc.flow_data as any).tokko_property_details : null;
-      
       // Save 3 drafts
       const draftsToInsert = batchContent.map((item: any) => ({
         user_id: user?.id,
@@ -134,7 +171,8 @@ export function CopyGeneratorFlow() {
               body: JSON.stringify({
                 draft_id: draft.id,
                 copy_content: draft.content,
-                tokko_property: tokkoProperty,
+                propiedad_tokko_id: propiedadDelIpc,
+                foto_url: fotoElegida ?? undefined,
                 format,
                 style,
                 extra_prompt: "",
@@ -381,6 +419,62 @@ export function CopyGeneratorFlow() {
                     ? "Elegí con cuál de los dos logos de la agencia sale esta placa."
                     : "Tu director configuró un solo logo, así que las placas salen con ese."}
                 </p>
+              </div>
+            )}
+
+            {/* La foto real de la propiedad. Solo aparece si el perfil está atado a una
+                propiedad de cartera: si no, no hay nada que elegir. */}
+            {propiedadDelIpc && (
+              <div className="space-y-4">
+                <Label className="text-sm font-bold">6. Foto de la placa</Label>
+                {cargandoFotos ? (
+                  <div className="grid grid-cols-4 gap-2">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="aspect-[4/3] rounded-lg bg-muted animate-pulse" />
+                    ))}
+                  </div>
+                ) : fotos.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Esta propiedad todavía no tiene fotos en Tokko. La placa va a salir con una imagen creada por IA.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-4 gap-2 max-h-[260px] overflow-y-auto pr-1">
+                      {fotos.map((f, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setFotoElegida(f.image)}
+                          className={cn(
+                            "relative aspect-[4/3] rounded-lg overflow-hidden border-2 transition",
+                            fotoElegida === f.image ? "border-accent ring-1 ring-accent" : "border-transparent hover:border-accent/50"
+                          )}
+                        >
+                          <img
+                            src={f.thumb || f.image}
+                            alt={`Foto ${i + 1}`}
+                            className="w-full h-full object-cover"
+                            // El ancho real lo sabe el navegador recién cuando la bajó.
+                            onLoad={(e) => {
+                              const ancho = (e.currentTarget as HTMLImageElement).naturalWidth
+                              if (ancho && ancho < 1080) {
+                                setFotosChicas((prev) => (prev[f.image] ? prev : { ...prev, [f.image]: true }))
+                              }
+                            }}
+                          />
+                          {fotosChicas[f.image] && (
+                            <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] text-white py-0.5">
+                              poco nítida
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      Las 3 placas salen con esta foto, tal cual está en Tokko. Sin retocar.
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </div>
