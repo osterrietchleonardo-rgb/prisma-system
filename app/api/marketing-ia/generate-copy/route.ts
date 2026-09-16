@@ -9,6 +9,7 @@ import { buildOperacionDirective } from "@/lib/marketing-ia/operacion-context";
 import { REGLA_VOZ } from "@/lib/marketing-ia/voz";
 import { nivelDesdeIpc, NIVEL_DESCRIPCION } from "@/lib/marketing-ia/niveles";
 import { ESTRUCTURAS, resolverEstructura, esquemaJsonGuion, guiaBloquesParaPrompt } from "@/lib/marketing-ia/estructuras";
+import { REGLAS_POST, sellarContenidoPost } from "@/lib/marketing-ia/parrafos";
 
 export const dynamic = "force-dynamic";
 
@@ -124,7 +125,12 @@ ESTO ES UN GUION PARA HABLAR A CÁMARA, no un texto para leer en pantalla:
 Estructura exacta del JSON:
 ${esquemaJsonGuion(estructura)}`;
   } else {
-    return `${base}\n\nEstructura exacta:\n{"hook":"una frase de apertura demoledora","desarrollo":"3-5 párrafos cortos que construyan el deseo usando el ángulo ${config.angle}","cta":"llamada a la acción estratégica"}`;
+    return `${base}
+
+${REGLAS_POST}
+
+Estructura exacta:
+{"hook":"una frase de apertura demoledora, sin emoji","parrafos":["...6 a 8 párrafos cortos que construyan el deseo usando el ángulo ${config.angle}..."],"cta":"llamada a la acción estratégica"}`;
   }
 };
 
@@ -263,7 +269,7 @@ export async function POST(req: Request) {
     }
 
     try {
-      const copyContent = JSON.parse(cleanResponse);
+      let copyContent = JSON.parse(cleanResponse);
 
       // La estructura y la duración las sella el servidor: el modelo no suma bien y no tiene por qué elegirlas.
       if (copy_type === "video") {
@@ -272,6 +278,8 @@ export async function POST(req: Request) {
         copyContent.duracion_estimada = bloques.reduce(
           (total: number, b: any) => total + (Number(b?.segundos) || 0), 0
         );
+      } else {
+        copyContent = sellarContenidoPost(copyContent);
       }
 
       return NextResponse.json(copyContent);
