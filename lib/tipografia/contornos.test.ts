@@ -4,9 +4,12 @@ import { contornosDeTexto, anchoDelTexto, repartirEnRenglones } from "./contorno
 describe("contornosDeTexto", () => {
   it("un emoji cuenta como letra sin dibujar", () => {
     // La Inter incrustada tiene 515 glifos y ninguno es un emoji: charToGlyph('🏡') da .notdef,
-    // que devuelve un contorno vacio. Hasta el 16-sep-2026 eso pasaba sin ser contado, asi que
-    // un emoji en una placa se dibujaba como nada y nadie se enteraba. Es el mismo accidente
-    // del credito de OpenStreetMap del mapa del ACM, que salio en blanco durante meses.
+    // que en esta fuente es una "caja de tofu" VISIBLE con un contorno real de 638 caracteres
+    // (medido 16-sep-2026), no un contorno vacio. Hasta el 16-sep-2026 esa caja se dibujaba Y NO
+    // se contaba, asi que un emoji en una placa aparecia como un rectangulo sin que nadie se
+    // enterara del problema. Es un accidente parecido al credito de OpenStreetMap del mapa del
+    // ACM, que salio en blanco durante meses, aunque ahi el sintoma era lo opuesto (nada visible
+    // en vez de una caja de mas).
     const c = contornosDeTexto("Casa 🏡", 0, 20, 20);
     expect(c.letrasRotas).toBe(1);
   });

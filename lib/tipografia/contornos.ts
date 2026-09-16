@@ -83,10 +83,18 @@ export function contornosDeTexto(texto: string, x0: number, y: number, cuerpo: n
     if (previo) x += f.getKerningValue(previo, g) * escala;
     // Un decimal alcanza y sobra para una letra chica, y achica el archivo un 20%.
     const d = g.getPath(x, y, cuerpoEntero).toPathData(1);
-    // Una letra que la fuente NO TIENE devuelve el glifo .notdef, con un contorno vacio: se
-    // dibuja como nada, sin error. Hasta el 16-sep-2026 no se contaba, asi que un emoji pasaba
-    // el control en silencio. El espacio tambien tiene contorno vacio, pero SI existe en la
-    // fuente, por eso el criterio es el nombre del glifo y no si el contorno vino vacio.
+    // Una letra que la fuente NO TIENE devuelve el glifo .notdef, y en esta Inter incrustada
+    // .notdef es una "caja de tofu" VISIBLE, con un contorno real de 638 caracteres (medido
+    // 16-sep-2026) — no un contorno vacio. Por eso `d.includes("NaN")` nunca la agarraba: una
+    // caja es un path valido, sin ningun NaN adentro. Hasta el 16-sep-2026 esa caja se dibujaba
+    // Y no se contaba, asi que un emoji pasaba el control en silencio mientras aparecia en la
+    // placa como un rectangulo. El espacio, en cambio, SI tiene contorno vacio (0 caracteres,
+    // glifo "space") y SI existe en la fuente: por eso el criterio tiene que ser el nombre del
+    // glifo y no si el contorno vino vacio, o cada espacio del aviso legal se reportaria como
+    // letra rota. Ademas TAB y salto de linea tambien resuelven a .notdef en esta fuente: hoy
+    // no llegan hasta aca porque todo el que llama a esta funcion pasa antes por
+    // repartirEnRenglones, que colapsa los espacios en blanco — pero un futuro llamador directo
+    // los dibujaria como cajas.
     if (g.name === ".notdef") letrasRotas++;
     else if (d && d.includes("NaN")) letrasRotas++;
     else if (d) paths.push(d);
