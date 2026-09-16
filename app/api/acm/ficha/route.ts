@@ -12,6 +12,7 @@ import { requireTenant } from "@/lib/auth/tenant-validation";
 import type { AcmComparable } from "@/lib/tasacion/types";
 import {
   computeComparison,
+  datosDeLink,
   matchBarrioPulso,
   type AcmFichaSnapshot,
   type AmbienteStats,
@@ -25,6 +26,7 @@ import { recortarAPalabra, MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
 import { normalizarImagenes, urlsFotoRed } from "@/lib/acm/fotos-url";
 import { seccionesParaFicha } from "@/lib/acm/material";
 import { logoParaDestino } from "@/lib/marketing-ia/logo-variante";
+import { antiguedadDesdeChecklist, antiguedadSujeto } from "@/lib/acm/antiguedad";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -161,6 +163,11 @@ export async function POST(req: Request) {
           amenities = carteraAmenities(full.tokko_data);
           descripcion = full.description || "";
         }
+      } else if (c.source === "link") {
+        // Sumado por link y fuera de la red: no hay fila que releer, los datos viajan en el
+        // comparable. Como pasaron por el navegador, las fotos se revalidan acá contra los hosts
+        // permitidos (una URL de otro lado no llega a la ficha) y el texto se acota.
+        ({ images, amenities, descripcion } = datosDeLink(c.link_datos, MAX_IMAGES));
       } else {
         const full = roomixById[c.id.replace(/^roomix_/, "")];
         if (full) {
@@ -183,6 +190,8 @@ export async function POST(req: Request) {
         ambientes: c.ambientes ?? null,
         dormitorios: c.dormitorios ?? null,
         banos: c.banos ?? null,
+        // Las búsquedas guardadas antes de sep-2026 no traen el campo: se lee del checklist.
+        antiguedad: c.antiguedad !== undefined ? c.antiguedad : antiguedadDesdeChecklist(c.checklist),
         precio: c.precio ?? null,
         moneda: c.moneda || "USD",
         precio_m2: c.precio_m2 ?? null,
@@ -268,6 +277,7 @@ export async function POST(req: Request) {
         m2: sujetoM2(sujeto),
         dormitorios: sujeto.dormitorios ?? null,
         banos: sujeto.banos ?? null,
+        antiguedad: antiguedadSujeto(sujeto),
         // Solo va si el asesor tildó la casilla. El tope de 700 ya se aplicó al generarla,
         // pero se re-aplica acá porque el texto pudo editarse a mano.
         descripcion: sujeto.incluir_desc_ficha && sujeto.descripcion_ia
