@@ -90,7 +90,7 @@ export function DashboardPropertiesSection({ data }: { data: any }) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.kpis.conInquilino.count}</div>
-            <p className="text-xs text-muted-foreground mt-1">{data.kpis.conInquilino.pct}% ocupación actual</p>
+            <p className="text-xs text-muted-foreground mt-1">{data.kpis.conInquilino.pct}% de la cartera</p>
           </CardContent>
         </Card>
 

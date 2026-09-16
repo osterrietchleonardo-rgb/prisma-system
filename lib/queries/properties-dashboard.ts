@@ -1,15 +1,49 @@
 import { createClient } from "@/lib/supabase/server"
+import { todasLasFilas } from "@/lib/queries/todas-las-filas"
+import { estabaEnCartera } from "@/lib/queries/cartera"
+import { finDelDiaAR } from "@/lib/dashboard/periodo"
 
-export async function getPropertiesDashboardData(agencyId: string) {
+/** Tokko guarda la situación en inglés; la pantalla la muestra en castellano. */
+const SITUACION: Record<string, string> = {
+  "Empty": "Vacía",
+  "In use": "En uso",
+  "Tenant": "Con inquilino",
+  "Owner": "Habitada por el dueño",
+  "Construction company": "Constructora",
+  "---": "Sin dato",
+}
+
+/**
+ * La cartera responde al filtro del dashboard: la del asesor elegido (Tokko guarda el asesor por
+ * email) y la que había al cierre del período (`endDate`, 'yyyy-MM-dd'; hoy si no viene).
+ */
+export async function getPropertiesDashboardData(agencyId: string, agentId?: string, endDate?: string) {
   const supabase = createClient()
-  
-  const { data: properties } = await supabase
-    .from("properties")
-    .select("*")
-    .eq("agency_id", agencyId)
-    .eq("is_active", true)
 
-  if (!properties || properties.length === 0) {
+  let emailAsesor: string | null = null
+  if (agentId) {
+    const { data } = await supabase.from("profiles").select("email").eq("id", agentId).maybeSingle()
+    emailAsesor = data?.email ?? null
+  }
+  const instante = endDate ? Date.parse(finDelDiaAR(endDate)) : Date.now()
+
+  // Todas (también las dadas de baja): con alta y baja se sabe cuáles estaban al cierre del
+  // período. De a tandas: la base corta en 1.000 filas.
+  const todas = await todasLasFilas<any>((desde, hasta) =>
+    supabase
+      .from("properties")
+      .select("*")
+      .eq("agency_id", agencyId)
+      .order("id", { ascending: true })
+      .range(desde, hasta)
+  )
+  const properties = todas.filter((p) => {
+    if (agentId && (!emailAsesor || p.assigned_agent?.email !== emailAsesor)) return false
+    const raw = p.tokko_data || {}
+    return estabaEnCartera({ is_active: p.is_active, alta: raw.created_at, baja: raw.deleted_at }, instante)
+  })
+
+  if (properties.length === 0) {
     return null
   }
 
@@ -19,6 +53,7 @@ export async function getPropertiesDashboardData(agencyId: string) {
   let sumUSD = 0
   let validPricesUSD = 0
   let sumPricePerSqm = 0
+  let validM2 = 0
   let aptoCreditoCount = 0
   let conInquilinoCount = 0
   let conVideoCount = 0
@@ -43,6 +78,7 @@ export async function getPropertiesDashboardData(agencyId: string) {
   const producerStats: Record<string, { total: number; valueUSD: number }> = {}
   const tag3Counts: Record<string, number> = {}
   const ageRanges = {
+    "Sin dato": 0,
     "A estrenar (0)": 0,
     "1 - 10 años": 0,
     "11 - 20 años": 0,
@@ -54,29 +90,33 @@ export async function getPropertiesDashboardData(agencyId: string) {
     const raw = prop.tokko_data || {}
     const operations = raw.operations || []
     
-    // Encontrar precio USD si existe
+    // Precio de VENTA en dólares. Los alquileres no entran en valor, promedio, rangos ni m²:
+    // un alquiler de US$800 mezclado con ventas de US$300.000 bajaba todos los promedios
+    // (15/9/2026, Central: promedio 317.283 con alquileres, 331.213 sólo ventas).
     let priceUSD = 0
     for (const op of operations) {
-      if (op.prices) {
-        const pUSD = op.prices.find((p: any) => p.currency === "USD")
-        if (pUSD?.price) {
-          priceUSD = pUSD.price
-          break
-        }
+      if (op.operation_type !== "Sale" || !op.prices) continue
+      const pUSD = op.prices.find((p: any) => p.currency === "USD")
+      if (pUSD?.price) {
+        priceUSD = pUSD.price
+        break
       }
     }
 
-    if (!priceUSD && prop.currency === "USD" && prop.price > 0) {
+    if (!priceUSD && prop.status === "Venta" && prop.currency === "USD" && prop.price > 0) {
       priceUSD = prop.price
     }
 
     if (priceUSD > 0) {
       sumUSD += priceUSD
       validPricesUSD++
-      
-      const roofed_surface = raw.roofed_surface || prop.covered_area
+
+      // El m² se promedia sólo entre las que tienen superficie: dividir por todas las que
+      // tienen precio lo subestimaba (Central: 2.953 en vez de 3.198).
+      const roofed_surface = Number(raw.roofed_surface || prop.covered_area)
       if (roofed_surface > 0) {
         sumPricePerSqm += (priceUSD / roofed_surface)
+        validM2++
       }
 
       // Range
@@ -99,18 +139,18 @@ export async function getPropertiesDashboardData(agencyId: string) {
       typeAvgPrices[pType].count++
     }
 
-    // Apto crédito
-    if (raw.credit_eligible && raw.credit_eligible !== "No especificado") {
-        const creditLower = raw.credit_eligible.toLowerCase();
-        if (creditLower.includes("apto crédito") || creditLower === "sí" || creditLower === "yes") {
-             aptoCreditoCount++
-        }
+    // Apto crédito. Tokko lo guarda en inglés: "Eligible" / "Not eligible" / "Not specified".
+    // Se buscaba en castellano y daba 0 (Central tiene 52 aptas).
+    const credito = String(raw.credit_eligible || "").toLowerCase()
+    if (credito === "eligible" || credito.includes("apto crédito") || credito === "sí" || credito === "yes") {
+      aptoCreditoCount++
     }
 
-    // Situation & Condition
-    const sit = raw.situation || "Sin dato"
+    // Situation & Condition. "Tenant" = con inquilino (se buscaba "inquilino" y daba 0).
+    const sitRaw = raw.situation || "---"
+    const sit = SITUACION[sitRaw] || sitRaw
     situationCounts[sit] = (situationCounts[sit] || 0) + 1
-    if (sit.toLowerCase().includes("inquilino")) conInquilinoCount++
+    if (sitRaw === "Tenant" || sitRaw.toLowerCase().includes("inquilino")) conInquilinoCount++
 
     const cond = raw.property_condition || "Sin dato"
     conditionCounts[cond] = (conditionCounts[cond] || 0) + 1
@@ -141,8 +181,10 @@ export async function getPropertiesDashboardData(agencyId: string) {
     }
 
     // Age
+    // Tokko usa -1 para "sin dato": antes caía en "1 - 10 años".
     const age = raw.age !== undefined && raw.age !== null ? Number(raw.age) : null
-    if (age !== null) {
+    if (age === null || Number.isNaN(age) || age < 0) ageRanges["Sin dato"]++
+    else {
       if (age === 0) ageRanges["A estrenar (0)"]++
       else if (age <= 10) ageRanges["1 - 10 años"]++
       else if (age <= 20) ageRanges["11 - 20 años"]++
@@ -152,7 +194,7 @@ export async function getPropertiesDashboardData(agencyId: string) {
   }
 
   const precioPromedio = validPricesUSD > 0 ? Math.round(sumUSD / validPricesUSD) : 0
-  const m2Promedio = validPricesUSD > 0 && sumPricePerSqm > 0 ? Math.round(sumPricePerSqm / validPricesUSD) : 0
+  const m2Promedio = validM2 > 0 ? Math.round(sumPricePerSqm / validM2) : 0
 
   return {
     kpis: {

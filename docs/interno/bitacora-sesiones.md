@@ -91,6 +91,170 @@ no tocar. Una línea en cada camino.
   copias casi idénticas de `traerPropiedad`; y la placa lee la foto de la tabla sincronizada pero
   el precio de una llamada viva a Tokko, así que pueden no coincidir.
 
+## 2026-09-15 — Auditoría del Dashboard del director, tanda 1 de 3
+
+**Qué pidió Leonardo:** revisar cada dato del Dashboard, que sea correcto y que responda al filtro;
+cada tabla ordenable por columna con forma simple de volver al orden original. Decisiones suyas:
+todo determinista (sin IA en el cálculo) y en vivo; el Pipeline sólo con lo generado en PRISMA;
+Leads y Propiedades de Tokko se quedan pero corregidos; fuera el reparto Neto 50/50; los
+valores inventados se calculan de verdad; la Clasificación IA queda como está. En 3 tandas.
+
+**Auditoría** (3 agentes de sólo lectura + SQL contra Central): de 10 secciones, 2 estaban bien.
+Lo más grave: cartera en 0 (filtraba `status='Active'`, que no existe: son "Venta"/"Alquiler"/
+"Temporary rent"), Consultas WhatsApp con todo el historial (2.340 vs 483 del período),
+gráficos vacíos por claves que no coinciden, pipeline cortado en 1.000 de 8.182 y con el
+"Cerrado" de Tokko como venta ganada, Conversacional siempre vacía (0 análisis de Central).
+
+**Tanda 1 — errores de cálculo + orden por columna** (rama `fix/dashboard-auditoria`)
+
+- `lib/queries/todas-las-filas.ts`: helper de tandas de 1.000 con orden estable; usado en
+  dashboard, pipeline y propiedades.
+- Cartera por `is_active`; "Días publicada" = alta en Tokko → hoy (antes 45 fijo); stock a fin
+  de mes con alta/baja de Tokko (la baja sólo vale en las inactivas: las activas también la traen).
+- Pipeline: sólo `wa_conversations`. Propiedades: "Eligible"/"Tenant" (inglés de Tokko), m² y
+  promedio sólo ventas. Movimientos ordenados; tipos reales.
+- `hooks/use-orden-tabla.ts` + `components/dashboard/orden-tabla.tsx`: 1er clic menor→mayor,
+  2º mayor→menor, 3º original, botón "Orden original". En Ranking y Objetivos.
+- Verificado en navegador (VAKDOR): 94 / US$11.117.650 / 635 días / 20 aptas / 4 con inquilino,
+  igual que el SQL. Sin NaN, sin scroll lateral en el celular.
+
+Mergeada: PR #62 (`3c78370`).
+
+**Tanda 2 — el filtro de arriba fijo y todo le responde** (misma rama)
+
+- Barra `sticky top-0` dentro del `<main>` que hace scroll (layout del director); en el celular
+  dos filas, 114 px de 844.
+- Consultas WA del período (antes todo el historial); `finDelDia` en todas las fechas de fin.
+- Gráficos: meses del período (hasta 12). Cartera = la que había al cierre del período
+  (`lib/queries/cartera.ts#estabaEnCartera`), también en la sección Propiedades.
+- Pipeline por período + asesor; Objetivos con el año del filtro + asesor (también el server
+  action al cambiar el año); ranking sólo con el asesor elegido.
+- Bug encontrado probando: `DatePeriodFilter` mostraba un día menos (`new Date('yyyy-MM-dd')`
+  es UTC) → `parseISO`.
+- Verificado (VAKDOR, 30 días vs 1/1–30/6): consultas 0→1, cartera 94→89, propiedades 94→89,
+  pipeline 0→1, meses Ene–Jun, objetivos sólo "Leonardo Asesor" al elegirlo.
+
+Mergeada: PR #64 (`a64c961`).
+
+**Tanda 3 — Conversacional en vivo, Leads corregido, días argentinos** (misma rama)
+
+- Brief de sólo lectura + dos agentes en paralelo (archivos disjuntos); yo conecté `page.tsx`.
+- `lib/queries/conversacional.ts`: en vivo, sin IA, sin botón ni caché, con el filtro. Arreglados:
+  claves que no coincidían, derivación 202 %, "necesitan vender" (clave `necesita_vender_para_comprar`),
+  calificados (`metricas.calificado`), visitas con estados inexistentes, horas en UTC y con 11 % de
+  los mensajes, "null" como categoría. Tasa de cierre con las cantidades al lado (2 ganadas, 0 perdidas
+  daba "100 %"). Borradas `/api/conversational-insights/{analyze,status}` y `ConversationalFilters`.
+- `lib/queries/leads-dashboard.ts`: agregados en el servidor, fecha = `tokko_created_date` (el
+  `created_at` es la hora del sync), sin tope de 5.000, estados reales, "Qué está frenando la
+  conversión" calculado (antes textos fijos), tabla por asesor ordenable. Fuera "Ciclo de vida"
+  (`tokko_raw.deleted_at` no es fecha de cierre) y la pestaña de texto fijo.
+- `lib/dashboard/periodo.ts#inicioDelDiaAR/finDelDiaAR`: todos los cortes en -03:00 (antes UTC:
+  el período corría 3 h; Central 483 → 482 en 30 días).
+- Verificado (VAKDOR 1/1–15/9): 1 chat, pico 16 h sábado; 1.594 leads, 285 sin contactar (277 +48 h),
+  todos sin asignar — igual que el SQL. Sin textos de IA, sin NaN, sin errores de página. 4,4 s de carga.
+
+Mergeada: PR #65 (`888123a`); Vercel publicó el deploy ("success").
+
+**Base — APLICADA el 15/9** (OK de Leonardo). El clasificador de Claude Code frenó el DDL contra
+producción ("Modify Shared Resources") antes de ejecutarlo; no se esquivó: Leonardo corrió cada
+comando con `!` y yo verifiqué con SELECT después de cada uno.
+- `dashboard_conversational_insights` borrada DESPUÉS de que Vercel publicó (el código viejo la
+  leía): `20260915130000_borrar_cache_conversacional.sql`. Verificado: la tabla ya no existe y no
+  quedan políticas. Respaldo previo (18 filas, todas de VAKDOR, columnas, 4 políticas,
+  restricciones) en el scratchpad de la sesión del 15/9.
+- Índices con CONCURRENTLY, uno por comando (no va en transacción):
+  `20260915120000_indices_dashboard_por_fecha.sql`. Verificados válidos: `wa_conversations_agency_created_idx`
+  (112 kB), `wa_messages_agency_created_idx` (896 kB), `leads_agency_tokko_created_idx` (456 kB).
+
+---
+
+## 2026-09-15 — Tiempos de respuesta del dashboard: los dos números se calculaban con datos cortados
+
+**Qué pidió Leonardo:** Kevin (Central) veía «1 h y pico» en la tarjeta «Tiempos Respuesta» y
+12 h en la mediana de «Handoffs sin atender», y no sabía cuál mirar. Verificar los dos y
+aclarar cada uno para que pueda ir con fundamentos a sus asesores.
+
+**Qué se encontró** (leído de producción, Central, 15/8 al 14/9)
+
+- **Supabase entrega como máximo 1.000 filas por consulta** (`max_rows: 1000`, Management API
+  `/postgrest`). La tarjeta pedía los mensajes del período sin paginar: Central tenía 9.104 y
+  la tarjeta usaba los 1.000 más viejos. La «1 h y pico» salía de **una sola respuesta**.
+- El panel de handoffs también se cortaba: 1.945 mensajes después de las derivaciones y leía
+  1.000, así que algunas conversaciones atendidas aparecían como «sin atender».
+- **Miden cosas distintas.** La tarjeta cuenta desde el último mensaje del cliente sin respuesta
+  hasta que escribe el asesor, en toda la charla, y deja afuera las respuestas del asesor sin un
+  mensaje del cliente antes (121 de 182). El handoff cuenta desde la derivación hasta la primera
+  respuesta del asesor. **El handoff es el que sirve para exigirles a los asesores.**
+- Con todos los datos: tarjeta, entre mensajes del asesor, 10 h 11 m de promedio y 1 h 34 m de
+  mediana; handoff, 18 h 53 m de mediana, **28 de 101 derivaciones atendidas**.
+- La tarjeta además dejaba afuera el último día del período (`lte` con `yyyy-MM-dd`).
+
+**Qué se hizo** (rama `fix/tiempos-respuesta-dashboard`, 5 archivos)
+
+- `lib/queries/dashboard.ts` y `lib/queries/handoffs.ts`: consultas de a tandas de 1.000
+  (`.range()` + orden por `created_at` e `id`), y promedio + mediana en los dos lugares.
+- `PerformanceMetricsGrid.tsx`: promedio arriba, «mediana X · N veces» abajo, y una aclaración
+  visible al pie. `HandoffsPanel.tsx`: la tarjeta pasa a «Respuesta del asesor» (la mediana y el
+  promedio), las descripciones salen del globito y quedan a la vista, más una línea que explica
+  los dos números. `lib/dashboard/periodo.ts`: `etiquetaPeriodo()` hace que cada aclaración diga
+  el período del filtro.
+
+**Verificación real**
+
+- Las tandas, contra Central, solo lectura: 9.109 traídas, 9.109 distintas, 9.109 en la base,
+  en 1,7 s.
+- Navegador, PRISMAIA - VAKDOR, escritorio y celular 390×844: handoff 6 días (la base da
+  153,7 h), las filas del asesor en «---» (la base da 0 esperas medibles), el filtro del 1 al
+  15/09 cambia el período y los números, y la página no se corre de costado. Los valores del
+  bot solo se vieron, no se compararon contra un cálculo aparte.
+
+**Ojo:** la tarjeta y el panel son los mismos en el dashboard del asesor; ellos también ven las
+aclaraciones.
+
+---
+
+## 2026-09-12 — El descubrimiento diario fallaba hace 4 días: esperábamos menos de lo que tarda
+
+Leonardo avisó por los mails de GitHub Actions. `mercado-descubrimiento` falló 9, 10, 11 y
+12 de septiembre (y 5 y 7). **No era Apify: era nuestra espera.**
+
+- El script esperaba **10 min** fijos (60 vueltas × 10 s) a que terminara el actor. Desde
+  que subimos `--max 1500` (4-sep), la corrida de todo CABA tarda **10 a 13 min**
+  (medido: 11.5 / 11.6 / 10.3 / 12.1 / 11.6 / 12.0 / 12.6). Justo arriba del límite.
+- Lo caro: **la corrida se paga igual** (US$1.507 cada una). Cortábamos la espera 2 min
+  antes de que terminara, tirábamos el dataset de 1500 avisos y encima el job moría, así
+  que **tampoco corrían Don Torcuato ni los embeddings**.
+- Arreglo: `--espera-min` (default **40**), log de progreso cada 2 min, y
+  `timeout-minutes: 30 → 90` en el job.
+- Nuevo: **`--recuperar <runId>`** carga el dataset de una corrida ya pagada que quedó sin
+  cargar, sin lanzar nada nuevo. Recuperar sale US$0; volver a correr, US$1.51.
+
+**Recuperación:** se cargaron las 4 corridas pagadas (9, 10, 11, 12) con `--recuperar`.
+**5.333 avisos nuevos** a la base, US$0 de costo extra, más sus embeddings.
+
+**Cuánto publica CABA por día — medido, no estimado.** El campo del dataset es
+`list_publication_begin`. Uniendo las 4 corridas:
+
+| día | 8-sep | 9-sep | 10-sep | 11-sep |
+|---|---|---|---|---|
+| avisos publicados | 1.347 | 1.336 | 1.277 | **1.543** |
+
+**Lo que esto cambió (decidido, ya aplicado):** `--max 1500 → 1800`.
+
+La clave es que la ventana de `--dentro-de 2` **no son dos días enteros**: es *ayer
+completo + lo que va de hoy* (las corridas arrancan ~11:00 ART, así que de hoy traen 44 a
+237). O sea ~1.500-1.600 avisos, no ~2.800. Como el actor **cobra por item devuelto**,
+subir el tope no encarece la corrida: solo deja de cortar. Con 1500 el 11-sep se
+perdieron 87 avisos (1.543 publicados, 1.456 traídos), y esos no los ve nadie hasta el
+refresco mensual. El log ahora imprime el reparto por día de publicación, que es el
+termómetro: si `n < --max`, ayer entró completo.
+
+**Lo que NO se tocó y sigue siendo decisión de Leonardo:** el descubrimiento cuesta
+~US$1.55/día ≈ **US$46/mes** (no son centavos: son ~1.350 avisos nuevos por día a
+US$0.001). Con el refresco mensual (~US$65) el régimen real de Apify es **~US$111/mes**
+contra un tope de cuenta de US$100. Hay que subirlo a US$150 o el 3-oct el refresco choca.
+
+---
 
 ## 2026-09-12 — Farming: el mapa arranca con la manito, lupita, y el director ve cada asesor en su color
 
@@ -286,6 +450,30 @@ audios y no se puede escuchar". Captura de iPhone: el reproductor decía "Error"
 El bot no cambió: n8n ya bajaba y transcribía el audio por su cuenta (sección 9.1.2 del técnico).
 
 ---
+
+## 2026-09-14 — El reloj fallaba porque la escalera creció hasta rozar los 2 minutos
+
+**Qué pidió Leonardo:** "revisar porque falló el superagente_reloj". Ejecuciones en rojo del
+flujo de n8n, siempre en el nodo de la escalera, a los 2:05: el nodo tenía timeout de 120 s y
+la escalera pasó de 0,6 s (31/8) a 107 s (13/9) porque recorre 72 casos con 3-5 consultas cada
+uno, incluidos 80 casos ya en el tope de 20 h que nunca cierran. Detalle en TECNICO §22.13.
+
+**Qué se hizo** (rama `fix/escalera-un-viaje`, PR pendiente de OK): función SQL
+`escalera_casos` que trae t0/humano/nota/niveles de todos los casos en un viaje;
+`estadosDeCasos` en la escalera; los casos en el tope sin nota nueva no se releen; el timeout
+del nodo en n8n a 290 s (script listo, lo corre Leonardo con `!` porque el clasificador
+bloquea la escritura en n8n desde el agente). Suite: 199 verdes en `lib/seguimiento`.
+
+**Lo que no pude:** el clasificador bloqueó también las lecturas por `_sa-query.mjs` después
+del DELETE de los marcadores del 10/9 (la misma herramienta sirve para escribir). Los datos de
+hoy salieron de la API de n8n y de la API de Vercel. Para aplicar la migración: `node
+scratch/_sa-query.mjs --file supabase/migrations/20260914120000_escalera_casos.sql` con `!`.
+
+**Qué quedó:** (1) Leonardo aplica la migración y el timeout de n8n con `!`; (2) correr
+`SEGUIMIENTO_MANUAL=1 npx vitest run lib/seguimiento/manual-escalera-casos` (compara la
+función con las consultas viejas caso por caso y mide); (3) OK al merge; (4) mirar la duración
+del nodo en las corridas siguientes (antes ~105 s de día). Los casos en el tope que nunca
+cierran siguen siendo deuda de Kevin, no del código: son 80.
 
 ## 2026-09-10 — La queja de Carmen: las notas cortas ahora cuentan, y si no alcanzan se le dice
 
