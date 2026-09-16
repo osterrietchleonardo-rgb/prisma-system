@@ -1,0 +1,114 @@
+//
+// Farming · las reglas de la tarjeta de la caminata, sin base de datos en el medio.
+//
+// La mayoría de lo que el asesor releva NO está publicado en ningún portal: `mercado_avisos` es
+// una ayuda, no la fuente. Por eso la tarjeta se crea desde cero y lo único que se le exige es
+// la calle y el tipo — está parado en la vereda con el teléfono en la mano.
+
+export type TipoDireccion = "edificio" | "casa" | "ph" | "local" | "oficina" | "lote" | "otro"
+export type EtapaDireccion =
+  | "relevado" | "presentado" | "en_secuencia" | "respondio" | "tasacion" | "captada" | "descartada"
+export type Vinculo = "propietario" | "inquilino" | "encargado" | "familiar" | "otro"
+
+export const TIPOS: { clave: TipoDireccion; etiqueta: string }[] = [
+  { clave: "edificio", etiqueta: "Edificio" },
+  { clave: "casa", etiqueta: "Casa" },
+  { clave: "ph", etiqueta: "PH" },
+  { clave: "local", etiqueta: "Local" },
+  { clave: "oficina", etiqueta: "Oficina" },
+  { clave: "lote", etiqueta: "Lote" },
+  { clave: "otro", etiqueta: "Otro" },
+]
+
+/** Las seis columnas del tablero, más «descartada» al costado. El orden es el del spec. */
+export const ETAPAS: { clave: EtapaDireccion; etiqueta: string }[] = [
+  { clave: "relevado", etiqueta: "Relevado" },
+  { clave: "presentado", etiqueta: "Presentado" },
+  { clave: "en_secuencia", etiqueta: "En secuencia" },
+  { clave: "respondio", etiqueta: "Respondió" },
+  { clave: "tasacion", etiqueta: "Tasación" },
+  { clave: "captada", etiqueta: "Captada" },
+  { clave: "descartada", etiqueta: "Descartada" },
+]
+
+export const VINCULOS: { clave: Vinculo; etiqueta: string }[] = [
+  { clave: "propietario", etiqueta: "Propietario" },
+  { clave: "inquilino", etiqueta: "Inquilino" },
+  { clave: "encargado", etiqueta: "Encargado" },
+  { clave: "familiar", etiqueta: "Familiar" },
+  { clave: "otro", etiqueta: "Otro" },
+]
+
+export interface EntradaDireccion {
+  calle: string
+  altura?: string | null
+  tipo: TipoDireccion
+  tramo?: string | null
+  pisos?: number | null
+  unidades_por_piso?: number | null
+  unidades_manual?: number | null
+  encargado_nombre?: string | null
+  encargado_turno?: string | null
+  encargado_notas?: string | null
+  lat?: number | null
+  lng?: number | null
+  a_la_venta?: boolean
+  cartel?: "dueno" | "inmobiliaria" | "sin_cartel" | null
+  inmobiliaria_cartel?: string | null
+  precio_pedido?: number | null
+  moneda?: "USD" | "ARS" | null
+  observaciones?: string | null
+  relevada_en?: string | null
+}
+
+export function etiquetaDe(etapa: EtapaDireccion): string {
+  return ETAPAS.find((e) => e.clave === etapa)?.etiqueta ?? etapa
+}
+
+/** Regla de las slides: las unidades NO se cargan a mano. */
+export function unidadesTotales(
+  e: Pick<EntradaDireccion, "pisos" | "unidades_por_piso" | "unidades_manual">,
+): number | null {
+  if (e.pisos && e.unidades_por_piso) return e.pisos * e.unidades_por_piso
+  return e.unidades_manual ?? null
+}
+
+/**
+ * La dirección comparable. Tiene que dar lo mismo que `farming_direccion_normalizada` en la
+ * base, que es la que sostiene el índice único: acá sirve para avisarle al asesor ANTES de
+ * mandar el formulario, pero el candado de verdad es el de Postgres.
+ */
+export function normalizarDireccion(calle: string, altura?: string | null): string {
+  // Los mismos tres pasos, en el mismo orden, que `farming_direccion_normalizada` en la base.
+  // El segundo —tirar todo lo que no sea letra, número o espacio— es el que hace que
+  // «Av. Ejemplo» y «Av Ejemplo» sean la misma puerta.
+  return `${(calle || "").trim()} ${(altura || "").trim()}`
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+const CLAVES_TIPO = TIPOS.map((t) => t.clave) as string[]
+
+/** Todos los problemas juntos, en criollo. Vacío = se puede guardar. */
+export function validarDireccion(e: Partial<EntradaDireccion>): string[] {
+  const errores: string[] = []
+
+  if (!e.calle?.trim()) errores.push("Falta la calle.")
+  if (!e.tipo || !CLAVES_TIPO.includes(e.tipo)) errores.push("Elegí qué tipo de propiedad es.")
+
+  // Si carga pisos, hace falta el otro número: si no, el total queda en blanco y el indicador
+  // de «unidades potenciales» miente.
+  if (e.pisos && !e.unidades_por_piso) errores.push("Pusiste los pisos: falta cuántas unidades hay por piso.")
+  if (e.unidades_por_piso && !e.pisos) errores.push("Pusiste las unidades por piso: faltan los pisos.")
+
+  if (e.precio_pedido != null && !e.moneda) errores.push("Un precio sin moneda no dice nada: elegí USD o pesos.")
+  if (e.cartel === "inmobiliaria" && !e.inmobiliaria_cartel?.trim()) {
+    errores.push("Decinos de qué inmobiliaria es el cartel.")
+  }
+
+  return errores
+}
