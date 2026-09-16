@@ -89,3 +89,29 @@ export async function zonaAccesible(
 
   return { zona: { id: fila.id, nombre: fila.nombre, geojson: fila.geojson }, puede: !!compartida }
 }
+
+/**
+ * ¿Puede esta persona tocar esta tarjeta? Se resuelve por su zona: la tarjeta no tiene una
+ * regla propia. Devuelve la tarjeta aunque no pueda, para distinguir 403 (es de la zona de un
+ * colega) de 404 (no existe).
+ */
+export async function direccionAccesible(
+  admin: SupabaseClient<any, any, any>,
+  direccionId: string,
+  agencyId: string,
+  userId: string,
+): Promise<{ direccion: any | null; puede: boolean }> {
+  if (!FORMA_UUID.test(direccionId)) return { direccion: null, puede: false }
+
+  const { data, error } = await admin
+    .from("farming_direcciones")
+    .select("*")
+    .eq("id", direccionId)
+    .eq("agency_id", agencyId)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return { direccion: null, puede: false }
+
+  const { puede } = await zonaAccesible(admin, (data as any).zona_id, agencyId, userId)
+  return { direccion: data, puede }
+}
