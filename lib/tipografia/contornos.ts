@@ -83,7 +83,12 @@ export function contornosDeTexto(texto: string, x0: number, y: number, cuerpo: n
     if (previo) x += f.getKerningValue(previo, g) * escala;
     // Un decimal alcanza y sobra para una letra chica, y achica el archivo un 20%.
     const d = g.getPath(x, y, cuerpoEntero).toPathData(1);
-    if (d && d.includes("NaN")) letrasRotas++;
+    // Una letra que la fuente NO TIENE devuelve el glifo .notdef, con un contorno vacio: se
+    // dibuja como nada, sin error. Hasta el 16-sep-2026 no se contaba, asi que un emoji pasaba
+    // el control en silencio. El espacio tambien tiene contorno vacio, pero SI existe en la
+    // fuente, por eso el criterio es el nombre del glifo y no si el contorno vino vacio.
+    if (g.name === ".notdef") letrasRotas++;
+    else if (d && d.includes("NaN")) letrasRotas++;
     else if (d) paths.push(d);
     x += (g.advanceWidth ?? 0) * escala;
     previo = g;
