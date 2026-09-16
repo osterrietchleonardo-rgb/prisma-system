@@ -324,6 +324,27 @@ US$102,43 de 100 y el descubrimiento está frenado desde el 14):
 2. Releer 500 avisos de un barrio (US$0,50) → ¿cuántos cambian de precio por mes sin republicarse?
    De eso depende si el refresco cada 2 meses alcanza o sobra.
 3. Bajar el segundo archivo del sitemap (`sitemap_prop_https_2`), que hoy dio 403.
+4. **Argenprop, muestra de 500 avisos (US$0,50)** con `igolaizola/argenprop-scraper`, 2-3 barrios,
+   cruzada contra la base por dirección + precio → **cuántos avisos son únicos**. CABA entero son
+   102.843 (≈US$103 de una vez). El actor filtra por ubicación, radio en km, `advertiserTypes`
+   (dueño directo) y `sortBy: newest`, así que permitiría un descubrimiento diario barato.
+5. **Mercado Libre, muestra de 500 avisos (US$2)** con `gio21/mercadolibre-inmuebles-scraper`
+   (US$4/1.000, cuatro veces ZonaProp) → confirmar con muestra grande el 94% de repetición que
+   dio la muestra chica (29 de 31 ya estaban en la base).
+
+Las cinco juntas cuestan menos de US$3,50 y cada una decide un camino. **Sumar un portal recién se
+encara si la 4 da volumen único**: exige clave nueva en `mercado_avisos` (hoy es el postingId de
+ZonaProp), capa "estos avisos son el mismo inmueble" por geo+precio+m² (los códigos NO cruzan entre
+portales, medido 0/40) y geocodificar direcciones, porque ni Argenprop ni Mercado Libre dan
+coordenadas.
+
+**API de Mercado Libre: CERRADA, no insistir.** Tres apps propias distintas (la última con unidad
+VIS y permisos mínimos) dan lo mismo: el token sirve (`/users/me`, `/categories`, `/sites/MLA` y
+`/items/{id}/description` responden 200) pero `/sites/MLA/search` da 403, `/items/{id}` da 403 y
+`/users/{id}/items/search` responde textual **"Searching another user items is restricted."** La
+doc oficial (10/09/2026) ya no documenta la búsqueda por sitio, y hay decenas de desarrolladores
+reportando lo mismo en 2026. El cambio es de abril-2025: solo se accede a lo del usuario que
+autoriza la app. Único uso que queda: que un cliente nuestro autorice la app para bajar SUS avisos.
 
 **Sin resolver, de Leonardo:** regenerar los Client Secret de las dos apps de Mercado Libre
 (`2055069549619410` y `5235611298360779`), que quedaron expuestos en el chat, y dejar sus permisos
