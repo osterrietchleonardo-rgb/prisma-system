@@ -14,7 +14,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { pedir } from "@/lib/farming/cliente"
-import { SENALES, type AvisoEnZona, type RespuestaAvisos, type Senal } from "@/lib/farming/avisos"
+import { atajosVisibles, SENALES, type AvisoEnZona, type RespuestaAvisos, type Senal } from "@/lib/farming/avisos"
 import type { ZonaFarming } from "@/lib/farming/tipos"
 
 const plata = (n: number | null) => (n === null ? "Precio a consultar" : `USD ${n.toLocaleString("es-AR")}`)
@@ -139,6 +139,9 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
   }, [])
 
   const descartar = async (a: AvisoEnZona) => {
+    // Mismo generation ref que `traer`: si cambia de zona o de filtro mientras el POST está
+    // en vuelo, esta lista y estos conteos ya no son los del aviso que se está descartando.
+    const mio = gen.current
     setAvisos((prev) => prev.filter((x) => x.id !== a.id))
     setUltimoDescarte(a)
     ajustarConteos(-1, a.senales)
@@ -148,33 +151,46 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
         body: JSON.stringify({ zona_id: zonaId, aviso_id: a.id, es_dueno_directo: a.es_dueno_directo }),
       })
     } catch (e: any) {
-      // Si no se pudo guardar, el aviso vuelve a la lista: nada desaparece en silencio.
+      // El asesor tiene que enterarse de que no se guardó SIEMPRE, cambie o no de zona.
+      toast.error(e.message)
+      // Pero si ya cambió, el aviso vuelto es de OTRA zona: no lo reinserta acá, y el
+      // conteo que ajustaría también sería el de la zona equivocada.
+      if (gen.current !== mio) return
       setAvisos((prev) => [a, ...prev])
       setUltimoDescarte(null)
       ajustarConteos(1, a.senales)
-      toast.error(e.message)
     }
   }
 
   const deshacer = async () => {
     if (!ultimoDescarte) return
     const a = ultimoDescarte
+    const mio = gen.current
     setUltimoDescarte(null)
     try {
       await pedir(`/api/farming/avisos/marca?zona_id=${zonaId}&aviso_id=${a.id}`, { method: "DELETE" })
+      // Si mientras el DELETE estaba en vuelo cambió de zona o de filtro, reinsertar acá
+      // metería el aviso de la zona VIEJA en la lista de la que se está mirando ahora.
+      if (gen.current !== mio) return
       setAvisos((prev) => [a, ...prev])
       ajustarConteos(1, a.senales)
     } catch (e: any) {
-      // Si el DELETE falla, el banner y la posibilidad de reintentar vuelven: sin esto el
-      // asesor se queda sin forma de deshacer y la marca sigue viva del lado del servidor.
-      setUltimoDescarte(a)
+      // El asesor tiene que enterarse de que el deshacer falló SIEMPRE, cambie o no de zona.
       toast.error(e.message)
+      // Si ya cambió, reaparecer el banner sería para la zona VIEJA: tocar «deshacer» ahí
+      // dispararía un DELETE contra el zona_id nuevo, la zona equivocada.
+      if (gen.current !== mio) return
+      setUltimoDescarte(a)
     }
   }
 
   if (zonas.length === 0) {
     return <p className="text-sm text-muted-foreground">Dibujá una zona en «Mis zonas» y acá vas a ver lo que está a la venta adentro.</p>
   }
+
+  // Recalculado en cada render, no lo que trajo el último fetch: así un atajo que llega a
+  // cero por un descarte deja de dibujarse en el momento, no recién en el próximo fetch.
+  const atajosAhora = datos ? atajosVisibles(datos.conteos) : []
 
   return (
     <div className="space-y-4">
@@ -200,13 +216,15 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
         </p>
       </div>
 
-      {/* Los atajos: solo los que tienen avisos. La línea de abajo explica para qué sirve cada uno. */}
-      {datos && datos.atajos.length > 0 && (
+      {/* Los atajos: solo los que tienen avisos AHORA, no los que tenía la última respuesta del
+          servidor — `ajustarConteos` los mueve en vivo con cada descarte/deshacer, y un atajo
+          en cero se siente roto (la regla de Leonardo, 16-sep). */}
+      {datos && atajosAhora.length > 0 && (
         <div className="flex flex-wrap gap-2">
           <Button variant={senal === null ? "default" : "outline"} size="sm" className="h-9" onClick={() => setSenal(null)}>
             Todas ({datos.conteos.total})
           </Button>
-          {datos.atajos.map((clave) => {
+          {atajosAhora.map((clave) => {
             const s = SENALES.find((x) => x.clave === clave)!
             return (
               <Button
