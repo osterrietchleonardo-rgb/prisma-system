@@ -10,10 +10,21 @@
 -- y acá el caído entra a propósito — para buscar es ruido, para captar es la mejor señal.
 --
 -- EL ÍNDICE: el recorte va como ST_Intersects(geom, <poligono>::geography), que es lo que
--- engancha mercado_avisos_geom_idx en las DOS particiones. Medido contra producción el
--- 16-sep-2026 sobre la zona real de Central (170 avisos adentro):
---     Index Scan en mercado_avisos_inmobiliarias_geom_idx + mercado_avisos_duenos_geom_idx
---     Execution Time: 24,5 ms · Buffers: shared hit=457
+-- engancha mercado_avisos_geom_idx en las DOS particiones.
+--
+-- MEDIDO DESPUÉS DE APLICAR, 16-sep-2026, contra la zona real de Central (0,27 km², 170 avisos
+-- adentro, sobre 67.577 avisos de venta). Tres corridas seguidas de la función completa:
+--     169 ms · 131 ms · 136 ms   (la primera paga el caché frío)
+-- El plan de la función no se ve desde afuera (Postgres no la inlinea, muestra un Function
+-- Scan), así que el índice se comprobó con la consulta cruda equivalente, que da:
+--     Index Scan using mercado_avisos_inmobiliarias_geom_idx  → 169 filas
+--     Index Scan using mercado_avisos_duenos_geom_idx         → 1 fila
+--     Execution Time: 91 ms
+-- Los ~40 ms de diferencia son las 16 columnas que la función devuelve contra el solo id de la
+-- consulta cruda. Nada de esto se acerca al tope de 30 s del rol service_role.
+--
+-- (Una medición anterior de 24,5 ms que estuvo escrita acá era de otra consulta, más chica;
+-- quedó corregida al aplicar. El número que vale es el de arriba.)
 --
 -- Aplicar por Management API con el OK de Leonardo.
 -- Rollback: supabase/rollback/20260916_farming_avisos_rollback.sql
