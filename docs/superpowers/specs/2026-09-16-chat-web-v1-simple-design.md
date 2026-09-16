@@ -17,13 +17,15 @@
 ## 1. La v1 en una frase
 
 La agencia pega **una línea** en su sitio y aparece un chat donde responde su mismo asistente
-(Sofía, Lara), que **solo sabe lo que la agencia cargó y lo que hay en su cartera**, junta los datos
-del visitante, y cuando la cosa se pone seria lo pasa a WhatsApp, que es donde el equipo ya trabaja.
-El director ve la conversación entera en PRISMA y recibe un email con el resumen.
+(Sofía, Lara), que **solo sabe lo que la agencia cargó y lo que hay en su cartera**. El asistente
+conversa, pide los datos (nombre, celular, email, qué busca) y, cuando tiene con qué, **le manda al
+número que la agencia eligió una plantilla de WhatsApp con el lead y un link para escribirle de una**.
+El director ve todos los chats en una bandeja nueva dentro de PRISMA.
 
-**La decisión de fondo:** el chat web **no es una bandeja nueva**. Es un embudo hacia el canal que ya
-existe. Eso saca de la v1 media aplicación (bandeja, tiempo real, responder desde ahí, indexar el
-sitio, segundo analizador) y deja el trabajo en tres piezas chicas.
+**La decisión de fondo (Leonardo, 16/9):** hay bandeja para el director, pero **se conversa con el
+lead desde WhatsApp, no desde PRISMA**. La bandeja es para ver, entender y no perder nada; el ida y
+vuelta con la persona sigue donde el equipo ya trabaja. Eso mantiene la v1 chica: sin tiempo real,
+sin responder desde la web, sin indexar el sitio, sin un segundo analizador.
 
 ---
 
@@ -33,10 +35,12 @@ sitio, segundo analizador) y deja el trabajo en tres piezas chicas.
 |---|---|
 | **El widget** | `widget.js` (una línea en el sitio) que abre un iframe con una página de PRISMA. Alternativa sin script: un link a esa misma página, para sitios que no dejan pegar código |
 | **El agente** | Un endpoint que responde con el motor común (`lib/agente/`), con 4 herramientas y los guardarraíles en código |
-| **La vista** | Una página en PRISMA, **solo lectura**, con la lista de chats y la conversación; un interruptor para pausar al asistente; y un email con el resumen cuando hay un dato que vale |
+| **La bandeja** | Una página nueva en PRISMA para el director: lista de chats, la conversación completa, los datos capturados, el estado (nuevo / derivado / atendido), interruptor para pausar al asistente, y el botón para abrir el WhatsApp del lead |
+| **La derivación** | Plantilla de WhatsApp al número que recibe los leads, con los datos y el link directo al chat (§4-bis), más el email de respaldo |
 
 Tres tablas nuevas, nada de lo existente se toca: `web_widgets` (una fila por agencia),
-`web_conversaciones`, `web_mensajes`.
+`web_conversaciones`, `web_mensajes`. Una plantilla nueva por agencia (§4-bis), que se crea por el
+mismo camino que las del equipo (`plantillasEquipo` en `lib/whatsapp/plantillas-v2.ts`).
 
 ---
 
@@ -95,6 +99,49 @@ Motivo, medido el 16/9 en Central: 2.350 contactos de WhatsApp contra 5.858 lead
 la parte en tres.
 
 ---
+
+## 4-bis. La derivación: del chat web al WhatsApp de una persona
+
+Es el corazón de la v1, y lo que decide si esto sirve o no.
+
+**Al crear el widget, el sistema pide el número de WhatsApp de quien va a recibir estos leads.**
+Se escribe dos veces, como el alta de contactos del tracking, y se guarda en formato internacional.
+Puede ser el director, un asesor o el número general de la agencia; puede cambiarse cuando quieran.
+
+**Durante la charla**, el asistente pide de a poco —nunca de corrido— nombre, celular, email, qué
+busca, zona y presupuesto. Apenas tiene **nombre y una forma de contacto**, dispara la derivación.
+
+**La derivación es una plantilla de WhatsApp** al número elegido, aprobada por Meta, con esta forma:
+
+> Hola {{1}}, entró una consulta por el sitio de {{2}}. {{3}} Escribile directo acá: {{4}}
+
+donde {{3}} lo arma el asistente con lo que sabe (qué busca, zona, presupuesto, la propiedad que
+estaba mirando y el último mensaje textual), y {{4}} es el link `wa.me/<celular del lead>` con un
+texto sugerido ya escrito. Un toque y la persona está escribiéndole al lead.
+
+Reglas de la derivación:
+- **Una por conversación.** Si el lead sigue hablando y da datos nuevos, no se manda otra: la
+  bandeja los tiene y el chat está a un toque.
+- **Horario.** Entre las 23 y las 6 no se manda: queda programada para las 6, igual que hace hoy el
+  aviso de derivación de WhatsApp.
+- **Si el lead no deja celular**, la plantilla igual sale con lo que haya (nombre, email, qué busca)
+  y el link lleva a la bandeja en PRISMA en vez de al chat.
+- **Respaldo por email** siempre, al correo que cargó el director, con la conversación completa.
+- **Si la plantilla falla** (Meta la rechaza, el número no existe), queda anotado como fallido en la
+  bandeja y el email sale igual. Nunca un lead sin que nadie se entere.
+
+**Trampa verificada (importante):** el número que recibe los leads va a contestar esa plantilla
+("ok", "gracias"). Ese mensaje entra por el mismo webhook que los leads, y hoy lo salva el **gate de
+internos** (`lib/whatsapp/gate-internos.ts`), que reconoce a la gente del equipo por su teléfono en
+`profiles` y corta ahí. **Si el número elegido no pertenece a un perfil del equipo, su respuesta va a
+ser tratada como un lead nuevo y Sofía le va a contestar como si fuera un cliente.** Por eso, al
+guardar el widget, el sistema avisa si ese número no está en el equipo y ofrece agregarlo.
+
+**Lo que esto implica, dicho claro:** la conversación sigue en el WhatsApp personal de esa persona,
+así que PRISMA no la ve (es el mismo punto ciego que ya tienen las derivaciones de hoy). Se acepta
+a propósito para la v1 —Leonardo, 16/9: "todavía no dentro de PRISMA, eso luego se verá"—. El camino
+para cerrarlo más adelante es que el link apunte al WhatsApp **de la agencia** en vez del personal,
+y ahí sí queda todo registrado.
 
 ## 5. Seguridad
 
@@ -160,7 +207,7 @@ en silencio.
 |---|---|---|
 | Rastrear e indexar el sitio del cliente (tabla y embeddings propios) | Es un robot con sus fallas, y el 90 % de lo que respondería ya está en el documento de la agencia y en la cartera | Cuando un cliente pida que el chat conozca páginas que no están en el documento |
 | El analizador de 45 campos portado de n8n | Duplica un analizador que ya existe y que va a morir cuando el bot de compradores pase a código. El asistente guarda los 6 datos que importan con una herramienta | Junto con la mudanza del bot de compradores |
-| Bandeja completa con tiempo real y responder desde la web | Es una segunda bandeja para un equipo que ya vive en otra. En v1 el humano contesta por WhatsApp | Cuando el volumen de chats web lo justifique |
+| Responder al lead desde PRISMA, y el tiempo real | La bandeja SÍ va (decisión de Leonardo, 16/9), pero para ver: el ida y vuelta se hace por WhatsApp. Sin responder desde la web no hace falta tiempo real: la lista se refresca sola cada 15 segundos | Cuando el equipo pida contestar desde ahí |
 | Mostrar los pasos de pensamiento | Suma trabajo y no cambia la respuesta | Nunca, salvo pedido |
 | Preguntas para quien quiere sumarse al equipo | Es otro caso de uso; mezcla el objetivo del chat | Cuando Kevin lo pida, como objetivo aparte |
 | Aviso por WhatsApp al asesor | Necesita una plantilla nueva aprobada por Meta | v2, junto con las plantillas de propietarios |
@@ -170,8 +217,10 @@ en silencio.
 ## 9. Decisiones de Leonardo
 
 1. ¿Arranca en vakdor.com antes que en Central? (recomendado: sí)
-2. ¿La v1 sin bandeja, con el humano contestando por WhatsApp? (recomendado: sí; es lo que la hace
-   chica y lo que evita una segunda bandeja abandonada)
+2. **Resuelto (16/9):** hay bandeja para el director, y el ida y vuelta con el lead se hace por
+   WhatsApp, con la plantilla y el link directo (§4-bis).
+2-bis. ¿Qué número recibe los leads en cada agencia? Tiene que ser de alguien del equipo, o Sofía
+   le va a contestar cuando responda (§4-bis).
 3. ¿Quién carga el documento de la agencia? Hoy está vacío en las dos, y sin eso el asistente solo
    sabe de la cartera (recomendado: Leonardo el suyo; Kevin el de Central, con un pedido concreto)
 4. El modelo arranca con Luna solo si pasa la prueba contra el actual; si no, queda el de hoy.
