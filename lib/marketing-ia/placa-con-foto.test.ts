@@ -74,6 +74,28 @@ describe("medirPanel", () => {
     expect(m.altoFoto).toBeLessThan(1080 * 0.45);
     expect(m.altoFoto).toBeGreaterThanOrEqual(1080 * 0.3);
   });
+
+  it("cuando de verdad no entra, lo dice en vez de taparlo", async () => {
+    // El ultimo recurso tiene que ser VISIBLE. Antes, `Math.min(altoPanel, techoPanel)` aceptaba el
+    // desborde en silencio y el precio se dibujaba abajo del aviso legal. Ahora la placa igual sale
+    // —no se rompe nada— pero avisa, y la ruta lo registra en el log.
+    // Caso alcanzable de verdad: un titulo largo de aviso real con un pie legal mas grande todavia.
+    const tituloLargo =
+      "Excelente departamento de tres ambientes con balcon aterrazado y cochera cubierta en el corazon de Belgrano";
+    const m = medirPanel({
+      ancho: 1080, alto: 1080, reservadoAbajo: 500,
+      contenido: { ...CONTENIDO, titulo: tituloLargo },
+    });
+    expect(m.desborda).toBe(true);
+    // Y aun desbordando, el piso duro del 30% se respeta: la foto nunca desaparece.
+    expect(m.altoFoto).toBeGreaterThanOrEqual(Math.floor(1080 * 0.3));
+  });
+
+  it("en el caso normal el desborde es false", async () => {
+    // Si un refactor deja `desborda` clavado en true o en false, una de las dos pruebas cae.
+    const m = medirPanel({ ancho: 1080, alto: 1350, reservadoAbajo: 319, contenido: CONTENIDO });
+    expect(m.desborda).toBe(false);
+  });
 });
 
 describe("armarPlacaConFoto", () => {
