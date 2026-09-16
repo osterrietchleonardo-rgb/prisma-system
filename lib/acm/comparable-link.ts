@@ -19,6 +19,7 @@ import { idZonaprop } from "@/lib/acm/fotos-aviso";
 import { normalizarImagenes, urlFotoRed } from "@/lib/acm/fotos-url";
 import { puntuarCandidato, type Candidato, type ParamsSujeto } from "@/lib/acm/puntaje-link";
 import { antiguedadSujeto } from "@/lib/acm/antiguedad";
+import { ZONA_GENERAL } from "@/lib/acm/barrio-aviso";
 import {
   amenityLabels,
   amenityTokens,
@@ -81,10 +82,6 @@ export async function zonaScore(
   const scores = relaciones.filter((r: any) => claves.includes(r.relacionado)).map((r: any) => Number(r.zona_score));
   return scores.length ? Math.max(...scores) : 0;
 }
-
-/** Nombres que describen una ciudad o región entera, no un barrio. Mismo criterio que el
- *  extractor (`ZONA_GENERAL` en roomix-sync/extractor-server.mjs), ya normalizado. */
-const ZONA_GENERAL = /^(capital federal|ciudad( autonoma)? de buenos aires|c\.?a\.?b\.?a\.?|buenos aires|argentina|gran buenos aires|g\.?b\.?a\.?|provincia( de buenos aires)?|zona (norte|sur|oeste|este)|amba)$/;
 
 /** Lo que el sujeto aporta a la cuenta, igual que lo arma /api/acm/comparables. */
 export function paramsSujeto(s: Partial<Sujeto>): ParamsSujeto {
@@ -230,7 +227,9 @@ export async function comparableDesdeLink(args: {
   if (!tieneDatos) {
     return {
       ok: false,
-      error: "No pudimos leer ese aviso: el portal no dejó ver los datos. Probá de nuevo en un rato o con otro link.",
+      error: ex.aviso?.startsWith("Ese link no se puede abrir")
+        ? ex.aviso
+        : "No pudimos leer ese aviso: el portal no dejó ver los datos. Probá de nuevo en un rato o con otro link.",
     };
   }
 
