@@ -136,7 +136,9 @@ console.log("Seed: se crea con service_role una marca de A en su propia zona (et
 const marcaSeed = { zona_id: zona.id, aviso_id: 999999999, aviso_es_dueno_directo: false, user_id: A.uid, estado: "descartado" }
 const { error: eSeedMarca } = await admin.from("farming_avisos_marca").insert(marcaSeed)
 
+let marcaOmitida = false
 if (eSeedMarca) {
+  marcaOmitida = true
   console.warn("No se pudo sembrar la marca de prueba (¿todavía no está aplicada 20260916120000_farming_avisos.sql?):", eSeedMarca.message)
   console.warn("Se saltean los 4 casos de farming_avisos_marca.")
 } else {
@@ -182,5 +184,16 @@ const { error: eLimpieza } = await admin.from("farming_zonas").delete().eq("id",
 if (eLimpieza) console.warn("No se pudo limpiar la zona de prueba:", eLimpieza.message, "— borrarla a mano:", zona.id)
 
 const fallas = resultados.filter((r) => !r.ok)
-console.log(fallas.length ? `\nX ${fallas.length} FALLAS` : "\nTodo como tiene que ser: los ataques fallan, los controles positivos pasan y la fila no cambió")
-process.exit(fallas.length ? 1 : 0)
+if (fallas.length) {
+  console.log(`\nX ${fallas.length} FALLAS`)
+  process.exit(1)
+} else if (marcaOmitida) {
+  // Un verde acá sin haber atacado farming_avisos_marca es peor que no correr el script: dice
+  // "seguro" sin haberlo probado. Distinto código de salida (2) para no confundirlo con el 1
+  // de "un ataque pasó" — acá ningún ataque pasó, simplemente no se corrieron.
+  console.log("\n⚠ 4 ataques a farming_avisos_marca NO se corrieron (la migración 20260916120000 no está aplicada). Esto NO es un OK.")
+  process.exit(2)
+} else {
+  console.log("\nTodo como tiene que ser: los ataques fallan, los controles positivos pasan y la fila no cambió")
+  process.exit(0)
+}
