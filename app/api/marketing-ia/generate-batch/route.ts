@@ -9,6 +9,7 @@ import { buildOperacionDirective } from "@/lib/marketing-ia/operacion-context";
 import { nivelDesdeIpc, NIVEL_DESCRIPCION } from "@/lib/marketing-ia/niveles";
 import { REGLA_VOZ } from "@/lib/marketing-ia/voz";
 import { ESTRUCTURAS, resolverEstructura, esquemaJsonGuion, guiaBloquesParaPrompt } from "@/lib/marketing-ia/estructuras";
+import { REGLAS_POST, sellarContenidoPost } from "@/lib/marketing-ia/parrafos";
 
 export const dynamic = "force-dynamic";
 
@@ -122,18 +123,23 @@ Estructura exacta del ARRAY JSON: 3 objetos, con "angle" distinto cada uno ("pas
 ]
 Devolvé los 3 objetos completos, no solo el del ejemplo.`;
   } else {
-    return `${base}\n\nEstructura exacta del ARRAY JSON:\n[
+    return `${base}
+
+${REGLAS_POST}
+
+Estructura exacta del ARRAY JSON:
+[
   {
     "angle": "pas",
-    "content": {"hook":"frase de apertura","desarrollo":"cuerpo usando el ángulo pas","cta":"llamada a la acción"}
+    "content": {"hook":"frase de apertura, sin emoji","parrafos":["párrafo 1","párrafo 2","párrafo 3","párrafo 4","párrafo 5","párrafo 6"],"cta":"llamada a la acción"}
   },
   {
     "angle": "transformacion",
-    "content": {"hook":"frase de apertura","desarrollo":"cuerpo usando el ángulo transformacion","cta":"llamada a la acción"}
+    "content": {"hook":"frase de apertura, sin emoji","parrafos":["...6 a 8 párrafos..."],"cta":"llamada a la acción"}
   },
   {
     "angle": "autoridad",
-    "content": {"hook":"frase de apertura","desarrollo":"cuerpo usando el ángulo de autoridad o datos","cta":"llamada a la acción"}
+    "content": {"hook":"frase de apertura, sin emoji","parrafos":["...6 a 8 párrafos..."],"cta":"llamada a la acción"}
   }
 ]`;
   }
@@ -182,7 +188,12 @@ export async function POST(req: Request) {
     let propertyData: TokkoProperty | null = null;
     const propertyId = payload.propiedad_tokko_id || ipc.propiedad_tokko_id || (ipc.flow_data as any).propiedad_tokko_id;
 
-    if (propertyId) {
+    // El id viaja a una URL de Tokko CON la clave de la agencia adentro: mismo guardia que
+    // traerPropiedad en generate-image/route.ts. Un valor sin validar no debe llegar a una URL
+    // con una credencial adentro.
+    if (propertyId && !/^\d+$/.test(String(propertyId))) {
+      console.error("[GENERATE-BATCH] propiedad_tokko_id invalido, no es un id numerico:", propertyId);
+    } else if (propertyId) {
       try {
         if (agencyId) {
           const TOKKO_API_KEY = agencyTokkoKey || process.env.TOKKO_API_KEY;
@@ -268,6 +279,13 @@ export async function POST(req: Request) {
           item.content.duracion_estimada = bloques.reduce(
             (total: number, b: any) => total + (Number(b?.segundos) || 0), 0
           );
+        }
+      } else {
+        // La forma del texto la sella el servidor, no el modelo: los parrafos se pegan con
+        // renglon en blanco, el hook sale sin emoji y cada parrafo se queda con uno solo.
+        for (const item of generatedBatch) {
+          if (!item?.content) continue;
+          item.content = sellarContenidoPost(item.content);
         }
       }
 

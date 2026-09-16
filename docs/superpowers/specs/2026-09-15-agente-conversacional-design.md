@@ -308,6 +308,11 @@ tamaños son gruesos y se ajustan al terminar la Fase 0.
   traza, costo), como pide la evaluación del 8/9 §3.2.
 - Personalización del prompt por agencia desde PRISMA.
 
+**Primer agente sobre este runtime (16/9):** el de propietarios (captación), diseñado en
+`2026-09-16-agente-propietarios-design.md`. Volumen bajo, sin paridad que igualar y sin un cliente
+en vivo dependiendo de él: es el piloto que construye y valida este motor antes de tocar el bot de
+compradores.
+
 ---
 
 ## 5. Costo
