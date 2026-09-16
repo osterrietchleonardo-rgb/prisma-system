@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
   LIMITES,
+  esFichaDePropiedad,
   esIpInterna,
   htmlATexto,
   linksDeHtml,
@@ -52,6 +53,34 @@ describe("revisarUrl: el guardia del rastreo", () => {
     expect(revisarUrl("ftp://vakdor.com", dominios)).toMatchObject({ ok: false, motivo: "esquema" })
     expect(revisarUrl("https://otro.com", dominios)).toMatchObject({ ok: false, motivo: "dominio" })
     expect(revisarUrl("https://vakdor.com/a.pdf", dominios)).toMatchObject({ ok: false, motivo: "extension" })
+    expect(revisarUrl("https://vakdor.com/propiedad/123-depto", dominios)).toMatchObject({ ok: false, motivo: "ficha" })
+  })
+})
+
+describe("esFichaDePropiedad: las fichas sueltas no entran, la cartera es mejor fuente", () => {
+  it("deja afuera la ficha de una propiedad", () => {
+    for (const u of [
+      "https://central.com/propiedad/1234-departamento-en-venta",
+      "https://central.com/propiedades/45-casa-city-bell",
+      "https://central.com/inmueble/98/ficha",
+      "https://central.com/emprendimientos/torre-del-sol",
+      "https://central.com/es/property/778899",
+      "https://central.com/ficha/1122",
+    ])
+      expect(esFichaDePropiedad(u), u).toBe(true)
+  })
+  it("deja pasar las secciones, incluido el listado general", () => {
+    for (const u of [
+      "https://central.com/",
+      "https://central.com/propiedades",
+      "https://central.com/propiedades/",
+      "https://central.com/tasaciones",
+      "https://central.com/sumate-al-equipo",
+      "https://central.com/nosotros",
+      "https://central.com/blog/como-vender-tu-casa",
+      "https://central.com/venta/departamentos/la-plata",
+    ])
+      expect(esFichaDePropiedad(u), u).toBe(false)
   })
 })
 
@@ -189,6 +218,25 @@ describe("rastrearSitio", () => {
     const r = await rastrearSitio(opciones({ limites: { ...LIMITES, maxPaginas: 1 } }))
     expect(r.paginas).toHaveLength(1)
     expect(r.truncado).toBe(true)
+  })
+
+  it("en un sitio de inmobiliaria, las fichas no se comen el cupo: primero las secciones", async () => {
+    // Un sitemap como el de verdad: 3 secciones perdidas entre 200 fichas de propiedades.
+    const fichas = Array.from({ length: 200 }, (_, i) => `https://vakdor.com/propiedad/${i}-departamento`)
+    const secciones = ["https://vakdor.com/", "https://vakdor.com/tasaciones", "https://vakdor.com/blog/vender-mejor"]
+    const todas = [...fichas.slice(0, 100), ...secciones, ...fichas.slice(100)]
+    const fetchSitio = (async (u: string | URL) => {
+      const url = String(u)
+      const cuerpo = url.endsWith("sitemap.xml")
+        ? `<urlset>${todas.map((x) => `<url><loc>${x}</loc></url>`).join("")}</urlset>`
+        : `<html><head><title>${url}</title></head><body>texto de ${url}</body></html>`
+      return { ok: true, status: 200, headers: new Headers({ "content-type": "text/html" }), text: async () => cuerpo }
+    }) as unknown as typeof fetch
+
+    const r = await rastrearSitio(opciones({ fetchFn: fetchSitio, limites: { ...LIMITES, maxPaginas: 5 } }))
+    // ninguna ficha, y las secciones ordenadas de la más general a la más profunda
+    expect(r.paginas.map((p) => p.url)).toEqual(secciones)
+    expect(r.paginas.some((p) => p.url.includes("/propiedad/"))).toBe(false)
   })
 
   it("si el sitio apunta a una dirección interna, no se lee NADA", async () => {

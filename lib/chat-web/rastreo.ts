@@ -34,6 +34,9 @@ export const LIMITES: LimitesRastreo = {
   maxCaracteresPagina: 8_000,
 }
 
+/** Tope de direcciones que se juntan del sitemap antes de ordenarlas y quedarse con las primeras. */
+const MAX_CANDIDATAS = 5_000
+
 /** Lo que no es una página: archivos que no aportan texto o que pesan. */
 const EXTENSIONES_FUERA =
   /\.(pdf|jpe?g|png|gif|webp|svg|ico|mp4|mov|avi|webm|mp3|wav|zip|rar|7z|gz|doc|docx|xls|xlsx|ppt|pptx|csv|dwg|exe|dmg)$/i
@@ -62,7 +65,40 @@ export function normalizarSitio(entrada: string): SitioNormalizado | null {
   return { origen: `https://${host}/`, dominios: [host, `www.${host}`] }
 }
 
-export type MotivoRechazo = "esquema" | "dominio" | "extension" | "invalida"
+/**
+ * Las secciones que suelen colgar de sí las fichas de propiedades, en español y en inglés.
+ * Ojo: el listado general ("/propiedades") SÍ entra, porque es una sección del sitio; lo que queda
+ * afuera es la ficha suelta ("/propiedades/45-casa-city-bell").
+ */
+const SEGMENTOS_FICHA =
+  /^(propiedad|propiedades|inmueble|inmuebles|emprendimiento|emprendimientos|ficha|fichas|listing|listings|property|properties|detalle)$/i
+
+/**
+ * ¿Es la ficha de UNA propiedad? Esas no se rastrean: ya están en la cartera, que es mejor fuente y
+ * está siempre al día. Sin esto, en un sitio con 300 publicaciones las fichas se comen el cupo de
+ * 60 páginas y el asistente nunca llega a leer "Tasaciones" ni "Sumate al equipo".
+ */
+export function esFichaDePropiedad(entrada: string): boolean {
+  let partes: string[]
+  try {
+    partes = new URL(entrada).pathname.split("/").filter(Boolean)
+  } catch {
+    return false
+  }
+  const i = partes.findIndex((p) => SEGMENTOS_FICHA.test(p))
+  return i !== -1 && partes.length > i + 1
+}
+
+/** Qué tan adentro del sitio está una dirección: "/" es 0, "/tasaciones" es 1. */
+function profundidad(url: string): number {
+  try {
+    return new URL(url).pathname.split("/").filter(Boolean).length
+  } catch {
+    return 99
+  }
+}
+
+export type MotivoRechazo = "esquema" | "dominio" | "extension" | "ficha" | "invalida"
 export type RevisionUrl = { ok: true; url: URL } | { ok: false; motivo: MotivoRechazo }
 
 /** El guardia de cada dirección antes de pedirla. */
@@ -76,6 +112,7 @@ export function revisarUrl(entrada: string, dominios: string[]): RevisionUrl {
   if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, motivo: "esquema" }
   if (!dominios.includes(u.hostname.toLowerCase())) return { ok: false, motivo: "dominio" }
   if (EXTENSIONES_FUERA.test(u.pathname)) return { ok: false, motivo: "extension" }
+  if (esFichaDePropiedad(u.toString())) return { ok: false, motivo: "ficha" }
   return { ok: true, url: u }
 }
 
@@ -282,14 +319,16 @@ export async function rastrearSitio(opts: OpcionesRastreo): Promise<ResultadoRas
   }
 
   // ── 1. El camino ordenado: el sitemap ──
-  const candidatas: string[] = []
+  let candidatas: string[] = []
+  const encontradas: string[] = []
+  const yaCandidata = new Set<string>()
   let desdeSitemap = false
   const sitemapRaiz = `${sitio.origen}sitemap.xml`
   const primerSitemap = await leerPagina(sitemapRaiz, fetchFn, limites)
   if (primerSitemap) {
     const porVer = [sitemapRaiz]
     const yaVistos = new Set<string>()
-    while (porVer.length && candidatas.length < limites.maxPaginas && !sinTiempo()) {
+    while (porVer.length && encontradas.length < MAX_CANDIDATAS && !sinTiempo()) {
       const actual = porVer.shift()!
       if (yaVistos.has(actual)) continue
       yaVistos.add(actual)
@@ -305,12 +344,23 @@ export async function rastrearSitio(opts: OpcionesRastreo): Promise<ResultadoRas
       if (!xml) continue
       const { urls, sitemaps } = urlsDeSitemap(xml)
       for (const u of urls) {
-        // El sitemap tenía más de las que entran: el director tiene que saber que quedó cortado.
-        if (candidatas.length >= limites.maxPaginas) { truncado = true; break }
-        if (revisarUrl(u, sitio.dominios).ok && !candidatas.includes(u)) candidatas.push(u)
+        if (encontradas.length >= MAX_CANDIDATAS) { truncado = true; break }
+        if (!yaCandidata.has(u) && revisarUrl(u, sitio.dominios).ok) {
+          yaCandidata.add(u)
+          encontradas.push(u)
+        }
       }
       for (const s of sitemaps) if (!yaVistos.has(s) && revisarUrl(s, sitio.dominios).ok) porVer.push(s)
     }
+    // Las secciones primero: una dirección más corta es más general ("/tasaciones" antes que
+    // "/blog/una-nota-de-2024"). Así, si el sitio no entra entero, lo que queda es lo que orienta.
+    const ordenadas = encontradas
+      .map((u, i) => ({ u, i, hondo: profundidad(u) }))
+      .sort((a, b) => a.hondo - b.hondo || a.i - b.i)
+      .map((x) => x.u)
+    // El sitio tenía más páginas de las que entran: el director tiene que saber que quedó cortado.
+    if (ordenadas.length > limites.maxPaginas) truncado = true
+    candidatas = ordenadas.slice(0, limites.maxPaginas)
     desdeSitemap = candidatas.length > 0
   }
 
