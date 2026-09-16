@@ -41,13 +41,16 @@ export async function GET(req: Request) {
     if (!zona) return NextResponse.json({ error: "No encontramos esa zona activa" }, { status: 404 })
     if (!puede) return NextResponse.json({ error: "Esa zona es de un colega" }, { status: 403 })
 
-    // Lo ya descartado no vuelve a aparecer: va a la consulta, no se filtra después, para que
-    // la página no quede corta ni los conteos mientan.
+    // Lo ya descartado NI lo ya convertido en tarjeta vuelven a aparecer: los dos van a la
+    // consulta, no se filtran después, para que la página no quede corta ni los conteos
+    // mientan. "convertido" entra acá también (task 6, 16-sep-2026): un aviso que el asesor ya
+    // pasó a Relevamiento no tiene sentido que siga en esta lista — si volviera, «crear
+    // tarjeta» chocaría con un 409 contra la misma puerta que él mismo ya cargó.
     const { data: marcas, error: eM } = await admin
       .from("farming_avisos_marca")
       .select("aviso_id")
       .eq("zona_id", zonaId)
-      .eq("estado", "descartado")
+      .in("estado", ["descartado", "convertido"])
     if (eM) throw eM
     const excluir = (marcas || []).map((m: any) => Number(m.aviso_id))
 

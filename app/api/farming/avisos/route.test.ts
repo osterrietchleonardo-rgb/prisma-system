@@ -5,9 +5,15 @@ import { baseFalsa } from "@/lib/farming/base-falsa"
  * Los avisos publicados dentro de una zona. Las reglas que sostiene este archivo:
  *  1. La zona se valida SIEMPRE: de otro asesor → 403; de otra agencia o liberada → 404.
  *     createAdminClient se saltea la RLS, así que el filtro explícito no es opcional.
- *  2. Los descartados NO vuelven: viajan a la función como p_excluir, para que la página
- *     no quede corta y los conteos no mientan. El filtro es POR zona y POR estado: una marca
- *     de otra zona, o una que no está descartada, no cuenta.
+ *  2. Lo ya descartado NI lo ya convertido en tarjeta vuelven: los dos estados viajan a la
+ *     función como p_excluir, para que la página no quede corta y los conteos no mientan. El
+ *     filtro es POR zona (una marca de otra zona no cuenta), no por estado dentro de la
+ *     agencia — cualquiera de los dos estados excluye.
+ *     (Cambiado el 16-sep-2026, Task 6: antes "convertido" no existía como estado; ahora un
+ *     aviso que el asesor ya pasó a Relevamiento no tiene sentido que siga apareciendo en la
+ *     lista para "convertir" de nuevo — si volviera, «crear tarjeta» chocaría con un 409 contra
+ *     la puerta que él mismo ya cargó. Antes de este cambio, este archivo probaba lo contrario
+ *     a propósito: no es una regresión, es que el estado "convertido" recién existe.)
  *  3. Los atajos que se devuelven son solo los que tienen datos.
  *  4. Una señal desconocida es 400, no una consulta sin filtro.
  *  5. La 61ª fila es una sonda para saber si hay más: nunca llega al cliente.
@@ -67,7 +73,7 @@ beforeEach(() => {
         { zona_id: Z_MIA, aviso_id: 7, aviso_es_dueno_directo: false, user_id: YO, estado: "descartado", created_at: "" },
         // Una marca de OTRA zona: si el filtro por zona_id se rompe, se cuela en el excluir de Z_MIA.
         { zona_id: Z_JUAN, aviso_id: 99, aviso_es_dueno_directo: false, user_id: YO, estado: "descartado", created_at: "" },
-        // Una marca de la MISMA zona pero YA convertida: si el filtro por estado se rompe, también se cuela.
+        // Una marca de la MISMA zona pero YA convertida: TAMBIÉN tiene que excluir (task 6).
         { zona_id: Z_MIA, aviso_id: 55, aviso_es_dueno_directo: false, user_id: YO, estado: "convertido", created_at: "" },
       ],
     },
@@ -90,17 +96,19 @@ describe("GET /api/farming/avisos", () => {
     expect(d.avisos[0].titulo).toBe("Aviso 1")
   })
 
-  it("los descartados viajan como p_excluir a las DOS funciones", async () => {
+  it("los descartados Y los convertidos viajan como p_excluir a las DOS funciones", async () => {
     await pedir(`zona_id=${Z_MIA}`)
     expect(espia.rpc).toHaveLength(2)
-    for (const llamada of espia.rpc) expect(llamada.args.p_excluir).toEqual([7])
+    for (const llamada of espia.rpc) expect(llamada.args.p_excluir).toEqual([7, 55])
   })
 
-  it("una marca de otra zona y una propia con otro estado no ensucian el p_excluir", async () => {
-    // La fixture ya trae una marca en Z_JUAN y otra "convertida" en Z_MIA (ver beforeEach).
-    // Si el filtro `.eq("zona_id", ...)` o `.eq("estado", "descartado")` se sacara, esto fallaría.
+  // Antes (etapa 2) este test probaba que una marca "convertido" NO excluía — porque ese
+  // estado no existía todavía. Task 6 (16-sep-2026) lo cambia a propósito: ahora SÍ excluye
+  // (ver el comentario de la regla 2, arriba). Lo que se sigue probando sin cambios es que la
+  // zona filtra: la marca de Z_JUAN (mismo aviso_id 99 que no aparece acá) no se cuela en Z_MIA.
+  it("una marca de otra zona no ensucia el p_excluir; una convertida de MI zona SÍ excluye", async () => {
     await pedir(`zona_id=${Z_MIA}`)
-    for (const llamada of espia.rpc) expect(llamada.args.p_excluir).toEqual([7])
+    for (const llamada of espia.rpc) expect(llamada.args.p_excluir).toEqual([7, 55])
   })
 
   it("una zona sin marcas manda p_excluir: [] a las dos funciones", async () => {

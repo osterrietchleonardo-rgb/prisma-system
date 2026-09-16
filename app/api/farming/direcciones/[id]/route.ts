@@ -113,6 +113,21 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     const { error } = await admin.from("farming_direcciones").delete().eq("id", params.id)
     if (error) throw error
 
+    // Si esta tarjeta nació de un aviso, su marca en farming_avisos_marca quedó "convertido".
+    // Sin borrarla acá, quedaría apuntando para siempre a una tarjeta que ya no existe, y con
+    // el fix de app/api/farming/avisos/route.ts (task 6, 16-sep-2026: "convertido" también
+    // excluye) ese aviso desaparecería de «A la venta en mi zona» PARA SIEMPRE, sin ninguna
+    // forma de volver a verlo — la desaparición silenciosa que este proyecto rechaza.
+    // zona_id + aviso_id es la PK de esa tabla: no hace falta más candado que ese.
+    if (c.direccion.aviso_id !== null && c.direccion.aviso_id !== undefined) {
+      const { error: eMarca } = await admin
+        .from("farming_avisos_marca")
+        .delete()
+        .eq("zona_id", c.direccion.zona_id)
+        .eq("aviso_id", c.direccion.aviso_id)
+      if (eMarca) throw eMarca
+    }
+
     return NextResponse.json({ ok: true })
   } catch (e) {
     return responderError(e, "borrar tarjeta")

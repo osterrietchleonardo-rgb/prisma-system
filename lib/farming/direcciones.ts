@@ -104,6 +104,10 @@ export function normalizarDireccion(calle: string, altura?: string | null): stri
  * final de verdad es ese último número («3»), y «Conde 900 piso» —altura incluida— queda
  * adentro de la calle. No es un parser de direcciones: es la extracción rápida para no dejar
  * la tarjeta en blanco; el asesor la corrige a mano si hace falta.
+ *
+ * Caso conocido que parte mal, a propósito no cubierto: las direcciones rurales tipo «Ruta 8
+ * km 45» quedan con el «45» como altura (el "45" de "km 45" es el último número). Se corrige a
+ * mano desde la tarjeta, igual que cualquier otro caso que esta regex simple no acierta.
  */
 export function partirDireccion(direccion: string | null): { calle: string; altura: string | null } {
   const d = (direccion || "").trim()

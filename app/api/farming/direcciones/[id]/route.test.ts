@@ -255,3 +255,53 @@ describe("DELETE /api/farming/direcciones/[id]", () => {
     expect(r.status).toBe(404)
   })
 })
+
+// Task 6, segundo cambio (16-sep-2026): con el fix de app/api/farming/avisos/route.ts, una
+// marca "convertido" ahora excluye al aviso de «A la venta en mi zona» PARA SIEMPRE. Si se
+// borra la tarjeta que esa marca señala sin borrar también la marca, el aviso desaparece de la
+// solapa sin ninguna forma de volver a verlo — la desaparición silenciosa que este proyecto
+// rechaza. Por eso el DELETE de acá también borra la fila de farming_avisos_marca (si la
+// tarjeta tiene aviso_id), scopeada a zona_id + aviso_id (la PK de esa tabla).
+describe("DELETE /api/farming/direcciones/[id]: la marca del aviso que la originó", () => {
+  it("borrar una tarjeta nacida de un aviso borra también su marca: el aviso puede volver a listarse", async () => {
+    nuevaBase({
+      farming_direcciones: [direccionFixture(D_MIA, Z_MIA, AGENCIA, { aviso_id: 42, origen: "aviso" })],
+      farming_avisos_marca: [
+        { zona_id: Z_MIA, aviso_id: 42, aviso_es_dueno_directo: false, user_id: YO, estado: "convertido", direccion_id: D_MIA, created_at: "" },
+      ],
+    })
+    const r = await borrar(D_MIA)
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.ok).toBe(true)
+    expect(base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)).toBeUndefined()
+    expect(base.tablas.farming_avisos_marca).toHaveLength(0)
+  })
+
+  it("borrar una tarjeta que nunca vino de un aviso (aviso_id null) no toca ninguna marca", async () => {
+    nuevaBase({
+      farming_direcciones: [direccionFixture(D_MIA, Z_MIA, AGENCIA)], // aviso_id null, origen "caminata"
+      farming_avisos_marca: [
+        // Una marca de otro aviso en la MISMA zona: si el código borrara por zona_id solo (sin
+        // el AND aviso_id), esto desaparecería igual, y no debería.
+        { zona_id: Z_MIA, aviso_id: 7, aviso_es_dueno_directo: false, user_id: YO, estado: "descartado", direccion_id: null, created_at: "" },
+      ],
+    })
+    const r = await borrar(D_MIA)
+    expect(r.status).toBe(200)
+    expect(base.tablas.farming_avisos_marca).toHaveLength(1)
+  })
+
+  it("una tarjeta de la zona de un colega (con aviso_id): sigue dando 403, no borra la tarjeta NI la marca", async () => {
+    nuevaBase({
+      farming_direcciones: [direccionFixture(D_JUAN, Z_JUAN, AGENCIA, { aviso_id: 42, origen: "aviso" })],
+      farming_avisos_marca: [
+        { zona_id: Z_JUAN, aviso_id: 42, aviso_es_dueno_directo: false, user_id: JUAN, estado: "convertido", direccion_id: D_JUAN, created_at: "" },
+      ],
+    })
+    const r = await borrar(D_JUAN)
+    expect(r.status).toBe(403)
+    expect(base.tablas.farming_direcciones.find((x: any) => x.id === D_JUAN)).toBeDefined()
+    expect(base.tablas.farming_avisos_marca).toHaveLength(1)
+  })
+})
