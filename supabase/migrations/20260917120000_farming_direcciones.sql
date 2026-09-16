@@ -42,12 +42,19 @@ as $$
 $$;
 
 comment on function public.farming_direccion_normalizada(text, text) is
-  'Direccion comparable: minusculas, sin acentos, sin espacios de mas. Inmutable para poder indexarla. La consulta que busca duplicados tiene que escribir la expresion EXACTAMENTE igual que el indice, o Postgres no lo reconoce.';
+  'Direccion comparable: minusculas, sin acentos, sin espacios de mas. Inmutable para poder indexarla. La consulta que busca duplicados tiene que escribir la expresion EXACTAMENTE igual que el indice, o Postgres no lo reconoce. Si se cambia el cuerpo hay que reindexar farming_direcciones_sin_repetir_idx a mano: Postgres no lo rebuildea ni avisa.';
 
 -- ── Las tarjetas (hoja 1 del Excel) ──
 create table if not exists public.farming_direcciones (
   id                 uuid primary key default gen_random_uuid(),
-  zona_id            uuid not null references public.farming_zonas(id) on delete cascade,
+  -- RESTRICT y no CASCADE: borrar la zona no puede llevarse puesto lo relevado. El botón de
+  -- borrar zona (app/api/farming/zonas/[id]/route.ts) hace DELETE duro; con CASCADE, un click
+  -- del dueño destruye también las tarjetas del asesor con quien la comparte y el historial
+  -- firmado de farming_contactos. Con RESTRICT, borrar una zona vacía sigue andando; borrar una
+  -- zona trabajada falla fuerte y obliga a pasar por 'archivada' (que farming_zonas.estado ya
+  -- acepta desde la etapa 1) en vez de desaparecer el trabajo. Es la regla del spec «lo
+  -- trabajado no se borra por apretar un botón», escrita en la base y no en un comentario.
+  zona_id            uuid not null references public.farming_zonas(id) on delete restrict,
   agency_id          uuid not null,            -- denormalizado para la RLS
   tramo              text,                     -- la «cuadra / tramo» de la hoja 1
   calle              text not null,
@@ -86,7 +93,10 @@ create table if not exists public.farming_direcciones (
   fuera_de_zona      boolean not null default false,
   fuera_de_zona_desde timestamptz,
   observaciones      text,
-  creada_por         uuid not null references auth.users(id) on delete cascade,
+  -- RESTRICT: la desvinculación de un asesor en este proyecto pone estado + tokens_invalidos_desde,
+  -- nunca borra la fila de auth.users. Esto solo se activa si alguien de verdad borra un usuario,
+  -- y en ese caso tiene que fallar fuerte en vez de llevarse puesto el trabajo de campo.
+  creada_por         uuid not null references auth.users(id) on delete restrict,
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()
 );
@@ -97,14 +107,22 @@ comment on table public.farming_direcciones is
 create index if not exists farming_direcciones_tablero_idx on public.farming_direcciones (zona_id, etapa, orden);
 create index if not exists farming_direcciones_agencia_idx on public.farming_direcciones (agency_id);
 
--- Una sola vez la misma puerta por zona. La expresión tiene que escribirse igual en la consulta.
+-- Una sola vez la misma puerta por zona. PARCIAL: sin esto, dos lotes «s/n» en la misma calle
+-- normalizan igual (altura nula o vacía cae en '') y el segundo insert muere con un 23505 —
+-- justo el caso para el que existe el comentario de «altura text: existe el s/n». La regla solo
+-- aplica cuando SÍ hay una altura para comparar; sin altura, no hay puerta que choque.
+-- La consulta que busca duplicados tiene que repetir la expresión Y este WHERE carácter por
+-- carácter, o Postgres no reconoce el índice y no lo usa.
 create unique index if not exists farming_direcciones_sin_repetir_idx
-  on public.farming_direcciones (zona_id, public.farming_direccion_normalizada(calle, altura));
+  on public.farming_direcciones (zona_id, public.farming_direccion_normalizada(calle, altura))
+  where altura is not null and btrim(altura) <> '' and lower(btrim(altura)) not in ('s/n','sn','s.n.');
 
 -- ── Las personas de cada dirección ──
 create table if not exists public.farming_propietarios (
   id              uuid primary key default gen_random_uuid(),
   direccion_id    uuid not null references public.farming_direcciones(id) on delete cascade,
+  -- Denormalizacion para indices futuros: el acceso NUNCA se decide desde acá, sino por la zona
+  -- de la dirección padre (farming_puede_ver_zona, vía farming_direcciones.zona_id).
   agency_id       uuid not null,
   piso            text,                        -- «3», «PB», «3° B»
   unidad          text,
@@ -115,7 +133,8 @@ create table if not exists public.farming_propietarios (
   email           text,
   notas           text,
   tracking_log_id uuid,                        -- ETAPA 3-B: si ya se pasó al pipeline de Tracking
-  creado_por      uuid not null references auth.users(id) on delete cascade,
+  -- RESTRICT: mismo motivo que farming_direcciones.creada_por — acá se desvincula, no se borra.
+  creado_por      uuid not null references auth.users(id) on delete restrict,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
@@ -129,16 +148,28 @@ create table if not exists public.farming_contactos (
   id                uuid primary key default gen_random_uuid(),
   direccion_id      uuid not null references public.farming_direcciones(id) on delete cascade,
   propietario_id    uuid references public.farming_propietarios(id) on delete set null,
+  -- Denormalizacion para indices futuros: el acceso NUNCA se decide desde acá, sino por la zona
+  -- de la dirección padre (farming_puede_ver_zona, vía farming_direcciones.zona_id).
   agency_id         uuid not null,
-  user_id           uuid not null references auth.users(id) on delete cascade,
-  fecha             date not null default current_date,
+  -- RESTRICT: esto es el historial firmado — lo único que tiene que sobrevivir a la persona que
+  -- lo cargó. La desvinculación de este proyecto no borra auth.users (pone estado +
+  -- tokens_invalidos_desde); si alguna vez alguien borra un usuario de verdad, que falle fuerte
+  -- en vez de comerse la evidencia.
+  user_id           uuid not null references auth.users(id) on delete restrict,
+  -- current_date es UTC en Supabase: una visita cargada a las 21:30 de Buenos Aires caería en
+  -- la fila de mañana. En un cuaderno de caminata la fecha ES el dato.
+  fecha             date not null default ((now() at time zone 'America/Argentina/Buenos_Aires')::date),
   tipo              text not null check (tipo in (
                       'carta_1','carta_2','carta_3','carta_4','carta_5','carta_6','carta_7',
                       'carta_otra','visita_encargado','llamada','whatsapp','email','tasacion',
                       'entrevista','otro')),
   cartas_entregadas smallint,
-  etapa_desde       text,
-  etapa_hasta       text,
+  -- Mismos siete valores que farming_direcciones.etapa: sin este check el historial podía
+  -- registrar una transición a un estado que no existe.
+  etapa_desde       text check (etapa_desde is null or etapa_desde in
+                      ('relevado','presentado','en_secuencia','respondio','tasacion','captada','descartada')),
+  etapa_hasta       text check (etapa_hasta is null or etapa_hasta in
+                      ('relevado','presentado','en_secuencia','respondio','tasacion','captada','descartada')),
   nota              text,
   created_at        timestamptz not null default now()
 );
@@ -172,9 +203,20 @@ as $$
                       where c.zona_id = z.id and c.user_id = auth.uid()))
   )
   -- El director de la agencia mira, no edita (la escritura está revocada más abajo para todos).
+  --
+  -- La agencia sale de farming_zonas, NO de p_agency: p_agency es agency_id de
+  -- farming_direcciones/propietarios/contactos, una columna denormalizada sin FK que la ata a
+  -- farming_zonas.agency_id. Si la app alguna vez la escribe mal, esta rama no puede convertir
+  -- ese error en una fuga entre inmobiliarias. La rama 1 ya es segura porque lee farming_zonas
+  -- bajo su propia RLS por agencia; esta rama tiene que estarlo con la misma fuente de verdad.
   or exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.agency_id = p_agency and p.role = 'director'
+    select 1
+      from public.farming_zonas z
+      join public.profiles p on p.id = auth.uid()
+     where z.id = p_zona
+       and p.role = 'director'
+       and p.agency_id = z.agency_id
+       and z.agency_id = p_agency
   )
 $$;
 
