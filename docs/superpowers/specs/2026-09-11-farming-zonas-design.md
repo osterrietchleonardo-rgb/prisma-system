@@ -117,6 +117,17 @@ polígonos, con cuatro atajos de captación arriba:
 De cada aviso salen dos botones: **«crear tarjeta de relevamiento»** (lo manda a la solapa 2
 ya cargado con lo que el aviso traiga) y **«descartar»** (no vuelve a aparecer).
 
+> **Decisión de Leonardo, 16-sep-2026 (al construir la etapa 2): un atajo se dibuja SOLO si
+> tiene al menos un aviso.** Medido ese día en producción sobre 67.577 avisos de venta: dueño
+> directo 823, +120 días 13.950, **caídos 0 y con baja de precio 20**. Dos de los cuatro atajos
+> darían siempre cero, y un botón que siempre da cero se siente roto. Cuando el descubrimiento
+> diario vuelva a marcar caídos, los atajos aparecen solos: la pantalla los deriva de los
+> conteos vivos, no de una lista fija.
+>
+> La causa de esos ceros no es la consulta: el descubrimiento está caído desde el 9-sep-2026
+> (`FATAL: lanzar: 403`, tope de Apify agotado), y la verificación que marca «caído» corre una
+> vez por mes (cron día 3).
+
 **Acá no se tapa al colega.** En la ficha pública del ACM la descripción se recorta porque
 delata a la inmobiliaria que publica (55% traen matrícula, 42% el nombre del publicador). En
 esta solapa **no**: es la pantalla interna del asesor, no viaja a ningún cliente, y saber
