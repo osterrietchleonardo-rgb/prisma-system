@@ -23,6 +23,16 @@
 // aplicada (la tabla no existe) esos cuatro casos se saltean con un aviso, en vez de tirar
 // abajo todo el script.
 //
+// Etapa 3-A (20260917120000_farming_direcciones.sql, Task 8): se suman los ataques sobre
+// farming_direcciones, farming_propietarios y farming_contactos. Acá el orden SÍ importa: la
+// dirección de A se siembra y se ataca ANTES de compartir la zona con B (para probar que B no
+// ve nada de una zona que no es suya ni le compartieron), y el control positivo — B lee la
+// dirección, el propietario y el contacto — se hace DESPUÉS de compartir, reusando el mismo
+// `compartir` que ya hacía el seed de la etapa 2. Las tres tablas comparten una sola función de
+// acceso (farming_puede_ver_zona), así que un ataque que entrara acá sería el mismo agujero en
+// las tres. Igual que con la marca: si la migración no está aplicada, se saltea con aviso y el
+// veredicto final no puede dar verde.
+//
 // Uso (PowerShell):
 //   $env:A_EMAIL="..."; $env:A_PASS="..."; $env:B_EMAIL="..."; $env:B_PASS="..."; node scripts/farming-rls-ataque.mjs
 //
@@ -126,11 +136,112 @@ espera("nombre sin cambios", fila.nombre === original.nombre)
 espera("agency_id sin cambios", fila.agency_id === original.agency_id)
 espera("geojson sin cambios", JSON.stringify(fila.geojson) === original.geojson)
 
-console.log("Seed: se comparte la zona de A con B (para el control positivo de la marca, etapa 2)")
+console.log("Seed: se crea con service_role una dirección de A en su propia zona (etapa 3-A, farming_direcciones)")
+let direccionesOmitida = false
+let direccion = null
+let propietario = null
+let contacto = null
+const direccionSeed = { zona_id: zona.id, agency_id: perfilA.agency_id, calle: "ATAQUE-RLS calle (borrar)", altura: "9999", tipo: "casa", origen: "caminata", creada_por: A.uid }
+const { data: direccionFila, error: eSeedDireccion } = await admin
+  .from("farming_direcciones")
+  .insert(direccionSeed)
+  .select("id, calle, agency_id, zona_id")
+  .single()
+
+let propietarioSeed, contactoSeed
+if (eSeedDireccion) {
+  direccionesOmitida = true
+  console.warn("No se pudo sembrar la dirección de prueba (¿todavía no está aplicada 20260917120000_farming_direcciones.sql?):", eSeedDireccion.message)
+  console.warn("Se saltean los casos de farming_direcciones, farming_propietarios y farming_contactos.")
+} else {
+  direccion = direccionFila
+
+  console.log("Seed: se crea con service_role un propietario de esa dirección")
+  propietarioSeed = { direccion_id: direccion.id, agency_id: perfilA.agency_id, nombre: "ATAQUE-RLS propietario (borrar)", creado_por: A.uid }
+  const { data: propietarioFila, error: eSeedPropietario } = await admin
+    .from("farming_propietarios")
+    .insert(propietarioSeed)
+    .select("id, nombre, agency_id")
+    .single()
+  if (eSeedPropietario) throw new Error(`no se pudo sembrar el propietario de A: ${eSeedPropietario.message}`)
+  propietario = propietarioFila
+
+  console.log("Seed: se crea con service_role un contacto de esa dirección (etapa 3-B la va a llenar; acá solo se prueba el acceso)")
+  contactoSeed = { direccion_id: direccion.id, agency_id: perfilA.agency_id, user_id: A.uid, tipo: "otro" }
+  const { data: contactoFila, error: eSeedContacto } = await admin
+    .from("farming_contactos")
+    .insert(contactoSeed)
+    .select("id, tipo, agency_id")
+    .single()
+  if (eSeedContacto) throw new Error(`no se pudo sembrar el contacto de A: ${eSeedContacto.message}`)
+  contacto = contactoFila
+
+  console.log("ATAQUE 11: B intenta leer la dirección de A (la zona todavía NO está compartida)")
+  const { data: rDireccionB } = await B.c.from("farming_direcciones").select("id").eq("id", direccion.id)
+  espera("B NO ve la dirección de A", (rDireccionB?.length ?? 0) === 0)
+
+  console.log("ATAQUE 12: B intenta insertar una dirección en la zona de A")
+  const { error: eB8 } = await B.c
+    .from("farming_direcciones")
+    .insert({ zona_id: zona.id, agency_id: perfilA.agency_id, calle: "PWNED", tipo: "casa", origen: "caminata", creada_por: B.uid })
+  espera("B NO pudo insertar una dirección en la zona de A", !!eB8)
+
+  console.log("ATAQUE 13: B intenta actualizar la dirección de A")
+  const { error: eB9 } = await B.c.from("farming_direcciones").update({ calle: "PWNED" }).eq("id", direccion.id)
+  espera("B NO pudo actualizar la dirección de A", !!eB9)
+
+  console.log("ATAQUE 14: B intenta borrar la dirección de A")
+  const { error: eB10, count: countDireccion } = await B.c
+    .from("farming_direcciones")
+    .delete({ count: "exact" })
+    .eq("id", direccion.id)
+  espera("B NO pudo borrar la dirección de A", !!eB10 || countDireccion === 0)
+
+  console.log("ATAQUE 15: B intenta leer el propietario de A (la zona todavía NO está compartida)")
+  const { data: rPropietarioB } = await B.c.from("farming_propietarios").select("id").eq("id", propietario.id)
+  espera("B NO ve el propietario de A", (rPropietarioB?.length ?? 0) === 0)
+
+  console.log("ATAQUE 16: B intenta insertar un propietario en la dirección de A")
+  const { error: eB11 } = await B.c
+    .from("farming_propietarios")
+    .insert({ direccion_id: direccion.id, agency_id: perfilA.agency_id, nombre: "PWNED", creado_por: B.uid })
+  espera("B NO pudo insertar un propietario en la dirección de A", !!eB11)
+
+  console.log("ATAQUE 17: B intenta actualizar el propietario de A")
+  const { error: eB12 } = await B.c.from("farming_propietarios").update({ nombre: "PWNED" }).eq("id", propietario.id)
+  espera("B NO pudo actualizar el propietario de A", !!eB12)
+
+  console.log("ATAQUE 18: B intenta borrar el propietario de A")
+  const { error: eB13, count: countPropietario } = await B.c
+    .from("farming_propietarios")
+    .delete({ count: "exact" })
+    .eq("id", propietario.id)
+  espera("B NO pudo borrar el propietario de A", !!eB13 || countPropietario === 0)
+
+  console.log("ATAQUE 19: B intenta leer el contacto de A (la zona todavía NO está compartida)")
+  const { data: rContactoB } = await B.c.from("farming_contactos").select("id").eq("id", contacto.id)
+  espera("B NO ve el contacto de A", (rContactoB?.length ?? 0) === 0)
+}
+
+console.log("Seed: se comparte la zona de A con B (para los controles positivos de la marca —etapa 2— y de dirección/propietario/contacto —etapa 3-A—)")
 const { error: eCompartir } = await admin
   .from("farming_zonas_compartidas")
   .insert({ zona_id: zona.id, user_id: B.uid, agregado_por: A.uid })
 if (eCompartir) throw new Error(`no se pudo compartir la zona de A con B: ${eCompartir.message}`)
+
+if (!direccionesOmitida) {
+  console.log("Control positivo: B SÍ puede ver la dirección de A porque la zona está compartida con B")
+  const { data: rDireccionCompartida } = await B.c.from("farming_direcciones").select("id").eq("id", direccion.id)
+  espera("B ve la dirección de la zona compartida", rDireccionCompartida?.length === 1)
+
+  console.log("Control positivo: B SÍ puede ver el propietario de A porque la zona está compartida con B")
+  const { data: rPropietarioCompartido } = await B.c.from("farming_propietarios").select("id").eq("id", propietario.id)
+  espera("B ve el propietario de la zona compartida", rPropietarioCompartido?.length === 1)
+
+  console.log("Control positivo: B SÍ puede ver el contacto de A porque la zona está compartida con B")
+  const { data: rContactoCompartido } = await B.c.from("farming_contactos").select("id").eq("id", contacto.id)
+  espera("B ve el contacto de la zona compartida", rContactoCompartido?.length === 1)
+}
 
 console.log("Seed: se crea con service_role una marca de A en su propia zona (etapa 2, farming_avisos_marca)")
 const marcaSeed = { zona_id: zona.id, aviso_id: 999999999, aviso_es_dueno_directo: false, user_id: A.uid, estado: "descartado" }
@@ -179,6 +290,41 @@ if (eSeedMarca) {
   espera("estado de la marca sin cambios", filaMarca.estado === marcaSeed.estado)
 }
 
+if (!direccionesOmitida) {
+  console.log("Verificación: la dirección, el propietario y el contacto siguen exactamente como los sembró el service_role")
+  const { data: filaDireccion, error: eFinalDireccion } = await admin
+    .from("farming_direcciones")
+    .select("calle, agency_id, zona_id")
+    .eq("id", direccion.id)
+    .single()
+  if (eFinalDireccion) throw new Error(`no se pudo releer la dirección: ${eFinalDireccion.message}`)
+  espera("calle de la dirección sin cambios", filaDireccion.calle === direccionSeed.calle)
+  espera("agency_id de la dirección sin cambios", filaDireccion.agency_id === direccionSeed.agency_id)
+  espera("zona_id de la dirección sin cambios", filaDireccion.zona_id === direccionSeed.zona_id)
+
+  const { data: filaPropietario, error: eFinalPropietario } = await admin
+    .from("farming_propietarios")
+    .select("nombre, agency_id")
+    .eq("id", propietario.id)
+    .single()
+  if (eFinalPropietario) throw new Error(`no se pudo releer el propietario: ${eFinalPropietario.message}`)
+  espera("nombre del propietario sin cambios", filaPropietario.nombre === propietarioSeed.nombre)
+  espera("agency_id del propietario sin cambios", filaPropietario.agency_id === propietarioSeed.agency_id)
+
+  const { data: filaContacto, error: eFinalContacto } = await admin
+    .from("farming_contactos")
+    .select("tipo, agency_id")
+    .eq("id", contacto.id)
+    .single()
+  if (eFinalContacto) throw new Error(`no se pudo releer el contacto: ${eFinalContacto.message}`)
+  espera("tipo del contacto sin cambios", filaContacto.tipo === contactoSeed.tipo)
+  espera("agency_id del contacto sin cambios", filaContacto.agency_id === contactoSeed.agency_id)
+
+  console.log("Limpieza: se borra la dirección con service_role (propietario y contacto caen en cascada) — ANTES de la zona, por el RESTRICT de zona_id")
+  const { error: eLimpiezaDireccion } = await admin.from("farming_direcciones").delete().eq("id", direccion.id)
+  if (eLimpiezaDireccion) console.warn("No se pudo limpiar la dirección de prueba:", eLimpiezaDireccion.message, "— borrarla a mano:", direccion.id)
+}
+
 console.log("Limpieza: se borra con service_role")
 const { error: eLimpieza } = await admin.from("farming_zonas").delete().eq("id", zona.id)
 if (eLimpieza) console.warn("No se pudo limpiar la zona de prueba:", eLimpieza.message, "— borrarla a mano:", zona.id)
@@ -187,11 +333,14 @@ const fallas = resultados.filter((r) => !r.ok)
 if (fallas.length) {
   console.log(`\nX ${fallas.length} FALLAS`)
   process.exit(1)
-} else if (marcaOmitida) {
-  // Un verde acá sin haber atacado farming_avisos_marca es peor que no correr el script: dice
-  // "seguro" sin haberlo probado. Distinto código de salida (2) para no confundirlo con el 1
-  // de "un ataque pasó" — acá ningún ataque pasó, simplemente no se corrieron.
-  console.log("\n⚠ 4 ataques a farming_avisos_marca NO se corrieron (la migración 20260916120000 no está aplicada). Esto NO es un OK.")
+} else if (marcaOmitida || direccionesOmitida) {
+  // Un verde acá sin haber corrido estos ataques es peor que no correr el script: dice "seguro"
+  // sin haberlo probado. Distinto código de salida (2) para no confundirlo con el 1 de "un
+  // ataque pasó" — acá ningún ataque pasó, simplemente no se corrieron.
+  const omitidos = []
+  if (marcaOmitida) omitidos.push("4 ataques a farming_avisos_marca (falta 20260916120000_farming_avisos.sql)")
+  if (direccionesOmitida) omitidos.push("9 ataques + 3 controles positivos a farming_direcciones/farming_propietarios/farming_contactos (falta 20260917120000_farming_direcciones.sql)")
+  console.log(`\n⚠ NO se corrieron: ${omitidos.join(" y ")}. Esto NO es un OK.`)
   process.exit(2)
 } else {
   console.log("\nTodo como tiene que ser: los ataques fallan, los controles positivos pasan y la fila no cambió")
