@@ -70,9 +70,23 @@ Medido cargando esa misma fuente:
 glifos de la fuente: 515 | emoji 🏡 -> .notdef
 ```
 
-Un emoji sale como **nada o un cuadradito vacío, sin ningún error**. Es el mismo accidente que ya
-está documentado en `lib/tipografia/contornos.ts`: el crédito de OpenStreetMap del mapa del ACM
-salió como una fila de cuadraditos durante meses sin que nadie lo viera.
+**Corregido el 16-sep-2026, después de medirlo:** al principio de esta sesión se escribió acá que
+el emoji "sale como nada". **Es falso.** Midiendo el glifo de verdad contra la fuente incrustada:
+
+| | glifo | contorno |
+|---|---|---|
+| emoji 🏡 | `.notdef` | **638 caracteres — dibuja un cuadrito bien visible** |
+| espacio | `space` | vacío — no dibuja nada, pero es un glifo real |
+| tabulador | `.notdef` | 638 caracteres — otro cuadrito |
+
+O sea que un emoji en la placa **no desaparece: sale como un cuadrito de tofu en medio del
+título**. Es el mismo accidente que ya está documentado en `lib/tipografia/contornos.ts`: el
+crédito de OpenStreetMap del mapa del ACM salió como una fila de cuadraditos durante meses sin
+que nadie lo viera.
+
+Que el espacio tenga el contorno vacío mientras el `.notdef` tiene uno lleno es justo al revés de
+lo que parece, y define cómo se detecta: **el control mira el nombre del glifo, nunca si el
+contorno vino vacío.** Al revés, cada espacio del aviso legal se reportaría como letra rota.
 
 **Consecuencia de diseño: EN LA IMAGEN NO VA NINGÚN EMOJI.** Dicho por Leonardo el 16-sep-2026.
 Los emojis viven en el texto del post —que es lo que se pega en Meta— y en ningún otro lado. Ni
@@ -80,8 +94,9 @@ en el título de la placa, ni en la bajada, ni en las casillas de datos. El hook
 dibuja sobre la placa, se genera sin emoji y además se le sacan en el servidor por las dudas.
 
 **Agujero que hay que tapar de paso:** `Contornos.letrasRotas` (`contornos.ts:86`) solo cuenta
-coordenadas `NaN`. Un `.notdef` **no lo cuenta**, así que hoy un emoji pasaría por el control sin
-levantar la mano. Se agrega la detección de `.notdef` al contador.
+coordenadas `NaN`. El contorno del cuadrito de `.notdef` es un dibujo perfectamente válido y no
+tiene ningún `NaN`, así que pasaba derecho: **se dibujaba y no se contaba.** Se agrega la
+detección de `.notdef` al contador, por nombre de glifo.
 
 ### Las fotos de Tokko varían mucho, y el 18% son chicas
 
