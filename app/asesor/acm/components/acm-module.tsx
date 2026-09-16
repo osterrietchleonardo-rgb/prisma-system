@@ -38,6 +38,7 @@ export const SUJETO_INICIAL: Sujeto = {
     seguridad_24hs: false,
     jardin_privado: false,
     terraza_privada: false,
+    laundry: false,
   },
   ocupacion: "libre",
   moneda: "USD",
@@ -78,6 +79,8 @@ export function AcmModule({ esDirector = false }: { esDirector?: boolean }) {
   const [results, setResults] = useState<{
     cartera: AcmComparable[];
     roomix: AcmComparable[];
+    /** Sumados a mano pegando el link del aviso. Vacío en una búsqueda nueva. */
+    agregados: AcmComparable[];
     conSemantica: boolean;
     carteraFallo: boolean;
     roomixFallo: boolean;
@@ -137,6 +140,7 @@ export function AcmModule({ esDirector = false }: { esDirector?: boolean }) {
       setResults({
         cartera: data.cartera || [],
         roomix: data.roomix || [],
+        agregados: [],
         conSemantica: data.meta?.con_semantica ?? false,
         carteraFallo,
         roomixFallo,
@@ -200,6 +204,7 @@ export function AcmModule({ esDirector = false }: { esDirector?: boolean }) {
       setResults({
         cartera: data.cartera || [],
         roomix: data.roomix || [],
+        agregados: data.agregados || [],
         conSemantica: Boolean(data.con_semantica),
         carteraFallo: Boolean(data.cartera_fallo),
         roomixFallo: Boolean(data.roomix_fallo),
@@ -312,6 +317,8 @@ export function AcmModule({ esDirector = false }: { esDirector?: boolean }) {
                 operacion={operacion}
                 cartera={results.cartera}
                 roomix={results.roomix}
+                agregados={results.agregados}
+                onAgregadosChange={(agregados) => setResults((r) => (r ? { ...r, agregados } : r))}
                 conSemantica={results.conSemantica}
                 carteraFallo={results.carteraFallo}
                 roomixFallo={results.roomixFallo}

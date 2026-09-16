@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { ChecklistItem } from "@/lib/tasacion/types";
+import { fmtAntiguedad } from "@/lib/acm/antiguedad";
 
 // sub-scores tal cual los devuelve la RPC (0..100 o null si la dimensión no aplica).
 export interface SubScores {
@@ -39,12 +40,7 @@ function estado(score: number | null): ChecklistItem["estado"] {
 
 const fmtNum = (v: number | null | undefined, suf = "") => (v && v > 0 ? `${v}${suf}` : "—");
 // La antigüedad admite el estado de obra como valor válido: 0 = a estrenar, negativo = en pozo.
-const fmtAnios = (v: number | null | undefined) => {
-  if (v === null || v === undefined) return "—";
-  if (v < 0) return "En pozo";
-  if (v === 0) return "A estrenar";
-  return `${v} años`;
-};
+const fmtAnios = fmtAntiguedad;
 
 // Fase 2: qué se muestra en las filas nuevas. El sujeto declara cochera como sí/no
 // (los switches), el comparable como número contado; el piso 0 es PB.

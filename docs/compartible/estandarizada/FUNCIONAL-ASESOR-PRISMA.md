@@ -565,7 +565,7 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 **Cómo usarlo paso a paso:**
 1. **Elegí la propiedad a analizar** de una de estas 3 formas:
-   - **Cargar a mano:** completás el formulario (tipo, zona, m², ambientes, baños, amenities…).
+   - **Cargar a mano:** completás el formulario (tipo, zona, m², ambientes, baños, amenities…). Entre las amenities está **Laundry**: es el laundry **del edificio**, no el lavadero del departamento.
    - **Desde la cartera:** abrís el selector y **escribís para buscar** (por título, dirección o zona) entre las propiedades de tu agencia; elegís una y se completa sola. Tener buscador ayuda cuando son muchas propiedades.
    - **Desde un link:** pegás el link de un aviso (MercadoLibre, ZonaProp, Argenprop…) y apretás **Analizar**: trae los datos automáticamente. Si el portal bloquea la lectura o tarda demasiado, te avisa con un mensaje claro y completás a mano.
 
@@ -573,7 +573,14 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 > 📸 **Fotos de la propiedad (opcional).** Antes de buscar comparables podés adjuntar **hasta 4 fotos** de la propiedad y, si querés, decirle a la IA en qué fijarse (por ejemplo "estado de la cocina y del jardín"). Al tocar **"Analizar fotos con IA"**, Gemini te devuelve una **descripción escrita a partir de lo que ve** — no inventa nada ni oculta lo que está deteriorado, pero lo dice sin castigar la propiedad (por ejemplo, "cocina original, con posibilidad de actualización"). Esa descripción **es tuya**: la podés editar o reescribir del todo antes de seguir, y una casilla te deja elegir si va a la ficha del cliente o se queda solo para afinar la búsqueda. **El análisis se hace una sola vez** (no hay botón para repetirlo): una vez que la IA escribió la descripción, las fotos quedan fijas y el botón de analizar desaparece. Si querés rehacerlo con otras fotos, cambiá de forma de carga (manual / cartera / link) — eso limpia el formulario y arranca de cero. Ojo: si el análisis **falla** (se cayó internet o la IA no respondió), eso no cuenta como analizado y podés reintentar sin perder nada. Las fotos **no se guardan en ningún lado**: se usan para el análisis y se descartan. Tener esta descripción también **ayuda a encontrar mejores comparables**, porque el sistema empieza a comparar también por lo que se ve en las fotos, no solo por m²/ambientes/zona. Si elegiste la propiedad **desde la cartera**, no hace falta que busques las fotos en tu dispositivo: te aparece una **grilla con las fotos que esa propiedad ya tiene cargadas** y tildás hasta 4 con un toque (podés combinarlas con fotos subidas a mano; el tope de 4 es entre las dos). En carga a mano o por link, seguís subiendo las fotos vos, como antes. Después de analizar, también ves **cómo calificó la IA el estado de conservación y la luminosidad de tu propiedad** — corregilo con un toque si no estás de acuerdo; esa corrección es la base contra la que se comparan después las fotos de cada comparable (ver más abajo).
 2. Elegí la **operación** (Venta / Alquiler) y apretá **Buscar comparables**.
-3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**.
+3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**. Cada tarjeta muestra también la **antigüedad** (cuando el aviso la informa) y abajo tiene dos botones: **"Ver publicación"**, que abre el aviso original en otra pestaña, y **"Ver checklist"**.
+
+> 🔗 **¿Tenés un aviso que querés usar y no apareció?** Arriba de los resultados hay un cuadro para **pegar el link** de un aviso de **Zonaprop, Argenprop o MercadoLibre**. Tocás **"Sumar"** y el aviso entra en un bloque nuevo, **"Sumados por link"**, con sus datos, sus fotos, su antigüedad y su **% de comparabilidad** calculado igual que el resto. Lo podés elegir para la ficha del cliente como cualquier otro comparable, y queda **guardado en ese ACM** (lo ves al reabrirlo desde Mis ACM). Si te equivocaste, lo sacás con el **tacho** de la tarjeta.
+> - Si el aviso **ya estaba en la lista**, no lo repite: te avisa en qué bloque está y con qué %.
+> - Algunos portales tardan en dejarse leer: puede demorar **hasta 40 segundos**. Si no deja ver los datos, te avisa y no suma nada.
+> - Si el portal no deja leer el precio, la superficie o las fotos, igual lo suma y **te dice qué le faltó**.
+> - Si el aviso es de **otro barrio**, el % lo refleja (baja). Que lo hayas elegido vos no lo convierte en un comparable del mismo barrio.
+> 💰 Sumar un aviso por link **no consume créditos**.
 
 > 💡 El **tipo** y la **operación** son filtros estrictos. El **barrio, por defecto, se compara solo contra el mismo barrio y sus sub-barrios** (si tu propiedad es de Belgrano, un Belgrano R o un Belgrano Chico entran normalmente). Los **barrios limítrofes** (Núñez, Colegiales, Saavedra si tu propiedad es de Belgrano) **no entran salvo que vos lo pidas**: hay una casilla **"Incluir barrios linderos"** arriba del botón de buscar. Es así a propósito — un comparable de otro barrio puede tener el precio correcto, pero si tu cliente lo ve en su propia tasación, deja de confiar en el informe aunque el número esté bien. Si tildás la casilla, esos comparables **sí aparecen, marcados con un chip "lindero"** para que sepas cuáles son y decidas si los mostrás. No le molestan los acentos (Nuñez = Núñez).
 
@@ -598,6 +605,7 @@ Arriba de todo tenés dos solapas: **Nuevo ACM** y **Mis ACM**.
 
 - **Tocá cualquier fila** y volvés a la **misma pantalla de resultados**, tal como quedó ese día.
 - Si de ese ACM armaste una **ficha para el cliente**, la fila te muestra el botón **"Ficha"** para abrir el link directo.
+- Los avisos que **sumaste pegando el link** también quedan guardados ahí.
 - Si armás **otra ficha** desde el mismo ACM (por ejemplo con otros comparables), te queda **una fila por cada ficha**, así no perdés ninguna.
 - Podés **borrar** un ACM del historial con el tacho. Ojo: si ya compartiste la ficha con el cliente, **el link sigue funcionando**.
 
@@ -943,13 +951,35 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 
 **Si te faltó una manzana o te pasaste:**
 - **"sumar un pedazo"**: dibujás un trazo más y se suma a la zona (una zona puede tener varios pedazos).
-- **"redibujar"**: el trazo nuevo reemplaza al anterior.
+- **"redibujar"**: el trazo nuevo reemplaza al anterior. **El viejo no queda guardado en ningún lado.** Si ya terminaste con esa zona y vas a trabajar otra, conviene dibujar una zona nueva en vez de reemplazar ésta.
 
 **Compartir la zona:** con **"compartir"** elegís a un colega del desplegable. A él le aparece en su Farming como "zona que comparten conmigo" y la trabajan juntos. Vos seguís siendo el dueño: solo vos podés borrarla o sacar a alguien.
 
-**Borrar:** con **"borrar"**. Ojo: esas cuadras quedan libres para que otro las dibuje.
+**Borrar:** con **"borrar"**. Ojo: **no queda registro de la zona ni de su trazo**, y esas cuadras quedan libres para que otro las dibuje.
 
 **Los topes:** hasta **3 zonas** activas por asesor y **5 km²** por zona (sumando sus pedazos). Farming es para trabajar una zona concreta, no para dispersarse.
 
 > 💡 Si el director **libera** una zona tuya (por ejemplo, porque cambiaste de territorio), desaparece de tu lista y esas cuadras vuelven a estar disponibles. No se pierde nada: queda en el historial.
-> 🔜 Las solapas **"Relevamiento"** (el tablero de direcciones que vas trabajando) y **"A la venta en mi zona"** (los avisos publicados adentro de tu zona) llegan en las próximas etapas.
+
+### "A la venta en mi zona"
+
+Es la segunda solapa de Farming, al lado de "Mis zonas". **No tenés que cargar nada:** te muestra todas las propiedades que hoy están publicadas adentro de tu zona. Si compartís la zona con un colega, los dos ven la misma lista.
+
+**Arriba están los atajos**, que son las cuatro señales que más sirven para captar:
+
+| Atajo | Qué quiere decir |
+|---|---|
+| **Dueño directo** | lo vende el propietario, sin inmobiliaria. Es el que más conviene tocar. |
+| **Se cayó del portal** | lo bajaron sin venderlo: la propiedad sigue disponible y el dueño ya se cansó. |
+| **Lleva +120 días** | hace más de cuatro meses que está publicado y no se mueve. |
+| **Bajó el precio** | el dueño ya aceptó que estaba caro. |
+
+**Un atajo solo aparece si tiene propiedades.** Si no ves "Se cayó del portal", es porque hoy no hay ninguna en tu zona que cumpla eso, no porque esté roto. Tocás un atajo y la lista se achica; lo tocás de nuevo y volvés a ver todas. Abajo del atajo hay un renglón que te recuerda por qué esa señal importa.
+
+**De cada propiedad ves** la foto, el precio, la dirección, los metros, los ambientes y **quién la publica** (acá no se esconde: es tu pantalla de trabajo, no la del cliente). Con **"ver el aviso"** se abre la publicación original en otra pestaña.
+
+**"Descartar"** es para las que ya miraste o no te sirven: desaparecen de la lista y **no vuelven a aparecer**, ni aunque recargues. Si te equivocaste, tenés **"deshacer"** ahí mismo. Ojo: en una zona compartida, lo que descartás vos también desaparece de la lista de tu colega.
+
+**Si movés el trazo, la lista se acomoda sola.** No hay nada guardado: se calcula cada vez que entrás. Si agrandás la zona aparecen las propiedades nuevas, y si sacás una cuadra se van las de esa cuadra.
+
+> 🔜 La solapa **"Relevamiento"** —el tablero donde vas moviendo las direcciones según avanzás— llega en la próxima etapa, junto con el botón para pasar una de estas propiedades al tablero.

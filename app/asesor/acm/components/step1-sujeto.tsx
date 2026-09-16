@@ -274,7 +274,8 @@ export function Step1Sujeto({ sujeto, onChange, onNext, hideNextButton }: Step1S
             sum: "SUM",
             seguridad_24hs: "Seguridad 24hs",
             jardin_privado: "Jardín Privado",
-            terraza_privada: "Terraza Privada"
+            terraza_privada: "Terraza Privada",
+            laundry: "Laundry"
           }).map(([k, label]) => {
             const key = k as keyof Amenidades;
             return (

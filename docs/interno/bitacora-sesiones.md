@@ -16,6 +16,51 @@
 
 ---
 
+## 2026-09-16 — ACM: cuatro pedidos de los asesores (link, Laundry, antigüedad, sumar por link)
+
+**De dónde salió:** `system_feedback` de Central. Carolina Etcheverry (16-sep, `a251b9b4` link de
+los comparables y `adc8c2d4` Laundry), Carolina Grossi (28-ago, `0f151722` antigüedad) y Eric
+Zambrana (31-ago, `aa44c66e`, segunda mitad: sumar comparables por link). La primera mitad de
+Eric y la de Maximiliano (`353bbb7e`, zona dibujada) ya estaban hechas desde el 8-sep.
+
+**Lo que había de verdad detrás de cada uno**
+
+- Link: existía, al fondo del checklist desplegado. No era un error, era diseño.
+- Antigüedad: el campo del formulario existe desde marzo. Grossi armó una ficha
+  (`DQMs3ltJsXya`) 9 minutos antes de escribir: lo que faltaba era verla EN LA FICHA.
+- Laundry: "Laundry" (edificio) y "Lavadero" (unidad) son datos distintos en la red: solo
+  3.623 de 30.173 traen los dos. Token `laundry(?! ?room)`; exacto 10.387 contra `'Laundry'`.
+
+**Qué se hizo** (commit `47baa76`; detalle en TECNICO §10.6)
+
+- "Ver publicación" a la vista (44 px), antigüedad en tarjeta, hoja y portada.
+- `POST /api/acm/comparable-link`: Zonaprop se busca en `mercado_avisos` por id (el número del
+  aviso es el id); otro portal va por el extractor pidiendo `con_html`. `% = puntaje-link.ts`.
+- Fotos del propio aviso (`fotos-aviso.ts`), probadas contra páginas reales de los tres portales.
+
+**Verificación**
+
+- Paridad del % contra `acm_match_roomix` real: 305 avisos de 8 ACM, 305 iguales. La primera
+  corrida dio 303: el 66,5 en coma flotante redondeaba a 66 (Postgres dice 67).
+- 12 errores metidos a propósito, los 12 hicieron fallar su prueba. 2.262 pruebas en verde.
+- Navegador con PRISMAIA - VAKDOR: escritorio, celular emulado (390×844, touch) y tema claro;
+  ficha medida en modo impresión (cada hoja 1123 px, pie adentro).
+
+**Errores propios cazados probando:** (1) el servidor guardaba un aviso que la búsqueda ya
+había traído aunque la pantalla avisara "ya está" → duplicado al reabrir; ahora decide el
+servidor. (2) "CABA, Argentina" contaba como otro barrio (zona 0); no saber no es ser otro.
+(3) Las etiquetas pisaban "COMPARABLE" en 390 px (preexistente con "apto crédito").
+**Trampa:** `git checkout --` no restaura un archivo sin trackear; un mutante quedó puesto hasta
+que el grep lo mostró. Restaurar mutantes desde una copia, nunca con git.
+
+**Pendiente**
+
+- **Redeploy del extractor en EasyPanel** (con OK): sin eso, fuera de la red no hay fotos
+  cuando Tier 1 está bloqueado (en Vercel, casi siempre).
+- Argenprop por Tier 1 devuelve barrio "CABA, Argentina" (el JSON-LD no trae el barrio).
+- Marcar las 4 sugerencias como resueltas en admin-vakdor (con OK).
+- Datos de prueba en PRISMAIA - VAKDOR: `acm_searches` `1bd60870` y ficha `lTb19sULahAu`.
+
 ## 2026-09-16 — El gasto de Apify entra en US$100, las bajas vuelven a marcarse, y apareció el sitemap de ZonaProp
 
 **De dónde salió:** Leonardo pidió analizar un informe de fuentes de datos para el CMA que le
@@ -153,6 +198,64 @@ no tocar. Una línea en cada camino.
 - **Lo mismo de siempre que sigue abierto:** el `generate-batch` y el `generate-image` tienen dos
   copias casi idénticas de `traerPropiedad`; y la placa lee la foto de la tabla sincronizada pero
   el precio de una llamada viva a Tokko, así que pueden no coincidir.
+
+## 2026-09-16 — Farming etapa 2: «A la venta en mi zona»
+
+**Qué se construyó** (rama `feat/farming-avisos-en-mi-zona`, worktree `PRISMA-SYSTEM-farming2`):
+la segunda solapa de Farming, que lista lo que está publicado adentro de la zona del asesor sin
+que él cargue nada. Tabla `farming_avisos_marca` (lo que ya miró), dos funciones PostGIS que
+recortan `mercado_avisos` por el polígono, `GET /api/farming/avisos`, `POST/DELETE
+/api/farming/avisos/marca`, y la solapa con los cuatro atajos de captación.
+
+**Decisiones de Leonardo:**
+- **Un atajo se dibuja solo si tiene datos.** Hoy «se cayó» y «bajó el precio» dan cero en todo
+  el sistema, y un botón que siempre da cero se siente roto. Cuando el pipeline vuelva, aparecen
+  solos.
+- **Trazabilidad de zonas: no se guarda historial.** Preguntó si las zonas quedaban con fecha y
+  filtros para ver la evolución. Verificado ese día: **borrar borra la fila de verdad** y
+  **redibujar pisa el trazo anterior**. Su decisión textual: *«si se borran o se redibujan, no
+  pasa nada, queda lo último y lo visible»*, con un aviso en pantalla y la sugerencia de crear
+  una zona nueva en vez de reemplazar. Se hizo así: dos textos, cero cambios de comportamiento.
+
+**Migración aplicada a producción con su OK.** El clasificador del entorno bloquea «Production
+Deploy» desde el agente (los dos intérpretes): la corrió él con `! node scratch/aplicar-sql.mjs`.
+Verificado después: `authenticated` y `anon` quedan con SELECT y **nada** de escritura, RLS
+encendida, y el **ataque de RLS da 10/10 fallando** (se le sumaron 3 casos + 1 control positivo
+sobre la tabla nueva). El script ahora **no puede terminar en verde si los ataques no corrieron**
+(sale con código 2): antes, correrlo sin la migración aplicada decía «todo bien».
+
+**Dos números corregidos, los dos míos:**
+- Yo había escrito «24,5 ms» en el comentario de la migración. Medido de verdad ya aplicado
+  contra la zona real de Central: **131-136 ms** la función, 91 ms la consulta cruda equivalente
+  (que sí muestra el plan: Index Scan en los dos índices geom de las particiones). Corregido en
+  el archivo.
+- Un brief mío salió corrupto por un `sed` (metió un `&` literal donde iba una aserción). El
+  implementador no lo transcribió; se arregló el plan.
+
+**Encontrado probando en el navegador, no razonando:** las fotos de `mercado_avisos` **no cargan
+ninguna**. La base guarda la URL con el texto `wxh` sin reemplazar —es una plantilla, no una
+dirección—: el CDN da 404 con `wxh` y 200 con `360x266`. Son **70.202 de 70.322** avisos con
+foto. Esta rama es el único lugar de la app que lee `foto_portada`, así que no rompe nada más.
+
+**Verificado en el navegador** (usuario de prueba, zona de 1.097 avisos en Palermo): los atajos
+salen solo los dos que tienen datos; descartar baja el total y el conteo del atajo al instante y
+ofrece deshacer; **lo descartado no vuelve después de recargar**; 120 avisos tras «ver más` sin
+un solo repetido; los 244 elementos tocables miden ≥44 px en 390×844 y ninguna línea se corta.
+
+**Cabos sueltos (en el plan, no perdidos):**
+- El contraste del chip de señal da **2,78** en tema claro (mínimo legible 4,5); en oscuro, 5,84.
+- Descartar y después tocar «ver más» **saltea tantos avisos como los descartados** (confirmado
+  contra la app: 2 descartes → 2 avisos que no aparecen nunca). El offset tiene que ser la
+  cantidad de tarjetas en pantalla, no página × 60.
+- Si el asesor descarta el último aviso del atajo que está mirando, el chip desaparece con el
+  filtro puesto y, con una sola zona, no queda botón para volver a «Todas».
+- El endpoint de marca no valida que el aviso esté dentro de la zona (solo puede ensuciar la
+  lista propia). Para la etapa 3: «convertir» sobre un aviso ya descartado necesita `update`, no
+  el `ON CONFLICT DO NOTHING` de hoy, o no hace nada en silencio.
+- La tarjeta de zona de la solapa 1 todavía no muestra «avisos a la venta hoy», que el spec pide
+  y esta etapa recién ahora hace calculable.
+- **Pendiente de Leonardo:** el tope de Apify (US$100 agotado, gastado US$102,45). El
+  descubrimiento diario está caído desde el 9-sep y por eso dos atajos dan cero.
 
 ## 2026-09-15 — Auditoría del Dashboard del director, tanda 1 de 3
 

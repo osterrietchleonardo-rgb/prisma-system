@@ -12,6 +12,8 @@ const MATCHERS: Record<keyof Amenidades, RegExp> = {
   seguridad_24hs: /24 hour security|security|seguridad|vigilan|alarm/i,
   jardin_privado: /\bgarden\b|jard[ií]n|backyard/i,
   terraza_privada: /terrace|terraza|solarium|deck/i,
+  // "Public Laundry"/"Laundry" sí; "Laundry room" es el lavadero de la unidad, no el servicio.
+  laundry: /laundry(?! ?room)/i,
 };
 
 export function tokkoTagsToAmenidades(tags: string[]): Amenidades {
