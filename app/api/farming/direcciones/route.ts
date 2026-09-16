@@ -175,6 +175,11 @@ export async function POST(req: Request) {
       moneda: body?.moneda ?? null,
       observaciones: body?.observaciones ?? null,
       relevada_en: body?.relevada_en ?? null,
+      // «Qué sigue» y para cuándo: las dos columnas existen desde la migración y la tarjeta las
+      // muestra como línea visible. Sin esto el campo del formulario se guardaba en silencio en
+      // ningún lado, que es peor que no tenerlo.
+      proxima_accion: body?.proxima_accion ?? null,
+      proxima_accion_en: body?.proxima_accion_en ?? null,
       aviso_id: avisoId,
       aviso_es_dueno_directo: avisoId !== null ? !!body?.aviso_es_dueno_directo : null,
       origen,

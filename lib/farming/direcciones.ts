@@ -59,6 +59,10 @@ export interface EntradaDireccion {
   moneda?: "USD" | "ARS" | null
   observaciones?: string | null
   relevada_en?: string | null
+  /** «Qué sigue» y para cuándo. La tarjeta lo muestra como línea visible, nunca en un globito:
+   *  es lo que el asesor necesita leer de un vistazo antes de volver a esa puerta. */
+  proxima_accion?: string | null
+  proxima_accion_en?: string | null
 }
 
 export function etiquetaDe(etapa: EtapaDireccion): string {

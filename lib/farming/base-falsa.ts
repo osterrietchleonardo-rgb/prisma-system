@@ -44,7 +44,9 @@ export function baseFalsa(inicial: Record<string, Fila[]>, rpcs: Record<string, 
       limit: (n: number) => { tope = n; return q },
       single: () => { unico = true; return q },
       maybeSingle: () => { unico = true; quizas = true; return q },
-      then: (resolve: (r: { data: any; error: any }) => void) => {
+      // `count` viaja igual que en el cliente real cuando se pidió con `{ count: "exact" }`:
+      // sin declararlo acá, el `resolve({ data, count, error })` de más abajo no compila.
+      then: (resolve: (r: { data: any; count?: number | null; error: any }) => void) => {
         const pasa = (f: Fila) => filtros.every((p) => p(f))
         let res: Fila[]
         let count: number | null = null

@@ -29,6 +29,36 @@ function telefonoAGuardar(raw: unknown): string | null {
   return normalizePhoneE164(s) ?? s
 }
 
+/**
+ * Las personas de UNA tarjeta. Sin esto la pantalla podía sumar un propietario y no volver a
+ * verlo nunca: al reabrir la tarjeta la lista salía vacía aunque la fila estuviera guardada.
+ * Mismo candado que el alta, y primero la más vieja: el orden en que se fueron conociendo.
+ */
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  try {
+    const { userId, agencyId } = await requireTenant()
+    const admin = createAdminClient()
+
+    const { direccion, puede } = await direccionAccesible(admin, params.id, agencyId, userId)
+    if (!direccion) return NextResponse.json({ error: "No encontramos esa tarjeta" }, { status: 404 })
+    if (!puede) return NextResponse.json({ error: "Esa tarjeta es de la zona de un colega" }, { status: 403 })
+
+    // `agency_id` además del `direccion_id`, igual que el GET de direcciones: una fila mal
+    // escrita en la columna denormalizada falla cerrada en vez de filtrarse.
+    const { data, error } = await admin
+      .from("farming_propietarios")
+      .select("*")
+      .eq("direccion_id", params.id)
+      .eq("agency_id", agencyId)
+      .order("created_at", { ascending: true })
+    if (error) throw error
+
+    return NextResponse.json({ propietarios: data || [] })
+  } catch (e) {
+    return responderError(e, "propietarios de la tarjeta")
+  }
+}
+
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const { userId, agencyId } = await requireTenant()

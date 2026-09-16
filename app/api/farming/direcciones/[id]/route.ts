@@ -43,6 +43,9 @@ const COLUMNAS_EDITABLES = [
   "moneda",
   "observaciones",
   "relevada_en",
+  // «Qué sigue» y para cuándo: se editan desde el mismo diálogo que el resto de la tarjeta.
+  "proxima_accion",
+  "proxima_accion_en",
 ] as const
 
 async function candado(admin: ReturnType<typeof createAdminClient>, id: string, agencyId: string, userId: string) {
