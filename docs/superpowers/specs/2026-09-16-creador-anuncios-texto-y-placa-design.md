@@ -202,13 +202,31 @@ Entonces: **el alto del panel se calcula a partir de su contenido real** — cu�
 el título con el cuerpo elegido, más la bajada, el precio, la fila de casillas, el logo y la
 franja legal. La foto se queda con lo que sobra.
 
-Con dos topes:
+**Corregido el 16-sep-2026, después de probarlo con el aviso legal real del cliente.** Acá decía
+que la foto "nunca baja del 45%" y que primero se achica el título y después se sueltan las
+casillas. Las dos cosas quedaron mal: probando con el aviso legal de verdad de Central (165 px de
+franja, 319 px reservados con el logo), **el formato cuadrado seguía metiendo el precio abajo de la
+franja legal** aun con el título en el cuerpo más chico, cero casillas y la foto clavada en el 45%.
+El tope del 45% terminaba pisando el aviso legal, que es exactamente lo que este diseño existe
+para evitar.
 
-- La foto **nunca baja del 45%** del alto de la placa. Si el contenido no entra, se achica el
-  cuerpo del título (de mayor a menor, como hace `armarFranjaLegal`) y si aún así no entra, se
-  recortan las casillas de datos — que son lo prescindible.
-- Las casillas se dejan de dibujar en cuanto la siguiente no entra a lo ancho. Nunca se parten ni
-  se desbordan.
+**Lo que se construyó, que es otra cosa.** Hay una sola regla que no se negocia: *el contenido
+nunca se mete en la zona del aviso legal*. Para cumplirla, el panel afloja en este orden:
+
+1. **Suelta las casillas de datos** — son lo más prescindible.
+2. **Suelta la bajada.**
+3. **Achica el cuerpo del título**, de mayor a menor.
+4. **Achica la foto**: el 45% pasa a ser una *preferencia*, con un piso duro del **30%**.
+
+El título nunca se achica antes que las casillas, y esto es a propósito: en una placa inmobiliaria
+el título *es* el mensaje; las casillas son adorno informativo.
+
+Si ni con la foto al 30% entra, la placa **igual sale** —no se rompe nada— pero lo **avisa**: la
+función devuelve `desborda: true`, la ruta lo registra y el asesor ve una advertencia. Antes esto
+se aceptaba en silencio.
+
+Las casillas, además, se dejan de dibujar en cuanto la siguiente no entra a lo ancho. Nunca se
+parten ni se desbordan.
 
 Es la misma filosofía que ya tiene el aviso legal: se mide y se acomoda, no se supone.
 
@@ -245,9 +263,20 @@ no es prueba*):
 
 **Que la foto sea la foto** — esto es lo que sostiene todo el diseño:
 
-- Comparo **píxel a píxel** la placa generada contra la foto original de Tokko, en la zona que no
-  tapan ni el panel ni el logo ni la franja legal. Si no son idénticas, la imagen se tocó y el
-  diseño falló.
+**Corregido el 16-sep-2026:** acá decía "comparo píxel a píxel; si no son idénticas, la imagen se
+tocó". **Eso no se puede pedir**, y prometerlo hacía que la prueba fuera mentirosa: la placa se
+guarda como JPEG de calidad 92, así que los bytes cambian aunque nadie haya tocado la foto.
+
+Lo que se comprueba de verdad: se recorta la foto original por separado, exactamente como debería
+quedar (`resize` a la zona de foto, recorte al centro), y se compara **píxel contra píxel de esa
+referencia**, midiendo cuánto se desvía en promedio. Un viaje de ida y vuelta por JPEG mueve muy
+poco; cualquier cosa que le pase a la foto de verdad —un desenfoque, un retoque, una regeneración—
+la mueve muchísimo más.
+
+**Y la prueba se probó al revés**: se le metió un desenfoque a la foto a propósito para verla
+fallar, y recién después se sacó. La versión anterior de esta prueba usaba una foto de color plano
+y **seguía pasando con la foto desenfocada** — o sea que no probaba nada. Es la prueba que sostiene
+todo el diseño; si no puede fallar, no sirve.
 
 **Que no falte ninguna letra:**
 
@@ -267,10 +296,15 @@ Con la cuenta **PRISMAIA - VAKDOR**, nunca entrando como un asesor de Central.
 
 ## 5. Archivos que se tocan
 
+*(Lista completada el 16-sep-2026 al cerrar la rama: faltaban tres archivos.)*
+
 **Nuevos**
 
 - `lib/marketing-ia/parrafos.ts` + `parrafos.test.ts`
 - `lib/marketing-ia/placa-con-foto.ts` + `placa-con-foto.test.ts`
+- `lib/tipografia/contornos.test.ts` — no existía ninguna prueba de la tipografía
+- `app/api/marketing-ia/generate-batch/prompt.test.ts`
+- `app/api/marketing-ia/generate-image/camino.test.ts`
 
 **Modificados**
 
@@ -281,6 +315,9 @@ Con la cuenta **PRISMAIA - VAKDOR**, nunca entrando como un asesor de Central.
   servidor
 - `components/marketing-ia/copy-generator-flow.tsx` — el paso de elegir la foto
 - `lib/tipografia/contornos.ts` — que `letrasRotas` cuente también los `.notdef`
+- `lib/marketing-ia/aviso-legal.ts` — el repartidor de renglones se mudó a tipografía, porque ahora
+  lo usan dos
+- `types/marketing-ia.ts` — `foto_url` y `propiedad_tokko_id` en `GenerateImagePayload`
 
 ---
 
