@@ -16,6 +16,61 @@
 
 ---
 
+## 2026-09-16 — Farming etapa 3-A: la caminata (direcciones y propietarios)
+
+**Qué se construyó** (rama `feat/farming-relevamiento`, worktree `PRISMA-SYSTEM-farming2`): lo que
+el asesor carga **a pie**, que es la mayoría de lo que releva y no está publicado en ningún
+portal. Tres tablas (`farming_direcciones`, `farming_propietarios`, `farming_contactos`), los
+endpoints de alta/edición/borrado de tarjetas y personas, el botón que pasa un aviso publicado a
+Relevamiento, y la solapa nueva con su formulario. **La etapa 3 se partió en dos**: el tablero de
+6 columnas, el historial que se llena solo, los 9 indicadores y el botón a Tracking son la 3-B.
+
+**Lo que más vale de esta rama no es la pantalla, son dos protecciones:**
+- **Borrar una zona con trabajo cargado ahora es imposible.** El botón «borrar» existe desde la
+  etapa 1 y lo único que iba a frenar la cascada era un comentario que decía «esto se hace en la
+  etapa 3». La FK quedó en `on delete restrict` y la app archiva en vez de borrar. Probado contra
+  producción con una transacción que se revierte: la base **se niega**.
+- **El ataque de RLS pasó de 10 a 40 casos.** Ahora prueba lo que un test flojo deja pasar: que
+  un colega con zona compartida **lea pero no escriba**, y que el director **mire pero no edite**.
+  El bloque del director no corre si el service_role no confirma antes que esa cuenta es director
+  de esa agencia — si no, se saltea en vez de dar un OK falso. 40/40, salida 0.
+
+**Decisiones tomadas** (las discutibles, con su motivo):
+- `validarDireccion` devuelve `{ errores, avisos }`: solo la calle y el tipo bloquean. Un asesor
+  que escribe «pisos: 8» parado en la vereda tiene que poder guardar y completar después.
+- El `tipo` arranca en «Edificio». Lo había decidido al revés y **cambié de opinión** con el
+  argumento del revisor: una casa mal tipeada aporta CERO a «unidades potenciales» (las unidades
+  salen de los números, no del tipo), el error se ve en la tarjeta y se arregla con un toque;
+  sacar el default haría empezar cada puerta con el botón deshabilitado.
+- `fuera_de_zona` se guarda al crear, pero `fuera_de_zona_desde` queda NULL: esa fecha dice
+  «cuándo se cayó», y una tarjeta que nació afuera nunca se cayó. Con fecha = se cayó al mover el
+  trazo; sin fecha = nació afuera. Es lo que la 3-B va a usar para separar las dos poblaciones.
+- Al borrar una tarjeta que vino de un aviso se borra también su marca, así el aviso **vuelve** a
+  «A la venta en mi zona» en vez de quedar escondido para siempre.
+
+**Verificado en el navegador, contra datos reales** (usuario de prueba, zona de 1.097 avisos):
+se guarda con solo la calle; 8×4 muestra «Total: 32 unidades · se calcula solo»; «av   ejemplo
+1200» se detecta como la misma puerta que «Av. Ejemplo 1200» y el cuadro queda abierto para
+corregir; el teléfono se guarda en E.164 y disca desde un link de 44 px; pasar un aviso a tarjeta
+y deshacerlo revierte **las dos mitades**; a 390 px nada baja de 44 px ni se corta; consola limpia.
+
+**Dos cosas que solo aparecen probando, no leyendo código:**
+- Un **500 al guardar una persona** que NO era de la app: el servidor de desarrollo se quedaba sin
+  memoria compilando esa ruta (había **51 procesos de node** abiertos). Servidor limpio, mismo
+  pedido, 201. Conviene matar los node colgados antes de probar.
+- El buscador de direcciones medía **42 px** y, peor, **no llevaba `type`**, así que tampoco lo
+  alcanzaba la regla anti-zoom de iOS: al tocarlo en un iPhone la pantalla se agrandaba sola.
+  Arreglado en `components/mapa/mapa-buscador.tsx` (46 px y letra de 16), que **también arregla el
+  mapa del Buscador IA**.
+
+**Para la etapa 3-B, anotado para que no se pierda:**
+- Recalcular `fuera_de_zona` **cada vez que un PATCH traiga `lat` o `lng`**, no solo al redibujar:
+  hoy el cartel puede quedar mal en las dos direcciones, y una tarjeta puede terminar con una
+  calle que no coincide con su punto.
+- Convertir un aviso ya descartado necesita `update`, no `ON CONFLICT DO NOTHING`.
+- Los dos números de la tarjeta de zona («direcciones relevadas» y «avisos a la venta hoy») van
+  con la 3-B, que rehace esa tarjeta igual.
+
 ## 2026-09-16 — El creador de anuncios: texto que se puede pegar en Meta, y la placa con la foto REAL
 
 **Qué se construyó** (rama `feat/anuncios-texto-y-placa`, worktree `PRISMA-SYSTEM-anuncios`)
