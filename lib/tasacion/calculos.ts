@@ -36,6 +36,7 @@ const VALORES_AMENIDADES: Record<keyof Amenidades, number> = {
   seguridad_24hs: 2,
   jardin_privado: 3,
   terraza_privada: 3,
+  laundry: 1,
 };
 
 // 3. Cálculos de Diferenciales de Factor

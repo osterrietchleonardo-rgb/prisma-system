@@ -16,6 +16,53 @@
 
 ---
 
+## 2026-09-16 — ACM: cuatro pedidos de los asesores (link, Laundry, antigüedad, sumar por link)
+
+**De dónde salió:** `system_feedback` de Central. Carolina Etcheverry (16-sep, `a251b9b4` link de
+los comparables y `adc8c2d4` Laundry), Carolina Grossi (28-ago, `0f151722` antigüedad) y Eric
+Zambrana (31-ago, `aa44c66e`, segunda mitad: sumar comparables por link). La primera mitad de
+Eric y la de Maximiliano (`353bbb7e`, zona dibujada) ya estaban hechas desde el 8-sep.
+
+**Lo que había de verdad detrás de cada uno**
+
+- Link: existía, al fondo del checklist desplegado. No era un error, era diseño.
+- Antigüedad: el campo del formulario existe desde marzo. Grossi armó una ficha
+  (`DQMs3ltJsXya`) 9 minutos antes de escribir: lo que faltaba era verla EN LA FICHA.
+- Laundry: "Laundry" (edificio) y "Lavadero" (unidad) son datos distintos en la red: solo
+  3.623 de 30.173 traen los dos. Token `laundry(?! ?room)`; exacto 10.387 contra `'Laundry'`.
+
+**Qué se hizo** (commit `47baa76`; detalle en TECNICO §10.6)
+
+- "Ver publicación" a la vista (44 px), antigüedad en tarjeta, hoja y portada.
+- `POST /api/acm/comparable-link`: Zonaprop se busca en `mercado_avisos` por id (el número del
+  aviso es el id); otro portal va por el extractor pidiendo `con_html`. `% = puntaje-link.ts`.
+- Fotos del propio aviso (`fotos-aviso.ts`), probadas contra páginas reales de los tres portales.
+
+**Verificación**
+
+- Paridad del % contra `acm_match_roomix` real: 305 avisos de 8 ACM, 305 iguales. La primera
+  corrida dio 303: el 66,5 en coma flotante redondeaba a 66 (Postgres dice 67).
+- 12 errores metidos a propósito, los 12 hicieron fallar su prueba. 2.262 pruebas en verde.
+- Navegador con PRISMAIA - VAKDOR: escritorio, celular emulado (390×844, touch) y tema claro;
+  ficha medida en modo impresión (cada hoja 1123 px, pie adentro).
+
+**Errores propios cazados probando:** (1) el servidor guardaba un aviso que la búsqueda ya
+había traído aunque la pantalla avisara "ya está" → duplicado al reabrir; ahora decide el
+servidor. (2) "CABA, Argentina" contaba como otro barrio (zona 0); no saber no es ser otro.
+(3) Las etiquetas pisaban "COMPARABLE" en 390 px (preexistente con "apto crédito").
+**Trampa:** `git checkout --` no restaura un archivo sin trackear; un mutante quedó puesto hasta
+que el grep lo mostró. Restaurar mutantes desde una copia, nunca con git.
+
+**Pendiente**
+
+- **Redeploy del extractor en EasyPanel** (con OK): sin eso, fuera de la red no hay fotos
+  cuando Tier 1 está bloqueado (en Vercel, casi siempre).
+- Argenprop por Tier 1 devuelve barrio "CABA, Argentina" (el JSON-LD no trae el barrio).
+- Marcar las 4 sugerencias como resueltas en admin-vakdor (con OK).
+- Datos de prueba en PRISMAIA - VAKDOR: `acm_searches` `1bd60870` y ficha `lTb19sULahAu`.
+
+---
+
 ## 2026-09-16 — El creador de anuncios: texto que se puede pegar en Meta, y la placa con la foto REAL
 
 **Qué se construyó** (rama `feat/anuncios-texto-y-placa`, worktree `PRISMA-SYSTEM-anuncios`)

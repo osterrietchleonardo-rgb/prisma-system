@@ -695,7 +695,11 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 **Cómo usarlo:**
 1. **Elegí la propiedad a analizar:** a mano, desde la **cartera** (con **buscador**: escribís parte del título, dirección o zona y filtra al toque, ideal cuando tenés muchas propiedades) o pegando un **link** de portal (botón **Analizar**, extrae los datos solos).
 2. Elegí **operación** (Venta/Alquiler) y **Buscar comparables**.
-3. Resultados en dos bloques (**Cartera de tu agencia** y **Red de colaboración**), cada comparable con su **%** y el **checklist** (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo, operación). El **precio** va al costado, **fuera del %**.
+3. Resultados en dos bloques (**Cartera de tu agencia** y **Red de colaboración**), cada comparable con su **%** y el **checklist** (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo, operación). El **precio** va al costado, **fuera del %**. Cada tarjeta muestra la **antigüedad** y tiene a la vista el botón **"Ver publicación"** para abrir el aviso original.
+
+> 🔗 **Sumar un comparable pegando el link.** Arriba de los resultados hay un cuadro para pegar el link de un aviso de **Zonaprop, Argenprop o MercadoLibre**. El aviso entra en el bloque **"Sumados por link"** con sus datos, fotos, antigüedad y **% calculado igual que el resto**; se puede elegir para la ficha y queda guardado en el ACM. Si ya estaba en la lista no se repite, y si es de otro barrio el % baja. Puede tardar hasta 40 segundos cuando el portal demora en dejarse leer. No consume créditos.
+> 🧺 Entre las amenities está **Laundry** (el del edificio, no el lavadero de la unidad), y cuenta en el %.
+> 📄 La **ficha del cliente** muestra la **antigüedad** de cada comparable y la de la propiedad analizada.
 
 > ℹ️ Si cambiás de modo (a mano / cartera / link), el formulario **se limpia** para no mezclar datos de una carga con otra.
 

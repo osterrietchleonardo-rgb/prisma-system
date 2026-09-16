@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { prismaIA } from "@/lib/gemini";
+import { fotosDelAviso } from "@/lib/acm/fotos-aviso";
 import type { ExtractResult, Moneda, Operacion, TipoPropiedad, Sujeto } from "@/lib/tasacion/types";
 
 const UA =
@@ -79,6 +80,8 @@ const AMEN_RE: Record<string, RegExp> = {
   seguridad_24hs: /seguridad 24|vigilanc|24 ?hs|24 hour|porter[ií]a|portero/i,
   jardin_privado: /jard[ií]n|\bgarden\b|backyard|fondo verde/i,
   terraza_privada: /terraza|\bterrace\b|solarium|sol[áa]rium/i,
+  // Laundry del edificio. "Laundry room" (Tokko) y "lavadero" son de la unidad: no cuentan.
+  laundry: /laundry(?! ?room)|lavander[íi]a/i,
 };
 function mapAmenidades(text?: string | null): Record<string, boolean> {
   const out: Record<string, boolean> = {};
@@ -215,7 +218,7 @@ async function fromIA(html: string, url = ""): Promise<{ extract: Partial<Extrac
   if (contenido.length < 60) return null;
 
   const prompt = `Sos un analista inmobiliario experto de Argentina. Te paso TODO el contenido de la página de un aviso. Leé y RAZONÁ sobre el conjunto (título, URL, descripción, datos del portal y texto), y devolvé SOLO un JSON válido (sin texto extra):
-{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_semicubiertos":0,"m2_descubiertos":0,"m2_terreno":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"piso":null,"orientacion":"norte|sur|este|oeste|ne|no|se|so|null","precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","expensas":0,"responsable":"inmobiliaria o publicante, o null","fecha_publicacion":null,"amenidades":{"cochera_cubierta":false,"cochera_descubierta":false,"baulera":false,"pileta":false,"gimnasio":false,"sum":false,"seguridad_24hs":false,"jardin_privado":false,"terraza_privada":false}}
+{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_semicubiertos":0,"m2_descubiertos":0,"m2_terreno":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"piso":null,"orientacion":"norte|sur|este|oeste|ne|no|se|so|null","precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","expensas":0,"responsable":"inmobiliaria o publicante, o null","fecha_publicacion":null,"amenidades":{"cochera_cubierta":false,"cochera_descubierta":false,"baulera":false,"pileta":false,"gimnasio":false,"sum":false,"seguridad_24hs":false,"jardin_privado":false,"terraza_privada":false,"laundry":false}}
 Traé el MÁXIMO de variables que ENCUENTRES en el aviso (no dejes vacío lo que sí está escrito). Cómo razonar (interpretá lo que dice la página, NO adivines ni pongas valores por defecto):
 - operacion: mirá la URL, el título y el texto. "alquiler"/"alquilar"/"renta" -> alquiler. "venta"/"en venta"/"comprar" -> venta. Si de verdad no se puede determinar, null. PROHIBIDO asumir "venta" sin señal.
 - moneda: mirá cómo se muestra el precio. "US$"/"U$S"/"USD"/"dólares" -> USD. "$"/"ARS"/"pesos" sin símbolo de dólar -> ARS. Coherencia: alquiler mensual suele ser ARS, venta suele ser USD, pero mandá lo que la página indica. Si no hay señal, null.
@@ -223,7 +226,7 @@ Traé el MÁXIMO de variables que ENCUENTRES en el aviso (no dejes vacío lo que
 - superficies: m2_cubiertos = cubierta; m2_semicubiertos = balcón/semicubierto; m2_descubiertos = patio/descubierto; m2_terreno = lote. Si solo dan total, ponela en m2_cubiertos.
 - piso: número de piso si aplica (PB = 0), si no null. orientacion: solo si el aviso la indica, si no null. antiguedad_anios: años; "a estrenar"/"nuevo" = 0.
 - "ambientes" NO es "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1.
-- amenidades: RAZONÁ cada una y poné true SOLO la que el aviso confirme (si dice "No" o no la menciona, false). "cochera cubierta"->cochera_cubierta; "cochera descubierta"->cochera_descubierta; "baulera"->baulera; "pileta/piscina"->pileta; "gimnasio/gym"->gimnasio; "SUM"->sum; cualquier vigilancia/portería/"Seguridad: Sí"->seguridad_24hs; "jardín" propio->jardin_privado; "terraza/balcón aterrazado/solárium"->terraza_privada. NO coincidencia literal: interpretá el sentido.
+- amenidades: RAZONÁ cada una y poné true SOLO la que el aviso confirme (si dice "No" o no la menciona, false). "cochera cubierta"->cochera_cubierta; "cochera descubierta"->cochera_descubierta; "baulera"->baulera; "pileta/piscina"->pileta; "gimnasio/gym"->gimnasio; "SUM"->sum; cualquier vigilancia/portería/"Seguridad: Sí"->seguridad_24hs; "jardín" propio->jardin_privado; "terraza/balcón aterrazado/solárium"->terraza_privada; "laundry"/"lavandería" del edificio -> laundry (el "lavadero" de la unidad NO es laundry). NO coincidencia literal: interpretá el sentido.
 - Si un dato no está: null (0 en numéricos, amenidades en false).
 CONTENIDO:
 """${contenido}"""`;
@@ -272,6 +275,29 @@ CONTENIDO:
   }
 }
 
+const ENTIDADES: Record<string, string> = { "&amp;": "&", "&quot;": '"', "&#39;": "'", "&#x27;": "'", "&lt;": "<", "&gt;": ">", "&nbsp;": " " };
+
+/** El texto de la publicación: la descripción del JSON-LD si el portal la trae, si no la de las
+ *  etiquetas meta. Se usa en la ficha del cliente cuando el aviso se suma como comparable (ahí
+ *  pasa por `condensarDescripcion`, que le saca la letra chica y los datos de contacto). */
+export function descripcionDesdeHtml(html: string | null | undefined): string {
+  if (!html) return "";
+  const ld = parseJsonLdListings(html)
+    .map((n) => (typeof n?.description === "string" ? n.description : typeof n?.mainEntity?.description === "string" ? n.mainEntity.description : ""))
+    .find((d) => d.trim().length > 40);
+  const meta = (prop: string) => {
+    const re = new RegExp(`<meta[^>]+(?:property|name)\\s*=\\s*["']${prop}["'][^>]*content\\s*=\\s*["']([^"']+)["']`, "i");
+    return html.match(re)?.[1] || "";
+  };
+  const crudo = ld || meta("og:description") || meta("description") || "";
+  return crudo
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&(?:amp|quot|#39|#x27|lt|gt|nbsp);/g, (e: string) => ENTIDADES[e] ?? e)
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 4000);
+}
+
 function looksBlocked(status: number, html: string): boolean {
   if (status === 403 || status === 429 || status === 503 || status === 0) return true;
   const h = html.toLowerCase();
@@ -279,7 +305,7 @@ function looksBlocked(status: number, html: string): boolean {
 }
 
 // ── Tier 2: servicio extractor con navegador stealth (opcional, env-gated). ──
-async function tryExtractorService(url: string): Promise<ExtractResult | null> {
+async function tryExtractorService(url: string, conFotos = false): Promise<ExtractResult | null> {
   const svc = process.env.ACM_EXTRACTOR_URL;
   if (!svc) return null;
   try {
@@ -288,13 +314,16 @@ async function tryExtractorService(url: string): Promise<ExtractResult | null> {
     const res = await fetch(svc, {
       method: "POST",
       headers,
-      body: JSON.stringify({ url }),
+      // `con_html`: el servicio devuelve además la página, de donde salen las fotos y el texto
+      // del aviso. Solo lo pide el comparable por link: la carga de la propiedad no los usa y la
+      // página pesa cientos de KB. Un servicio viejo que no conoce el campo lo ignora (sin fotos).
+      body: JSON.stringify({ url, ...(conFotos ? { con_html: true } : {}) }),
       // el servicio puede tardar (resuelve Cloudflare); damos margen, pero acotado
       // para que la suma de tiempos no supere el maxDuration de la función (60s).
       signal: AbortSignal.timeout(38000),
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as Partial<ExtractResult>;
+    const { html: paginaServicio, ...data } = (await res.json()) as Partial<ExtractResult> & { html?: string };
     // Respetamos el veredicto del servicio: si NO pudo leer la página (bloqueo/thin), devuelve
     // ok:false y requiere_completar_manual:true. NO lo forzamos a "ok" para no dar datos inventados.
     const ok = data.ok ?? Boolean(data.precio || (data.sujeto && (data.sujeto.m2_cubiertos || data.sujeto.dormitorios)));
@@ -304,6 +333,9 @@ async function tryExtractorService(url: string): Promise<ExtractResult | null> {
       ok,
       requiere_completar_manual: data.requiere_completar_manual ?? !ok,
       metodo: "extractor-service",
+      ...(conFotos && typeof paginaServicio === "string"
+        ? { fotos: fotosDelAviso(url, paginaServicio), descripcion: descripcionDesdeHtml(paginaServicio) }
+        : {}),
     };
   } catch {
     return null;
@@ -311,7 +343,12 @@ async function tryExtractorService(url: string): Promise<ExtractResult | null> {
 }
 
 // ── Orquestador principal ──
-export async function extractFromUrl(url: string): Promise<ExtractResult> {
+/**
+ * @param opts.conFotos Además de los datos, las fotos y el texto del propio aviso. Lo pide el
+ *   comparable sumado por link; la carga de la propiedad analizada no lo necesita.
+ */
+export async function extractFromUrl(url: string, opts: { conFotos?: boolean } = {}): Promise<ExtractResult> {
+  const conFotos = opts.conFotos === true;
   const fuente_portal = portalFromUrl(url);
 
   let status = 0;
@@ -343,7 +380,7 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
   // Si parece bloqueado, intentamos primero el servicio con navegador (si existe).
   if (blocked) {
     serviceTried = true;
-    const viaSvc = await tryExtractorService(url);
+    const viaSvc = await tryExtractorService(url, conFotos);
     if (viaSvc) return { ...viaSvc, fuente_portal };
   }
 
@@ -370,7 +407,7 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
   // renderizada como un usuario real: resuelve ML/ZonaProp/Argenprop) antes de seguir.
   if (!tieneDatosMinimos && !serviceTried) {
     serviceTried = true;
-    const viaSvc = await tryExtractorService(url);
+    const viaSvc = await tryExtractorService(url, conFotos);
     if (viaSvc) return { ...viaSvc, fuente_portal };
   }
 
@@ -414,6 +451,7 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
     metodo: (ext.metodo as ExtractResult["metodo"]) ?? "opengraph",
     ok,
     requiere_completar_manual: !ok,
+    ...(conFotos && html && !blocked ? { fotos: fotosDelAviso(url, html), descripcion: descripcionDesdeHtml(html) } : {}),
     aviso: ok
       ? undefined
       : blocked

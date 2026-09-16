@@ -162,6 +162,27 @@ describe("urlFotoRed con el CDN de ZonaProp (mercado_avisos)", () => {
   });
 });
 
+// Los comparables sumados por link (16-sep-2026): las fotos de Argenprop y MercadoLibre salen
+// por el mismo proxy. Solo esos dos hosts exactos: el resto del dominio de un portal no.
+describe("urlFotoRed con las fotos de los portales (comparables por link)", () => {
+  it("manda por el proxy las fotos de Argenprop y de MercadoLibre", () => {
+    const ap = "https://www.argenprop.com/static-content/77823402/01d78f9b-bbb7-4043-af36-c3254ceeb024.jpg";
+    const ml = "https://http2.mlstatic.com/D_NQ_NP_2X_717437-MLA114123645099_072026-F.webp";
+    expect(urlFotoRed(ap)).toBe(`/api/foto-red?u=${encodeURIComponent(ap)}`);
+    expect(urlFotoRed(ml)).toBe(`/api/foto-red?u=${encodeURIComponent(ml)}`);
+  });
+
+  it("no cae con impostores ni con otros subdominios del portal", () => {
+    for (const u of [
+      "https://www.argenprop.com.evil.com/a.jpg",
+      "https://static.argenprop.com/a.jpg",
+      "https://http2.mlstatic.com.evil.com/a.webp",
+    ]) {
+      expect(urlFotoRed(u)).toBe(u);
+    }
+  });
+});
+
 // El agujero que encontro una revision el 26/08/2026: el proxy validaba el archivo con
 // `tipo.startsWith("image/")`, y `image/svg+xml` pasa ese filtro. Un SVG no es una foto: es
 // texto que puede traer un <script>, y servido desde prisma.vakdor.com correria con los
