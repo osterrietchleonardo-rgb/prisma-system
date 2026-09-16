@@ -50,16 +50,18 @@ function Tarjeta({ aviso, onDescartar }: { aviso: AvisoEnZona; onDescartar: (a: 
         )}
 
         <div className="mt-2 flex flex-wrap gap-2">
-          <a
-            href={aviso.url_publica}
-            target="_blank"
-            rel="noopener noreferrer"
-            // h-11 (44px) a mano: es un <a> suelto, no un <button>, y la regla global de
-            // globals.css que estira a 44px en el celular solo alcanza a "a.btn".
-            className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 text-xs font-medium dark:border-zinc-800"
-          >
-            <ExternalLink className="h-3.5 w-3.5" /> ver el aviso
-          </a>
+          {aviso.url_publica && (
+            <a
+              href={aviso.url_publica}
+              target="_blank"
+              rel="noopener noreferrer"
+              // h-11 (44px) a mano: es un <a> suelto, no un <button>, y la regla global de
+              // globals.css que estira a 44px en el celular solo alcanza a "a.btn".
+              className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 text-xs font-medium dark:border-zinc-800"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> ver el aviso
+            </a>
+          )}
           <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-xs" onClick={() => onDescartar(aviso)}>
             <X className="h-3.5 w-3.5" /> descartar
           </Button>

@@ -61,7 +61,7 @@ export interface AvisoEnZona {
   precio_usd: number | null
   m2: number | null
   ambientes: number | null
-  url_publica: string
+  url_publica: string | null
   foto: string | null
   publicador: string | null
   senales: Senal[]
@@ -87,6 +87,34 @@ const num = (v: number | string | null): number | null => {
   return Number.isFinite(n) ? n : null
 }
 
+/** `mercado_avisos` la puebla un crawler leyendo portales de terceros, no un humano de confianza
+ *  (mismo criterio que la allowlist de `lib/acm/fotos-url.ts`). Sin este filtro, un `javascript:`
+ *  colado en `url_publica` terminaría en un `href` y correría en la sesión del asesor al primer
+ *  click en «ver el aviso». Solo `http(s)` pasa; `new URL` dentro de un try/catch, nunca una
+ *  regex suelta — una cadena relativa o rota termina en `null`, nunca tira. */
+function urlPublicaSegura(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null
+  } catch {
+    return null
+  }
+}
+
+/** La foto ya pasó por `urlFotoRed`, que devuelve la ruta de NUESTRO proxy (`/api/...`) para los
+ *  hosts conocidos — pero si el host no está en su allowlist, la deja intacta. Acá se cierra esa
+ *  puerta: lo único que llega a un `<img src>` es nuestra propia ruta o una URL `http(s)` real;
+ *  cualquier otro esquema (`javascript:`, `data:`, etc.) queda en `null`. */
+function fotoSegura(url: string): string | null {
+  if (url.startsWith("/api/")) return url
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null
+  } catch {
+    return null
+  }
+}
+
 /** Qué señales de captación tiene un aviso. Un mismo aviso puede tener varias. */
 export function senalesDe(f: FilaAviso): Senal[] {
   const s: Senal[] = []
@@ -109,10 +137,10 @@ export function armarAviso(f: FilaAviso): AvisoEnZona {
     precio_usd: num(f.precio_usd),
     m2: num(f.superficie_total_m2),
     ambientes: f.ambientes,
-    url_publica: f.url_publica,
+    url_publica: urlPublicaSegura(f.url_publica),
     // La foto SIEMPRE por el proxy: el CSP de la app (img-src) no permite CDNs de terceros, y
     // así el navegador del asesor tampoco deja su Referer en el CDN ajeno.
-    foto: f.foto_portada ? urlFotoRed(f.foto_portada) : null,
+    foto: f.foto_portada ? fotoSegura(urlFotoRed(f.foto_portada)) : null,
     publicador: f.publicador_nombre,
     senales: senalesDe(f),
   }

@@ -81,4 +81,25 @@ describe("armarAviso", () => {
   it("60 por página", () => {
     expect(POR_PAGINA).toBe(60)
   })
+
+  // mercado_avisos la puebla un crawler leyendo portales de terceros, no un humano de confianza
+  // (mismo criterio que la allowlist de lib/acm/fotos-url.ts): una URL hostil colada en la fila
+  // no puede llegar intacta a un href o un src del navegador del asesor.
+  it("un url_publica javascript: no llega al href: queda en null", () => {
+    expect(armarAviso({ ...base, url_publica: "javascript:alert(1)" }).url_publica).toBeNull()
+  })
+
+  it("un foto_portada data: no llega al src: queda en null", () => {
+    expect(armarAviso({ ...base, foto_portada: "data:text/html,<script>alert(1)</script>" }).foto).toBeNull()
+  })
+
+  it("un aviso normal (https) sale sin tocar", () => {
+    const a = armarAviso(base)
+    expect(a.url_publica).toBe("https://www.zonaprop.com.ar/x-123.html")
+  })
+
+  it("la foto de la red, ya proxied, sale sin tocar", () => {
+    const a = armarAviso(base)
+    expect(a.foto).toBe(`/api/foto-red?u=${encodeURIComponent("https://imgar.zonapropcdn.com/avisos/1/x.jpg")}`)
+  })
 })
