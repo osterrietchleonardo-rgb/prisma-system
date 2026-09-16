@@ -16,6 +16,9 @@ export async function pedir(url: string, init?: RequestInit) {
   const d = await r.json().catch(() => ({}))
   if (!r.ok) {
     const e: any = new Error(d.error || "Algo salió mal")
+    // El código de estado, siempre: quien llama puede necesitar distinguir un 409 (choque) de
+    // cualquier otro error sin depender del texto exacto del mensaje del servidor.
+    e.status = r.status
     if (r.status === 409) e.choques = d.choques
     throw e
   }

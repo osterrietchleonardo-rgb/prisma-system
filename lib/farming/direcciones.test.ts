@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { unidadesTotales, normalizarDireccion, validarDireccion, TIPOS, ETAPAS } from "./direcciones"
+import { unidadesTotales, normalizarDireccion, validarDireccion, partirDireccion, tipoDesdeAviso, TIPOS, ETAPAS } from "./direcciones"
 
 /**
  * Las reglas de la tarjeta de la caminata. Lo que sostiene este archivo:
@@ -78,6 +78,15 @@ describe("validarDireccion", () => {
     expect(res.errores).toHaveLength(1)
   })
 
+  // El arreglo de una línea: `if (!e.tipo)` disparaba TAMBIÉN la rama de "presente pero
+  // inválido" para un tipo falsy-pero-no-nulo (""), duplicando la misma frase. Con
+  // `e.tipo == null` las dos ramas son mutuamente excluyentes.
+  it("un tipo vacío (string) da el mensaje una sola vez, no duplicado", () => {
+    const res = validarDireccion({ calle: "Conde", tipo: "" as any })
+    const veces = res.errores.filter((x) => x === "Elegí qué tipo de propiedad es.").length
+    expect(veces).toBe(1)
+  })
+
   it("pisos sin unidades por piso avisa, pero no bloquea: errores vacío, avisos lleno", () => {
     const res = validarDireccion({ calle: "Conde", tipo: "edificio", pisos: 8 })
     expect(res.errores).toEqual([])
@@ -150,6 +159,50 @@ describe("validarDireccion", () => {
     expect(validarDireccion({ calle: "Conde", tipo: "casa", cartel: "dueno" }).errores).toEqual([])
     expect(validarDireccion({ calle: "Conde", tipo: "casa", cartel: "sin_cartel" }).errores).toEqual([])
     expect(validarDireccion({ calle: "Conde", tipo: "casa", cartel: "inmobiliaria", inmobiliaria_cartel: "Vakdor" }).errores).toEqual([])
+  })
+})
+
+describe("partirDireccion", () => {
+  it("calle y altura simples", () => {
+    expect(partirDireccion("Conde 900")).toEqual({ calle: "Conde", altura: "900" })
+  })
+
+  it("una calle con abreviatura y varias palabras", () => {
+    expect(partirDireccion("Av. Santa Fe 3200")).toEqual({ calle: "Av. Santa Fe", altura: "3200" })
+  })
+
+  it("sin número: la calle entera, altura null", () => {
+    expect(partirDireccion("Camino Real")).toEqual({ calle: "Camino Real", altura: null })
+  })
+
+  it("texto después del número: el número final —no el del medio— es la altura", () => {
+    // Regla literal (regex simple): todo lo que no sea el número FINAL es la calle. Acá el
+    // final es "3" (de "piso 3"), no "900" — así que "900" queda adentro de la calle.
+    expect(partirDireccion("Conde 900 piso 3")).toEqual({ calle: "Conde 900 piso", altura: "3" })
+  })
+
+  it("null da calle vacía y altura null", () => {
+    expect(partirDireccion(null)).toEqual({ calle: "", altura: null })
+  })
+
+  it("vacío da calle vacía y altura null", () => {
+    expect(partirDireccion("")).toEqual({ calle: "", altura: null })
+  })
+})
+
+describe("tipoDesdeAviso", () => {
+  it("mapea los seis tipos conocidos del portal", () => {
+    expect(tipoDesdeAviso("Departamento")).toBe("edificio")
+    expect(tipoDesdeAviso("Casa")).toBe("casa")
+    expect(tipoDesdeAviso("PH")).toBe("ph")
+    expect(tipoDesdeAviso("Local")).toBe("local")
+    expect(tipoDesdeAviso("Oficina")).toBe("oficina")
+    expect(tipoDesdeAviso("Terreno")).toBe("lote")
+  })
+
+  it("cualquier otra cosa, u null, cae en otro", () => {
+    expect(tipoDesdeAviso("Cochera")).toBe("otro")
+    expect(tipoDesdeAviso(null)).toBe("otro")
   })
 })
 

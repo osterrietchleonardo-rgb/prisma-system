@@ -95,6 +95,46 @@ export function normalizarDireccion(calle: string, altura?: string | null): stri
     .trim()
 }
 
+/**
+ * Parte `aviso.direccion` (un solo string de `mercado_avisos`, ej. «Conde 900») en `calle` y
+ * `altura` para precargar la tarjeta cuando el asesor convierte un aviso en Relevamiento.
+ *
+ * Regex simple, a propósito: todo lo que NO sea el número final es la calle. Si el número no
+ * está pegado al final (por ejemplo «Conde 900 piso 3», con texto después de la altura), el
+ * final de verdad es ese último número («3»), y «Conde 900 piso» —altura incluida— queda
+ * adentro de la calle. No es un parser de direcciones: es la extracción rápida para no dejar
+ * la tarjeta en blanco; el asesor la corrige a mano si hace falta.
+ */
+export function partirDireccion(direccion: string | null): { calle: string; altura: string | null } {
+  const d = (direccion || "").trim()
+  if (!d) return { calle: "", altura: null }
+
+  const m = d.match(/^(.*?)\s*(\d+)$/)
+  if (!m) return { calle: d, altura: null }
+
+  const calle = m[1].trim()
+  // Si el número se traga toda la calle (ej.: la dirección es solo "1200"), no hay calle que
+  // separar: se deja el string entero como calle antes que perder el dato.
+  if (!calle) return { calle: d, altura: null }
+
+  return { calle, altura: m[2] }
+}
+
+/** El tipo de propiedad que trae `mercado_avisos` (texto libre del portal) mapeado a las siete
+ *  claves cerradas de `TIPOS`. Cualquier valor que el portal no cubra explícitamente —o que no
+ *  venga— cae en "otro": nunca se inventa un tipo. */
+export function tipoDesdeAviso(tipo: string | null): TipoDireccion {
+  switch (tipo) {
+    case "Departamento": return "edificio"
+    case "Casa": return "casa"
+    case "PH": return "ph"
+    case "Local": return "local"
+    case "Oficina": return "oficina"
+    case "Terreno": return "lote"
+    default: return "otro"
+  }
+}
+
 const CLAVES_TIPO = TIPOS.map((t) => t.clave) as string[]
 
 const CARTELES_VALIDOS = ["dueno", "inmobiliaria", "sin_cartel"] as const
@@ -165,9 +205,12 @@ export function validarDireccion(e: Partial<EntradaDireccion>): { errores: strin
 
   // Obligatorios: la calle y el tipo. Lo demás se completa después. Un tipo PRESENTE pero
   // inválido no es "falta el tipo": eso es un valor imposible, y lo corta valoresImposibles.
+  // `== null` y no `!e.tipo`: un tipo falsy-pero-no-nulo ("", 0) tiene que caer SOLO en
+  // valoresImposibles (presente pero inválido), nunca acá también — si no, el mismo mensaje
+  // sale duplicado (ausente + presente-inválido a la vez, contradictorio).
   const errores: string[] = []
   if (!e.calle?.trim()) errores.push("Falta la calle.")
-  if (!e.tipo) errores.push("Elegí qué tipo de propiedad es.")
+  if (e.tipo == null) errores.push("Elegí qué tipo de propiedad es.")
 
   // Si carga pisos, hace falta el otro número: si no, el total queda en blanco y el indicador
   // de «unidades potenciales» miente. Pero no bloquea la guardia.

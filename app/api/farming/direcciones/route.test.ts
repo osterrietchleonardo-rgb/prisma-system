@@ -303,6 +303,25 @@ describe("POST /api/farming/direcciones", () => {
     expect(r.status).toBe(409)
   })
 
+  it("un aviso que apunta a una puerta ya cargada: 409 y la marca queda como estaba (nunca se toca)", async () => {
+    // Task 6: «crear tarjeta» desde un aviso puede chocar contra una puerta que YA está en el
+    // tablero (otro asesor la relevó caminando antes). El 409 sale del mismo chequeo de
+    // duplicados que el alta manual —antes del insert—, así que farming_avisos_marca no debería
+    // tocarse: ni se inserta, ni queda "convertido" sin tarjeta real detrás.
+    nuevaBase({
+      farming_direcciones: [
+        { id: "existente", zona_id: Z_MIA, agency_id: AGENCIA, calle: "Peron", altura: "100", tipo: "casa", etapa: "relevado", orden: 0, creada_por: YO },
+      ],
+    })
+    const r = await pedirPOST({
+      zona_id: Z_MIA, calle: "Peron", altura: "100", tipo: "casa",
+      aviso_id: 7, aviso_es_dueno_directo: false,
+    })
+    expect(r.status).toBe(409)
+    expect(base.tablas.farming_direcciones).toHaveLength(1)
+    expect(base.tablas.farming_avisos_marca).toHaveLength(0)
+  })
+
   it("un 23505 real de Postgres (dos pedidos concurrentes que pasan el chequeo previo) también da 409", async () => {
     // El chequeo de arriba no encuentra nada (tabla vacía): esto simula la carrera donde el
     // índice único de Postgres frena lo que el chequeo en JS no llegó a ver.

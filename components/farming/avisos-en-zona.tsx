@@ -9,17 +9,26 @@
 // Acá NO se tapa al colega que publica (spec): es la pantalla interna del asesor, no viaja a
 // ningún cliente, y saber quién publica es justamente el dato que necesita.
 import { useCallback, useEffect, useRef, useState } from "react"
-import { ExternalLink, Loader2, Undo2, X } from "lucide-react"
+import { ClipboardPlus, ExternalLink, Loader2, Undo2, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { pedir } from "@/lib/farming/cliente"
 import { atajosVisibles, SENALES, type AvisoEnZona, type RespuestaAvisos, type Senal } from "@/lib/farming/avisos"
+import { partirDireccion, tipoDesdeAviso } from "@/lib/farming/direcciones"
 import type { ZonaFarming } from "@/lib/farming/tipos"
 
 const plata = (n: number | null) => (n === null ? "Precio a consultar" : `USD ${n.toLocaleString("es-AR")}`)
 
-function Tarjeta({ aviso, onDescartar }: { aviso: AvisoEnZona; onDescartar: (a: AvisoEnZona) => void }) {
+function Tarjeta({
+  aviso,
+  onDescartar,
+  onCrearTarjeta,
+}: {
+  aviso: AvisoEnZona
+  onDescartar: (a: AvisoEnZona) => void
+  onCrearTarjeta: (a: AvisoEnZona) => void
+}) {
   return (
     <div className="flex gap-3 rounded-xl border border-zinc-200 bg-card p-3 dark:border-zinc-800">
       {aviso.foto ? (
@@ -70,7 +79,16 @@ function Tarjeta({ aviso, onDescartar }: { aviso: AvisoEnZona; onDescartar: (a: 
           <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-xs" onClick={() => onDescartar(aviso)}>
             <X className="h-3.5 w-3.5" /> descartar
           </Button>
-          {/* ETAPA 3: acá va «crear tarjeta de relevamiento», que manda esta dirección al tablero. */}
+          {/* h-11 (44px), la regla global: es lo único de esta fila que escribe en la base
+              (descartar y "ver el aviso" ya existían de la etapa 2, sin tocar acá). */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-11 gap-1.5 text-xs"
+            onClick={() => onCrearTarjeta(aviso)}
+          >
+            <ClipboardPlus className="h-3.5 w-3.5" /> crear tarjeta
+          </Button>
         </div>
       </div>
     </div>
@@ -84,6 +102,9 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
   const [avisos, setAvisos] = useState<AvisoEnZona[]>([])
   const [cargando, setCargando] = useState(true)
   const [ultimoDescarte, setUltimoDescarte] = useState<AvisoEnZona | null>(null)
+  // Las dos mitades que el deshacer tiene que revertir: la marca (`convertido`) y la tarjeta
+  // que nació en farming_direcciones. Sin el id de la tarjeta no hay forma de borrarla después.
+  const [ultimaCreada, setUltimaCreada] = useState<{ aviso: AvisoEnZona; direccionId: string } | null>(null)
 
   // Cuenta las cargas: si el asesor cambia de zona o de filtro con un pedido todavía en
   // vuelo (por ejemplo, tocó «ver más» y después cambió de zona), la respuesta vieja no puede
@@ -98,6 +119,7 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
     setAvisos([])
     setDatos(null)
     setUltimoDescarte(null)
+    setUltimaCreada(null)
   }, [zonaId, senal])
 
   const traer = useCallback(async (desde: number, reemplazar: boolean) => {
@@ -191,6 +213,70 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
     }
   }
 
+  const crearTarjeta = async (a: AvisoEnZona) => {
+    // Mismo generation ref que `descartar`: si cambia de zona o de filtro mientras el POST
+    // está en vuelo, esta lista y estos conteos ya no son los del aviso convertido.
+    const mio = gen.current
+    setAvisos((prev) => prev.filter((x) => x.id !== a.id))
+    setUltimaCreada(null)
+    ajustarConteos(-1, a.senales)
+    const { calle, altura } = partirDireccion(a.direccion)
+    try {
+      const d = await pedir("/api/farming/direcciones", {
+        method: "POST",
+        body: JSON.stringify({
+          zona_id: zonaId,
+          aviso_id: a.id,
+          aviso_es_dueno_directo: a.es_dueno_directo,
+          calle,
+          altura,
+          tipo: tipoDesdeAviso(a.tipo),
+          a_la_venta: true,
+          precio_pedido: a.precio_usd,
+          moneda: "USD",
+          observaciones: a.titulo,
+        }),
+      })
+      if (gen.current !== mio) return
+      setUltimaCreada({ aviso: a, direccionId: d.direccion.id })
+    } catch (e: any) {
+      // Un 409 acá es la MISMA puerta ya cargada (por ejemplo, otro asesor la relevó
+      // caminando antes de que este aviso llegara a la lista): el mensaje del servidor está
+      // pensado para el formulario manual («Esa puerta ya está cargada...: calle altura»); acá
+      // se cambia por uno pensado para este botón, no un error crudo.
+      toast.error(e.status === 409 ? "Esa dirección ya está en tu tablero" : e.message)
+      if (gen.current !== mio) return
+      setAvisos((prev) => [a, ...prev])
+      ajustarConteos(1, a.senales)
+    }
+  }
+
+  const deshacerCreacion = async () => {
+    if (!ultimaCreada) return
+    const { aviso: a, direccionId } = ultimaCreada
+    const mio = gen.current
+    setUltimaCreada(null)
+    try {
+      // Las DOS mitades: la tarjeta que se creó y la marca que quedó "convertido". Primero la
+      // tarjeta: si este es un reintento después de que la marca fallara sola la vez anterior,
+      // la tarjeta ya no existe y el 404 se banca acá — si no, la marca quedaría "convertido"
+      // apuntando para siempre a una tarjeta borrada, y el aviso nunca volvería a esta lista.
+      try {
+        await pedir(`/api/farming/direcciones/${direccionId}`, { method: "DELETE" })
+      } catch (e: any) {
+        if (e.status !== 404) throw e
+      }
+      await pedir(`/api/farming/avisos/marca?zona_id=${encodeURIComponent(zonaId)}&aviso_id=${a.id}`, { method: "DELETE" })
+      if (gen.current !== mio) return
+      setAvisos((prev) => [a, ...prev])
+      ajustarConteos(1, a.senales)
+    } catch (e: any) {
+      toast.error(e.message)
+      if (gen.current !== mio) return
+      setUltimaCreada({ aviso: a, direccionId })
+    }
+  }
+
   if (zonas.length === 0) {
     return <p className="text-sm text-muted-foreground">Dibujá una zona en «Mis zonas» y acá vas a ver lo que está a la venta adentro.</p>
   }
@@ -266,6 +352,15 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
         </div>
       )}
 
+      {ultimaCreada && (
+        <div className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 text-xs">
+          <span>Lo pasaste a Relevamiento: «{ultimaCreada.aviso.titulo}» ya está en tu tablero.</span>
+          <Button variant="ghost" size="sm" className="h-9 gap-1.5" onClick={deshacerCreacion}>
+            <Undo2 className="h-3.5 w-3.5" /> deshacer
+          </Button>
+        </div>
+      )}
+
       {cargando && avisos.length === 0 && (
         <div className="flex h-40 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       )}
@@ -277,7 +372,7 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
       )}
 
       <div className="grid gap-3 lg:grid-cols-2">
-        {avisos.map((a) => <Tarjeta key={a.id} aviso={a} onDescartar={descartar} />)}
+        {avisos.map((a) => <Tarjeta key={a.id} aviso={a} onDescartar={descartar} onCrearTarjeta={crearTarjeta} />)}
       </div>
 
       {datos?.hay_mas && (
