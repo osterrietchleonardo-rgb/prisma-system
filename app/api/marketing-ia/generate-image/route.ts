@@ -27,6 +27,15 @@ async function traerPropiedad(
   claveAgencia: string | null
 ): Promise<TokkoProperty | null> {
   if (!tokkoId) return null;
+  // El id viaja a una URL de Tokko CON la clave de la agencia adentro. No confiamos en que
+  // llegue numerico solo porque el tipo dice `number | string`: un string cualquiera ahi
+  // adentro viaja con la credencial en un pedido saliente. Nunca se pudo explotar (Tokko
+  // devuelve 404 con basura), pero un valor sin validar no debe llegar a una URL con una
+  // credencial adentro — se corta antes.
+  if (!/^\d+$/.test(String(tokkoId))) {
+    console.error("[PLACA] propiedad_tokko_id invalido, no es un id numerico:", tokkoId);
+    return null;
+  }
   const clave = claveAgencia || process.env.TOKKO_API_KEY;
   if (!clave) return null;
   try {
@@ -72,9 +81,151 @@ function contenidoDelPanel(hook: string, p: TokkoProperty | null): ContenidoPane
   return {
     titulo: sinEmojis(hook),
     bajada: ubicacion ? sinEmojis(ubicacion) : undefined,
-    precio,
+    precio: precio ? sinEmojis(precio) : undefined,
     datos: datos.map(sinEmojis),
   };
+}
+
+/**
+ * Baja el logo (HTTP, con fallback a Supabase Storage) y lo deja preparado al ancho de la placa.
+ * Devuelve null si no hay logoUrl o si no se pudo conseguir el archivo — en cualquiera de los
+ * dos casos ya deja loggeado el motivo.
+ *
+ * Comun a los dos caminos (junto con `capasDelLogo` de abajo) para que no puedan volver a
+ * divergir: hasta el 16-sep-2026 el camino con foto tenia su propia copia recortada de esta
+ * logica, sin el fallback a Storage y sin loguear nada si el logo no se conseguia.
+ */
+async function bajarYPrepararLogo(
+  logoUrl: string | null | undefined,
+  imgWidth: number,
+  logoSize: string | undefined,
+  supabaseAdmin: ReturnType<typeof createAdminClient>
+): Promise<Awaited<ReturnType<typeof prepararLogo>> | null> {
+  console.log('[DEBUG] Logo URL detected:', logoUrl);
+  if (!logoUrl) {
+    console.warn('[WARN] No logo_url found in marketing_ai_config or agency record');
+    return null;
+  }
+
+  let logoRawBuffer: Buffer | null = null;
+
+  // 1. Try HTTP fetch
+  try {
+    const logoRes = await fetch(logoUrl);
+    if (logoRes.ok) {
+      logoRawBuffer = Buffer.from(await logoRes.arrayBuffer());
+      console.log('[DEBUG] Logo fetched successfully via HTTP');
+    } else {
+      console.warn(`[WARN] Logo HTTP fetch status: ${logoRes.status}`);
+    }
+  } catch (httpErr) {
+    console.error("[ERROR] Logo HTTP fetch error:", httpErr);
+  }
+
+  // 2. Fallback to Supabase Storage direct download if HTTP fetch failed
+  if (!logoRawBuffer && logoUrl.includes('marketing-images')) {
+    try {
+      const storagePath = logoUrl.split('marketing-images/')[1];
+      if (storagePath) {
+        const { data: fileData, error: storageErr } = await supabaseAdmin.storage
+          .from('marketing-images')
+          .download(storagePath);
+        if (fileData && !storageErr) {
+          logoRawBuffer = Buffer.from(await fileData.arrayBuffer());
+          console.log('[DEBUG] Logo downloaded successfully via Supabase Storage fallback');
+        } else if (storageErr) {
+          console.error('[ERROR] Storage download error:', storageErr);
+        }
+      }
+    } catch (stErr) {
+      console.error("[ERROR] Logo Storage download exception:", stErr);
+    }
+  }
+
+  if (!logoRawBuffer) {
+    console.warn('[WARN] Could not retrieve logo buffer for overlay. logoUrl:', logoUrl);
+    return null;
+  }
+
+  try {
+    return await prepararLogo(logoRawBuffer, imgWidth, logoSize);
+  } catch (e) {
+    console.error("[ERROR] No se pudo preparar el logo:", e);
+    return null;
+  }
+}
+
+/**
+ * Donde va el logo y, si hace falta, el halo de contraste detras: las capas para pasarle a
+ * sharp junto con lo demas. No compone nada — el que llama decide el orden con la franja legal
+ * en una sola pasada.
+ *
+ * `imageBuffer` tiene que ser la imagen TAL COMO VA A QUEDAR debajo del logo (la de Gemini ya
+ * recortada, o la placa con la foto ya armada): el halo se mide contra esos pixeles, no contra
+ * un fondo generico.
+ */
+async function capasDelLogo(
+  logoListo: Awaited<ReturnType<typeof prepararLogo>>,
+  imgWidth: number,
+  imgHeight: number,
+  franjaLegal: Awaited<ReturnType<typeof armarFranjaLegal>>,
+  marketingConfig: any,
+  imageBuffer: Buffer
+): Promise<OverlayOptions[]> {
+  try {
+    const resizedLogoBuffer = logoListo.png;
+    const logoW = logoListo.ancho;
+    const logoH = logoListo.alto;
+
+    const margin = Math.round(imgWidth * 0.04); // 4% margin
+
+    // Si hay aviso legal, el logo se apoya arriba de la franja usando su alto REAL.
+    const bottomOffset = (franjaLegal?.alto ?? 0) + logoH + margin;
+
+    const position = marketingConfig.logo_position || 'bottom-right';
+    let left = margin;
+    let top = margin;
+
+    switch (position) {
+      case 'top-left':
+        left = margin;
+        top = margin;
+        break;
+      case 'top-right':
+        left = imgWidth - logoW - margin;
+        top = margin;
+        break;
+      case 'bottom-left':
+        left = margin;
+        top = imgHeight - bottomOffset;
+        break;
+      case 'bottom-right':
+      default:
+        left = imgWidth - logoW - margin;
+        top = imgHeight - bottomOffset;
+        break;
+    }
+
+    // Clamping inside image bounds
+    left = Math.max(margin, Math.min(left, imgWidth - logoW - margin));
+    top = Math.max(margin, Math.min(top, imgHeight - logoH - margin));
+
+    // Antes del logo va el halo, si es que hace falta: se mide el logo contra el pedazo
+    // de foto donde cae. Si ya contrasta, esto no agrega nada.
+    const contraste = await halodeContraste(imageBuffer, logoListo, { left, top });
+    const capas: OverlayOptions[] = [
+      ...contraste.capas,
+      { input: resizedLogoBuffer, top: Math.round(top), left: Math.round(left) },
+    ];
+
+    console.log(`[DEBUG] Logo: ${logoW}x${logoH} (${marketingConfig.logo_size || 'medium'}${logoListo.recorto ? ', se le recorto el vacio' : ''}), ${position} en [${Math.round(left)}, ${Math.round(top)}]`);
+    console.log(`[DEBUG] Logo contraste: marca ${logoListo.claridad.toFixed(0)} vs fondo ${contraste.claridadFondo.toFixed(0)} = ${contraste.contraste.toFixed(0)} -> ${contraste.halo ? 'halo ' + contraste.halo : 'sin halo'}`);
+
+    return capas;
+  } catch (logoOverlayError) {
+    console.error("[ERROR] Sharp composite failed:", logoOverlayError);
+    return [];
+  }
 }
 
 const buildImagePrompt = (payload: GenerateImagePayload, branding?: any, propiedad?: TokkoProperty | null): string => {
@@ -255,104 +406,9 @@ export async function POST(req: Request) {
         // Si pidio lujo y la agencia no lo cargo, urlDelLogo devuelve el estandar: la placa nunca
         // se queda sin logo por esta eleccion. Ver lib/marketing-ia/logo-variante.ts.
         const logoUrl = urlDelLogo(marketingConfig, payload.logo_variant) || agency?.logo_url;
-        console.log('[DEBUG] Logo URL detected:', logoUrl);
-
-        if (logoUrl) {
-          try {
-            let logoRawBuffer: Buffer | null = null;
-
-            // 1. Try HTTP fetch
-            try {
-              const logoRes = await fetch(logoUrl);
-              if (logoRes.ok) {
-                logoRawBuffer = Buffer.from(await logoRes.arrayBuffer());
-                console.log('[DEBUG] Logo fetched successfully via HTTP');
-              } else {
-                console.warn(`[WARN] Logo HTTP fetch status: ${logoRes.status}`);
-              }
-            } catch (httpErr) {
-              console.error("[ERROR] Logo HTTP fetch error:", httpErr);
-            }
-
-            // 2. Fallback to Supabase Storage direct download if HTTP fetch failed
-            if (!logoRawBuffer && logoUrl.includes('marketing-images')) {
-              try {
-                const storagePath = logoUrl.split('marketing-images/')[1];
-                if (storagePath) {
-                  const { data: fileData, error: storageErr } = await supabaseAdmin.storage
-                    .from('marketing-images')
-                    .download(storagePath);
-                  if (fileData && !storageErr) {
-                    logoRawBuffer = Buffer.from(await fileData.arrayBuffer());
-                    console.log('[DEBUG] Logo downloaded successfully via Supabase Storage fallback');
-                  } else if (storageErr) {
-                    console.error('[ERROR] Storage download error:', storageErr);
-                  }
-                }
-              } catch (stErr) {
-                console.error("[ERROR] Logo Storage download exception:", stErr);
-              }
-            }
-
-            if (logoRawBuffer) {
-              // El logo se recorta (se le saca el vacio del archivo) y se lleva al tamano elegido.
-              // El porque de cada paso esta en lib/marketing-ia/logo.ts.
-              const logoListo = await prepararLogo(logoRawBuffer, imgWidth, marketingConfig.logo_size);
-              const resizedLogoBuffer = logoListo.png;
-              const logoW = logoListo.ancho;
-              const logoH = logoListo.alto;
-
-              const margin = Math.round(imgWidth * 0.04); // 4% margin
-
-              // Si hay aviso legal, el logo se apoya arriba de la franja usando su alto REAL.
-              // Antes se asumia un 11% fijo del alto, que no se correspondia con nada y dejaba el
-              // logo montado sobre el texto o flotando lejos.
-              const bottomOffset = (franjaLegal?.alto ?? 0) + logoH + margin;
-
-              const position = marketingConfig.logo_position || 'bottom-right';
-              let left = margin;
-              let top = margin;
-
-              switch (position) {
-                case 'top-left':
-                  left = margin;
-                  top = margin;
-                  break;
-                case 'top-right':
-                  left = imgWidth - logoW - margin;
-                  top = margin;
-                  break;
-                case 'bottom-left':
-                  left = margin;
-                  top = imgHeight - bottomOffset;
-                  break;
-                case 'bottom-right':
-                default:
-                  left = imgWidth - logoW - margin;
-                  top = imgHeight - bottomOffset;
-                  break;
-              }
-
-              // Clamping inside image bounds
-              left = Math.max(margin, Math.min(left, imgWidth - logoW - margin));
-              top = Math.max(margin, Math.min(top, imgHeight - logoH - margin));
-
-              // Antes del logo va el halo, si es que hace falta: se mide el logo contra el pedazo
-              // de foto donde cae. Si ya contrasta, esto no agrega nada.
-              const contraste = await halodeContraste(imageBuffer, logoListo, { left, top });
-              capas.push(...contraste.capas);
-              capas.push({ input: resizedLogoBuffer, top: Math.round(top), left: Math.round(left) });
-
-              console.log(`[DEBUG] Logo: ${logoW}x${logoH} (${marketingConfig.logo_size || 'medium'}${logoListo.recorto ? ', se le recorto el vacio' : ''}), ${position} en [${Math.round(left)}, ${Math.round(top)}]`);
-              console.log(`[DEBUG] Logo contraste: marca ${logoListo.claridad.toFixed(0)} vs fondo ${contraste.claridadFondo.toFixed(0)} = ${contraste.contraste.toFixed(0)} -> ${contraste.halo ? 'halo ' + contraste.halo : 'sin halo'}`);
-            } else {
-              console.warn('[WARN] Could not retrieve logo buffer for overlay. logoUrl:', logoUrl);
-            }
-          } catch (logoOverlayError) {
-            console.error("[ERROR] Sharp composite failed:", logoOverlayError);
-          }
-        } else {
-          console.warn('[WARN] No logo_url found in marketing_ai_config or agency record');
+        const logoListo = await bajarYPrepararLogo(logoUrl, imgWidth, marketingConfig.logo_size, supabaseAdmin);
+        if (logoListo) {
+          capas.push(...(await capasDelLogo(logoListo, imgWidth, imgHeight, franjaLegal, marketingConfig, imageBuffer)));
         }
 
         if (capas.length > 0) {
@@ -436,22 +492,15 @@ export async function POST(req: Request) {
         especificacion.ancho,
         especificacion.alto
       );
+      // Mismo bajado y preparado que el camino de Gemini (bajarYPrepararLogo): antes esto era
+      // una copia recortada que solo intentaba HTTP, sin el fallback a Supabase Storage.
       const logoUrl = urlDelLogo(marketingConfig, payload.logo_variant) || agency?.logo_url;
-      let logoListo: Awaited<ReturnType<typeof prepararLogo>> | null = null;
-      if (logoUrl) {
-        try {
-          const resLogo = await fetch(logoUrl);
-          if (resLogo.ok) {
-            logoListo = await prepararLogo(
-              Buffer.from(await resLogo.arrayBuffer()),
-              especificacion.ancho,
-              marketingConfig.logo_size
-            );
-          }
-        } catch (e) {
-          console.error("[PLACA] No se pudo preparar el logo:", e);
-        }
-      }
+      const logoListo = await bajarYPrepararLogo(
+        logoUrl,
+        especificacion.ancho,
+        marketingConfig.logo_size,
+        supabaseAdmin
+      );
       const margen = Math.round(especificacion.ancho * 0.04);
       const reservadoAbajo = (franjaLegal?.alto ?? 0) + (logoListo?.alto ?? 0) + margen * 2;
 
@@ -484,13 +533,23 @@ export async function POST(req: Request) {
         console.warn(`[WARN] Placa: la foto se agrandó ${placa.escalaFoto}x, va a salir poco nítida`);
       }
 
-      // El logo y el aviso legal encima, en el hueco reservado.
+      // El logo y el aviso legal encima, en el hueco reservado. Mismo `capasDelLogo` que el
+      // camino de Gemini: honra `logo_position` (antes esto era siempre bottom-right a mano) y
+      // calcula el halo de contraste contra la placa ya armada (antes no lo calculaba, asi que
+      // un logo oscuro sobre el panel oscuro (#12161c) podia quedar invisible sin ningun log).
       const capasFoto: OverlayOptions[] = [];
       if (franjaLegal) capasFoto.push({ input: franjaLegal.png, top: franjaLegal.top, left: 0 });
       if (logoListo) {
-        const left = especificacion.ancho - logoListo.ancho - margen;
-        const top = especificacion.alto - (franjaLegal?.alto ?? 0) - logoListo.alto - margen;
-        capasFoto.push({ input: logoListo.png, top: Math.round(top), left: Math.round(left) });
+        capasFoto.push(
+          ...(await capasDelLogo(
+            logoListo,
+            especificacion.ancho,
+            especificacion.alto,
+            franjaLegal,
+            marketingConfig,
+            imageBuffer
+          ))
+        );
       }
       if (capasFoto.length > 0) imageBuffer = await sharp(imageBuffer).composite(capasFoto).toBuffer();
     }
