@@ -15,6 +15,14 @@ async function permiso(admin: ReturnType<typeof createAdminClient>, zonaId: stri
   return null
 }
 
+/** `Number(null)` es 0 y `Number("")` también: sobre el string crudo, no sobre el resultado,
+ *  para que un aviso_id ausente o vacío sea 400 y no "el aviso 0". */
+function idEntero(crudo: string | null): number | null {
+  if (crudo === null || crudo.trim() === "") return null
+  const n = Number(crudo)
+  return Number.isInteger(n) ? n : null
+}
+
 export async function POST(req: Request) {
   try {
     const { userId, agencyId } = await requireTenant()
@@ -30,25 +38,22 @@ export async function POST(req: Request) {
     const no = await permiso(admin, zonaId, agencyId, userId)
     if (no) return NextResponse.json({ error: no.error }, { status: no.status })
 
-    // Descartar dos veces el mismo aviso no puede fallar: la PK es (zona_id, aviso_id).
-    const { data: ya, error: e1 } = await admin
-      .from("farming_avisos_marca")
-      .select("aviso_id")
-      .eq("zona_id", zonaId)
-      .eq("aviso_id", avisoId)
-      .maybeSingle()
-    if (e1) throw e1
-
-    if (!ya) {
-      const { error: e2 } = await admin.from("farming_avisos_marca").insert({
+    // Descartar dos veces el mismo aviso no puede fallar ni duplicar. Un check-then-insert deja
+    // una ventana: dos pedidos genuinamente concurrentes (doble tap, reintento de una red que
+    // falla) pasan los dos el chequeo y el segundo choca contra la PK (zona_id, aviso_id) con un
+    // 23505. El upsert con ignoreDuplicates es ON CONFLICT DO NOTHING: lo resuelve la base, sin
+    // ventana. user_id sale de la sesión, nunca del body: la zona puede ser compartida.
+    const { error } = await admin.from("farming_avisos_marca").upsert(
+      {
         zona_id: zonaId,
         aviso_id: avisoId,
         aviso_es_dueno_directo: !!body?.es_dueno_directo,
         user_id: userId,
         estado: "descartado",
-      })
-      if (e2) throw e2
-    }
+      },
+      { onConflict: "zona_id,aviso_id", ignoreDuplicates: true },
+    )
+    if (error) throw error
 
     return NextResponse.json({ ok: true })
   } catch (e) {
@@ -62,8 +67,8 @@ export async function DELETE(req: Request) {
     const q = new URL(req.url).searchParams
 
     const zonaId = q.get("zona_id")?.trim() || ""
-    const avisoId = Number(q.get("aviso_id"))
-    if (!zonaId || !Number.isInteger(avisoId)) {
+    const avisoId = idEntero(q.get("aviso_id"))
+    if (!zonaId || avisoId === null) {
       return NextResponse.json({ error: "Falta la zona o el aviso" }, { status: 400 })
     }
 
