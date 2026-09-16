@@ -191,6 +191,12 @@ export function MapaBuscador({ onElegir }: { onElegir: (l: Lugar) => void }) {
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600 dark:text-zinc-400" />
         <input
+          // type="text" explícito, aunque sea el default: las dos reglas para el celular de
+          // app/globals.css son selectores de ATRIBUTO (`input[type="text"] … { font-size:
+          // 16px !important }`), y un selector de atributo no matchea el valor por defecto —
+          // sin el atributo escrito, la regla no existe para este input. Sin ella la caja queda
+          // en 14 px y iOS hace zoom a toda la página apenas el asesor la toca en la calle.
+          type="text"
           value={texto}
           onChange={(e) => {
             // Si sigue escribiendo cambio de idea: el Enter viejo ya no aplica.
