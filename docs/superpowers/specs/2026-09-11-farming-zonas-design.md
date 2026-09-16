@@ -101,6 +101,21 @@ de compartir trae los asesores activos de la agencia. Cinco botones por zona: **
 **sumar un pedazo**, **compartir**, **borrar** y el mapa para verla. Y arriba, **dibujar una
 zona nueva**.
 
+> **Los dos números de la tarjeta —«direcciones relevadas» y «avisos a la venta hoy»— van con
+> la etapa 3, no con la 2.** «Direcciones relevadas» no existe hasta que exista el tablero. Y
+> «avisos a la venta hoy», que la etapa 2 recién ahora hace calculable, se postergó a propósito
+> el 16-sep (decisión delegada por Leonardo, «lo que vos decidas»):
+> - Cuesta un recorte PostGIS por zona en la primera carga de Farming. Medido ese día contra
+>   producción: ~90-135 ms cada uno. En paralelo son ~150 ms de más en una pantalla que hoy
+>   abre al toque.
+> - El número ya está a un toque de distancia, en el encabezado de la solapa «A la venta en mi
+>   zona» («N propiedades publicadas en «…»»).
+> - La etapa 3 rehace esa tarjeta igual, porque tiene que mostrar sus propios indicadores. Se
+>   hace una vez, con los dos números juntos, en vez de tocarla dos veces.
+>
+> Si al usarlo se nota que la solapa pasa desapercibida sin ese número, es una línea: agregar
+> `farming_avisos_conteos` por zona en `GET /api/farming/zonas`, en paralelo.
+
 **Solapa 2 · Relevamiento.** El tablero de 6 columnas. Es la hoja 1 del Excel convertida en
 tarjetas. Botón **«+ agregar dirección»** siempre visible (ver «La carga a pie», más abajo).
 
