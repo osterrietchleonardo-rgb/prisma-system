@@ -9,7 +9,7 @@
 type Fila = Record<string, any>
 type Predicado = (f: Fila) => boolean
 
-export function baseFalsa(inicial: Record<string, Fila[]>) {
+export function baseFalsa(inicial: Record<string, Fila[]>, rpcs: Record<string, (args: any) => Fila[]> = {}) {
   const tablas: Record<string, Fila[]> = JSON.parse(JSON.stringify(inicial))
   let siguienteId = 1
 
@@ -68,5 +68,13 @@ export function baseFalsa(inicial: Record<string, Fila[]>) {
     return q
   }
 
-  return { from, tablas }
+  /** Las funciones SQL: el doble no ejecuta SQL, devuelve lo que el test programó.
+   *  Igual que el cliente real, responde { data, error } y nunca tira. */
+  async function rpc(fn: string, args: any) {
+    const impl = rpcs[fn]
+    if (!impl) return { data: null, error: { message: `rpc desconocida: ${fn}` } }
+    return { data: impl(args), error: null }
+  }
+
+  return { from, rpc, tablas }
 }
