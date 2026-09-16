@@ -428,7 +428,9 @@ export async function POST(req: Request) {
         }
 
         if (capas.length > 0) {
-          imageBuffer = await sharp(imageBuffer).composite(capas).toBuffer();
+          // `.toBuffer()` sin `.jpeg()` re-encoda a la calidad por defecto de sharp (80 en vez de 92),
+          // perdiendo nitidez innecesariamente. Ver las medidas reales en el test.
+          imageBuffer = await sharp(imageBuffer).composite(capas).jpeg({ quality: 92 }).toBuffer();
         }
 
         // ─── Record image cost ──────────────────────────────────────────
@@ -568,7 +570,10 @@ export async function POST(req: Request) {
           ))
         );
       }
-      if (capasFoto.length > 0) imageBuffer = await sharp(imageBuffer).composite(capasFoto).toBuffer();
+      // En el camino con foto real, la foto se paso ya por `armarPlacaConFoto` a q92. Sin `.jpeg()` aca,
+      // sharp re-encoda a su default (80) y degrada la foto de la propiedad por nada. Medido el 16-sep:
+      // q92 luego default da MAD 5.67, q92 luego q92 da MAD 2.98. Se mantiene q92.
+      if (capasFoto.length > 0) imageBuffer = await sharp(imageBuffer).composite(capasFoto).jpeg({ quality: 92 }).toBuffer();
     }
 
     // Upload to Storage using Admin Client

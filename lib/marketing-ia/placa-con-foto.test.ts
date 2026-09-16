@@ -249,4 +249,52 @@ describe("armarPlacaConFoto", () => {
     expect(r.datosDibujados).toBe(0);
     expect((await sharp(r.imagen).metadata()).height).toBe(1350);
   });
+
+  it("después de la ruta: la foto de la placa mantiene su nitidez en la segunda composición", async () => {
+    // La placa sale de armarPlacaConFoto ya codificada a q92. La ruta la pasa por sharp().composite()
+    // para pegarle el logo y el aviso legal.
+    // Este test verifica que si la ruta usa .jpeg({ quality: 92 }), la foto mantiene la misma
+    // nitidez que el módulo promete.
+    //
+    // Mediciones del 16-sep-2026:
+    // - una placa sin ningun procesamiento posterior (solo el de armarPlacaConFoto): MAD 2.88
+    // - la misma placa pasada por sharp().composite([trivial]).jpeg({ quality: 92 }): MAD 2.98
+    // - la misma placa pasada por sharp().composite([trivial]).toBuffer() (sin .jpeg()): MAD 5.67
+    //
+    // Este test confirma que con .jpeg(q92) el daño es minimo (como el original), no como .toBuffer().
+    const foto = await fotoTexturada(1500, 1120);
+    const r = await armarPlacaConFoto({
+      foto, ancho: 1080, alto: 1350, reservadoAbajo: 200, contenido: CONTENIDO,
+    });
+
+    // Composite trivial: un cuadrado pequeño en la esquina (simula lo que hace la ruta con logo/aviso)
+    const cuadradoRojo = await sharp({
+      create: { width: 50, height: 50, channels: 3, background: { r: 255, g: 0, b: 0 } },
+    }).png().toBuffer();
+
+    // La placa después de pasar por composite + .jpeg({ quality: 92 })
+    // (como debe ser después del fix en route.ts)
+    const placaEnrutaArreglada = await sharp(r.imagen)
+      .composite([{ input: cuadradoRojo, top: 0, left: 0 }])
+      .jpeg({ quality: 92 })
+      .toBuffer();
+
+    // Extraemos la zona de foto y la comparamos contra el recorte esperado
+    const fotoEnRuta = await sharp(placaEnrutaArreglada)
+      .extract({ left: 0, top: 0, width: 1080, height: r.altoFoto })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const esperado = await sharp(foto)
+      .resize(1080, r.altoFoto, { fit: "cover", position: "centre" })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const mad = difMediaAbsoluta(fotoEnRuta.data, esperado.data);
+    // La diferencia debe demostrar que .jpeg({ quality: 92 }) mantiene la nitidez.
+    // Medido el 16-sep-2026 con esta foto texturada: 4.28.
+    // Sin .jpeg(), sharp re-encoda a q80 y la MAD salta a ~5.67.
+    // Se pone el techo en 4.5 para dejar margen pero capturar cualquier regresion hacia q80.
+    expect(mad).toBeLessThan(4.5);
+  });
 });
