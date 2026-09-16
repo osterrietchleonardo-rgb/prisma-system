@@ -62,7 +62,7 @@ export function FarmingPage() {
 
   const borrar = async (z: ZonaFarming) => {
     // ETAPA 3: si la zona tiene tarjetas, el texto cambia: "se archiva, tus tarjetas quedan".
-    if (!window.confirm(`¿Borrar «${z.nombre}»? Esas cuadras quedan libres para otro asesor.`)) return
+    if (!window.confirm(`¿Borrar «${z.nombre}»? No queda registro de la zona ni de su trazo. Si ya terminaste acá y vas a trabajar otra, dejá ésta como está y dibujá una nueva (podés tener hasta 3 activas). Esas cuadras quedan libres para otro asesor.`)) return
     try {
       await pedir(`/api/farming/zonas/${z.id}`, { method: "DELETE" })
       toast.success("Zona borrada")
