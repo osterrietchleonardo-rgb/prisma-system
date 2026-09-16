@@ -6,6 +6,45 @@ import { medirPanel, armarPlacaConFoto } from "./placa-con-foto";
 const fotoDe = (ancho: number, alto: number, color = { r: 20, g: 120, b: 200 }) =>
   sharp({ create: { width: ancho, height: alto, channels: 3, background: color } }).jpeg().toBuffer();
 
+/**
+ * Una foto de prueba CON TEXTURA: una grilla de bloques de colores distintos, deterministica
+ * (nada de `Math.random`, asi da siempre lo mismo).
+ *
+ * Por que no alcanza un color plano (lo que hacia `fotoDe`): un color plano sobrevive intacto a
+ * CUALQUIER cosa que se le haga a la foto — un blur, un desenfoque, un shift de color — porque
+ * el promedio de un area plana sigue siendo el mismo color. Contra eso, la prueba "LA FOTO NO SE
+ * TOCA" pasaba igual con un `.blur(30)` metido en el medio del armado (lo probo el revisor). Una
+ * grilla con muchos bordes de color SI se mueve con un blur: los bordes se mezclan con sus
+ * vecinos y el pixel deja de coincidir con el recorte de la foto original.
+ */
+const fotoTexturada = (ancho: number, alto: number): Promise<Buffer> => {
+  const columnas = 24;
+  const filas = 18;
+  const anchoBloque = ancho / columnas;
+  const altoBloque = alto / filas;
+  let rects = "";
+  for (let fila = 0; fila < filas; fila++) {
+    for (let col = 0; col < columnas; col++) {
+      // Hash determinista (no `Math.random`): la misma grilla sale igual en cualquier corrida.
+      const h = ((col * 2654435761 + fila * 40503 + 12345) >>> 0) % 0xffffff;
+      const color = `#${h.toString(16).padStart(6, "0")}`;
+      const x = Math.round(col * anchoBloque);
+      const y = Math.round(fila * altoBloque);
+      rects += `<rect x="${x}" y="${y}" width="${Math.ceil(anchoBloque)}" height="${Math.ceil(altoBloque)}" fill="${color}"/>`;
+    }
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${alto}">${rects}</svg>`;
+  return sharp(Buffer.from(svg)).jpeg({ quality: 95 }).toBuffer();
+};
+
+/** La diferencia media absoluta por canal entre dos buffers de pixeles crudos del mismo tamaño. */
+const difMediaAbsoluta = (a: Buffer, b: Buffer): number => {
+  const n = Math.min(a.length, b.length);
+  let suma = 0;
+  for (let i = 0; i < n; i++) suma += Math.abs(a[i] - b[i]);
+  return suma / n;
+};
+
 const CONTENIDO = {
   titulo: "Belgrano lidera la demanda de alquileres",
   bajada: "Monoambiente full amenities — La Pampa 1300",
@@ -109,19 +148,51 @@ describe("armarPlacaConFoto", () => {
     expect(m.height).toBe(1350);
   });
 
-  it("LA FOTO NO SE TOCA: el centro de la zona de foto sigue siendo la foto", async () => {
+  it("LA FOTO NO SE TOCA: la zona de foto de la placa coincide con el mismo recorte aplicado directo", async () => {
     // Es lo que sostiene todo el diseno. Si esto falla, la placa no muestra la propiedad real.
-    const COLOR = { r: 20, g: 120, b: 200 };
+    //
+    // Version anterior (revertida el 16-sep-2026): sacaba un parche de 4x4 del CENTRO de una
+    // foto de COLOR PLANO. El revisor la hizo fallar sin que la prueba se enterara: le metio un
+    // `.blur(30)` a la foto antes de pegarla en `armarPlacaConFoto` y la prueba igual paso,
+    // porque un blur no cambia el promedio de un area de un solo color. Era decorativa.
+    //
+    // Esta version usa una foto CON TEXTURA (una grilla de bloques de colores distintos, ver
+    // `fotoTexturada`) y compara, PIXEL A PIXEL sobre TODA la zona de la foto, la placa contra
+    // el resultado de aplicarle a la foto original el mismo recorte a mano
+    // (`sharp(foto).resize(ancho, altoFoto, { fit: "cover", position: "centre" })`). Eso es lo
+    // unico que "no se toca" permite: que se la recorte y escale, nada mas.
+    //
+    // La comparacion es ESTRUCTURAL, no byte a byte: la placa entera se vuelve a codificar como
+    // JPEG a calidad 92 (`armarPlacaConFoto` hace `.jpeg({ quality: 92 })` al final), asi que
+    // hay una diferencia de bytes legitima por ese solo paso, aunque la foto no se haya tocado.
+    // Se mide la diferencia media absoluta por canal entre los pixeles crudos de las dos
+    // versiones y se le pone un techo apenas arriba de lo que da un redondeo de JPEG limpio.
+    const foto = await fotoTexturada(1500, 1120);
     const r = await armarPlacaConFoto({
-      foto: await fotoDe(1500, 1120, COLOR), ancho: 1080, alto: 1350,
-      reservadoAbajo: 200, contenido: CONTENIDO,
+      foto, ancho: 1080, alto: 1350, reservadoAbajo: 200, contenido: CONTENIDO,
     });
-    const px = await sharp(r.imagen)
-      .extract({ left: 500, top: Math.round(r.altoFoto / 2), width: 4, height: 4 })
-      .raw().toBuffer();
-    expect(px[0]).toBeCloseTo(COLOR.r, -1);
-    expect(px[1]).toBeCloseTo(COLOR.g, -1);
-    expect(px[2]).toBeCloseTo(COLOR.b, -1);
+
+    const esperado = await sharp(foto)
+      .resize(1080, r.altoFoto, { fit: "cover", position: "centre" })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const real = await sharp(r.imagen)
+      .extract({ left: 0, top: 0, width: 1080, height: r.altoFoto })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    expect(real.info.width).toBe(esperado.info.width);
+    expect(real.info.height).toBe(esperado.info.height);
+    expect(real.info.channels).toBe(esperado.info.channels);
+
+    const mad = difMediaAbsoluta(real.data, esperado.data);
+    // Medido el 16-sep-2026 con esta misma foto texturada: la diferencia media absoluta de un
+    // redondeo de JPEG q92 limpio da 3.14. El techo queda apenas arriba, en un solo digito.
+    // Probado a proposito (y revertido antes de commitear): metiendole un `.blur(5)` a
+    // `fotoLista` en placa-con-foto.ts antes de pegarla, la MAD salta a 11.61 y esta prueba se
+    // pone roja.
+    expect(mad).toBeLessThan(6);
   });
 
   it("EN LA IMAGEN NO VA NINGUN EMOJI: si llega uno, se ve en el contador", async () => {
