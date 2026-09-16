@@ -61,6 +61,67 @@ que el grep lo mostró. Restaurar mutantes desde una copia, nunca con git.
 - Marcar las 4 sugerencias como resueltas en admin-vakdor (con OK).
 - Datos de prueba en PRISMAIA - VAKDOR: `acm_searches` `1bd60870` y ficha `lTb19sULahAu`.
 
+## 2026-09-16 — El gasto de Apify entra en US$100, las bajas vuelven a marcarse, y apareció el sitemap de ZonaProp
+
+**De dónde salió:** Leonardo pidió analizar un informe de fuentes de datos para el CMA que le
+generó Z.ai (`Downloads/informe_fuentes_datos_cma_argentina (1).pdf`, 43 págs). De ahí salió todo
+lo demás. Detalle completo y verificaciones en la memoria `remax-api-publica-y-informe-zai.md`.
+
+**Lo del informe, verificado en vivo (15-sep)**
+
+- **RE/MAX tiene API pública que funciona** (`api-ar.redremax.com`, sin token ni proxy): 66.693
+  avisos en venta hoy. Filtro por ciudad que el informe no trae: `like=geoLabel:La Plata` → 2.963.
+- **FALSO lo central del informe:** el "cruce exacto" entre el código de anunciante de ZonaProp y
+  el `internalId` de RE/MAX no existe: **0 de 40** (con control positivo y negativo). Pares
+  idénticos confirmados tienen códigos que no se corresponden (`421141094-1438` ⇄ `AR.42.136.94.841.V24`).
+- CABA: de 16.896 avisos de RE/MAX, 55% ya están en la base y 29% no tienen candidato; lo "nuevo"
+  es casi todo casas/PH/terrenos/locales, **los tipos que no cargamos de ZonaProp** (el portal tiene
+  24.800 en CABA y nosotros ~2.450). Mercado Libre: de 31 cruzables, 29 ya los teníamos; su API da
+  403 para buscar avisos ajenos con dos apps distintas. Benchmark oficial de CABA: la serie termina
+  en 2019. Argenprop bloquea (202 vacío) a los pocos pedidos.
+
+**Lo que se arregló** (rama `mercado-presupuesto`, worktree propio, commit `3ad77cc`)
+
+Leonardo puso el límite: **US$100/mes de Apify**, sin saltar al plan de US$200. El régimen daba ~120.
+
+- **Dos turnos parejos** (33.458 y 33.454 avisos): cada mes se relee media ciudad, todo CABA al día
+  cada 2 meses. Eligió esto sobre "7 barrios del cliente mensual + resto cada 3": no quería barrios
+  sin actualizar. Sale ~US$79/mes.
+- El workflow de refresco ya no lleva las 48 zonas escritas: se las pide a `mercado-sync/plan.mjs`
+  (con 29 tests) vía `matriz.mjs` y `fromJSON`.
+- **El descubrimiento pasa a las 00:30 AR** (era 7:00): la ventana incluye "lo que va de hoy" y eso
+  se repaga al día siguiente — medido el 8-sep, 315 avisos (~US$10/mes). La ventana ahora se calcula
+  (piso 2, techo 3 si faltó una corrida).
+- **Guardia de presupuesto** en el descubrimiento (tope 90) y refresco bajado a 70.
+- **La verificación de bajas estaba rota en 41 de 48 zonas** (mapa de 7 barrios escrito a mano): por
+  eso 70.129 avisos "activos" y 0 caídos. Ahora sale de la base, más un cajón `otros-sin-zona` con
+  los 608 avisos de barrios que ZonaProp escribe fuera de las 48 zonas (Barrio Norte, Once, Congreso).
+
+**Hallazgo grande, a medio probar: el sitemap de ZonaProp**
+
+`https://www.zonaprop.com.ar/sitemaps_https.xml` lista avisos **uno por uno con `lastmod`**, gratis
+y sin actor. Bajado: 48.785 avisos con fechas de los últimos 8 días; de 300 cruzados con la base, 26
+estaban publicados hace más de un mes y figuran modificados esta semana. **Si la fecha es confiable,
+el refresco pasa de US$67 a ~US$1,40** (releer solo lo que cambió) y se puede refrescar todo CABA
+todas las semanas. Dos avisos: **no es el censo completo** (~100.000 de ~700.000 → la ausencia NO
+prueba una baja) y el portal tira 403 si se le piden muchas páginas seguidas.
+
+**Pendiente, con fecha: 30-sep**, cuando se libere el ciclo de Apify (hoy la cuenta está en
+US$102,43 de 100 y el descubrimiento está frenado desde el 14):
+1. Releer 200 avisos con `lastmod` nuevo y 200 con `lastmod` viejo (US$0,40) → ¿la fecha marca
+   cambios de verdad?
+2. Releer 500 avisos de un barrio (US$0,50) → ¿cuántos cambian de precio por mes sin republicarse?
+   De eso depende si el refresco cada 2 meses alcanza o sobra.
+3. Bajar el segundo archivo del sitemap (`sitemap_prop_https_2`), que hoy dio 403.
+
+**Sin resolver, de Leonardo:** regenerar los Client Secret de las dos apps de Mercado Libre
+(`2055069549619410` y `5235611298360779`), que quedaron expuestos en el chat, y dejar sus permisos
+en "Sin acceso" (la primera tenía escritura sobre publicaciones, facturas y órdenes).
+
+**Falta probar de verdad:** la matriz por `fromJSON` solo se prueba corriendo el workflow en GitHub.
+Al subir la rama, dispararlo a mano una vez y mirar el job `plan`, que imprime en castellano qué
+zonas le tocan al mes. Si falla, falla antes de gastar.
+
 ---
 
 ## 2026-09-16 — El creador de anuncios: texto que se puede pegar en Meta, y la placa con la foto REAL
