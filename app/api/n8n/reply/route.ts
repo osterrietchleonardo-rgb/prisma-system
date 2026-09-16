@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { esMensajeDeLaDerivacionPropia } from '@/lib/whatsapp/derivacion-propia'
 
 /**
  * POST /api/n8n/reply
@@ -65,12 +66,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Conversacion no encontrada' }, { status: 404 })
     }
 
-    // Si el bot fue pausado manualmente mientras n8n procesaba, descartar
+    // Si el bot fue pausado mientras n8n procesaba (un asesor tomó la charla), descartar.
+    // Excepción: si lo apagó la derivación de Sofía EN ESTE MISMO TURNO, su mensaje ("te conecto
+    // con el equipo") tiene que llegar; antes se descartaba y el cliente quedaba sin respuesta.
+    // Ante cualquier duda (o si la consulta falla) se sigue descartando. Ver lib/whatsapp/derivacion-propia.ts
     if (!conv.bot_active) {
-      return NextResponse.json({
-        success: false,
-        message: 'Bot pausado: respuesta descartada — el agente humano tomó control',
-      })
+      const { data: recientes, error: errRecientes } = await supabase
+        .from('wa_messages')
+        .select('role, content, created_at')
+        .eq('conversation_id', conversation_id)
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      if (errRecientes || !esMensajeDeLaDerivacionPropia(recientes ?? [], new Date())) {
+        return NextResponse.json({
+          success: false,
+          message: 'Bot pausado: respuesta descartada — el agente humano tomó control',
+        })
+      }
+      console.log(`[n8n reply] Bot apagado por la derivación de Sofía en este turno: se envía su mensaje (conv ${conversation_id})`)
     }
 
     // Obtener credenciales de la instancia

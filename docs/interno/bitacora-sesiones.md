@@ -16,6 +16,182 @@
 
 ---
 
+## 2026-09-16 — Sofía: cuando derivaba, el cliente no recibía ningún mensaje
+
+**Qué pasaba:** `/api/n8n/reply` descarta toda respuesta si el bot está apagado (existe desde abril
+para no pisar a un asesor que toma la charla a mano). Pero `Gestion_Handoff` apaga el bot EN EL MEDIO
+del turno de Sofía, antes de que salga su mensaje ("te conecto con el equipo / te derivo con
+[asesor]"), y ese mensaje se descartaba: *"Bot pausado: respuesta descartada — el agente humano tomó
+control"*. Visto con el primer cliente real atendido por luna (Elian, colega, 16-sep 15:40).
+Confirmado en 4 ejecuciones del 16-sep (Elian 15539, Mariana 15496, Ines 15504, Julia 15525). En 30
+días, ~76 de 109 derivaciones sin mensaje al cliente (medición por palabras, aproximada). Casos que
+lo muestran: Paula (15-sep) "¿Se comunica un asesor conmigo?" sin respuesta; juan_ogo (9-sep) "No
+recibí respuesta".
+
+**Arreglo (rama `fix/derivacion-mensaje-al-cliente`):** `lib/whatsapp/derivacion-propia.ts`. Con el bot
+apagado, el mensaje pasa SOLO si hay una marca "⚠️ Handoff activado" (la escribe únicamente el
+subflujo de n8n; el botón del asesor apaga sin marca) de los últimos 5 minutos, y después de ella no
+escribió ni un asesor (`human`) ni el cliente (`lead`). Ante cualquier duda, o si la consulta falla,
+se sigue descartando. El bot queda apagado: la ruta no lo toca.
+
+**Decisión:** Leonardo propuso mover el apagado al final del flujo de n8n (mensaje primero, apagado
+después). Se descartó con datos: el mensaje sale 16-20 s después de derivar, así que abre una ventana
+en la que Sofía contestaría de nuevo, y si el envío falla el bot queda prendido (lo que le pasó a
+Sonia). Se eligió el arreglo en la app; Leonardo delegó la decisión.
+
+**Verificación:**
+- Prueba de la ruta con la derivación: FALLÓ con el código anterior y pasa con el arreglo. Las del
+  botón del asesor, el cliente que vuelve a escribir y el envío normal pasan en los dos.
+- 9 pruebas de la regla (bordes de 5 minutos, fecha rota, marca de otro texto).
+- Casos reales en el segundo exacto del envío: Elian, Mariana, Ines y Julia pasan de "descartado" a
+  "se envía"; Sonia a las 09:31 (turno posterior a su derivación) se descarta.
+- Bytes de la marca idénticos en los 242 mensajes guardados desde abril.
+- Suite completa: 125 archivos, 2.275 pruebas, 0 fallas. Tipos sin errores; los 2 avisos de lint de
+  la ruta ya estaban en `main` (`prefer-const` en `evoPayload`/`metaPayload`).
+
+**Pendiente:** ver la primera derivación real después del deploy. Sigue abierto aparte: Sonia (16-sep
+08:59) tuvo la marca de derivación y el bot quedó prendido 30 min.
+
+---
+
+## 2026-09-15/16 — Sofía: dejar de preguntar lo que la ficha del link ya contesta (aplicado en n8n)
+
+**De dónde salió:** sugerencia del asesor Eric Zambrana (Central), `system_feedback`
+`143c4b25-90eb-4459-a5ea-67e1c1960605`, 15-sep 12:30. No traía link a la charla; el caso se
+encontró buscando: **Emilio, 14-sep, `997786fa`**, depto de 1.470.000 USD en Puerto Madero.
+
+**El diagnóstico, que cambió el arreglo:** el bot NO desobedeció el prompt, lo cumplió.
+`metricas` se llena con lo que el cliente **teclea**, nunca con la propiedad por la que entró.
+Emilio nunca escribió "Puerto Madero" → `zona` y `barrio_consultado` en `null` → "Zona" era el
+**punto 1** de FALTA DEL MÍNIMO → el prompt dice "tu próxima pregunta es la PRIMERA de esa
+lista". Por eso el arreglo va en tres nodos, no solo en el prompt.
+
+**Medido contra producción (30 días, 465 conversaciones que arrancan con un link)**
+
+- "¿en qué zona?" tras entrar por link: **26**; ambientes 4; compra/alquiler 3.
+- Cerró con "¿en qué presupuesto te manejás?": **272 (61%)**. Ofreció reemplazar la propiedad
+  del link: **29**. Propiedades de ≥500k USD: 7, y las 4 que se leyeron fallaron igual.
+- `barrio_consultado` con dato y `zona` vacía: **80 de 516** (`Armar_Memoria` solo miraba
+  `zona`, aunque `calificacion_completitud` ya los contaba juntos).
+- Repreguntó el **nombre** ya dado: 8 conversaciones, siempre entre 0,3 y 2,4 min después
+  (una, dos veces en 18 s). Repreguntó el **presupuesto** tras una respuesta numérica: 18.
+  La regla ya existía (ANTI-REPETICIÓN nº 7) y se incumplió igual: patrón 1.
+
+**Qué se aplicó** (16-sep 00:38, `scratch/aplicar-prompt-ficha-obvia.mjs --apply`, 17 parches)
+
+- `Agente IA CEO` (15): sección nueva LO QUE LA PROPIEDAD YA CONTESTA (operación, tipo, zona y
+  ambientes resueltos por la propiedad, con su bloque ESTO NO QUEDA CONGELADO) · la memoria va
+  un turno atrasada y el historial le gana · la respuesta a lo que preguntó va ANTES de la
+  ficha · el cierre deja de ser el presupuesto · se omite la línea `Ficha completa:` cuando es
+  la propiedad que él trajo · el presupuesto nunca se usa contra esa propiedad · handoff por
+  conducta (pregunta si sos persona → ofrecerle el asesor en ese mismo mensaje; permuta,
+  financiación, uso para un evento, consulta de empresa → derivar sin calificar) · prohibido
+  hablarle de "ficha interna", "el registro", "el campo estructurado".
+- `Armar_Memoria`: Zona resuelta con `barrio_consultado || zona`.
+- `Analizar_Conversacion1`: regla 27 — la propiedad consultada llena barrio, operación, tipo y
+  ambientes; gana siempre lo que dijo el lead, y lo más nuevo.
+
+**Decisiones de Leonardo:** el presupuesto deja de ser la pregunta de cierre · el "ticket alto"
+se dispara por **conducta del cliente, sin umbral de precio** (7 casos en 30 días no justifican
+una rama por número que el bot solo conoce después de buscar) · alcance: prompt + los dos
+nodos de sistema.
+
+**Verificación**
+
+- `Armar_Memoria` corrido contra **517 filas reales**: 0 datos perdidos; conversaciones con
+  "Zona" pendiente 142 → 62. La primera corrida dio "80 perdidos" y **era un error del test**:
+  al salir Zona la lista se renumera y se comparaba con el número adelante.
+- 17 anclas únicas; delta de expresiones declarado; 89 nodos y conexiones intactos; relectura
+  posterior independiente, no la del script que escribió.
+- **Tres contradicciones propias cazadas al releer** (patrón 4): "no se los preguntes NUNCA"
+  con su excepción quince renglones abajo · "LA ÚNICA EXCEPCIÓN" cuando pasaron a ser dos ·
+  el presupuesto repreguntable a los 55 s.
+
+**Costo:** el bloque dinámico sube 2.553 → 2.807 chars (~77 tokens por turno; ~3.700 mensajes
+de clientes en 30 días). Lo demás es estático y cachea.
+
+**Línea de base:** Christopher (`207a11df`) terminó 00:32:49, seis minutos ANTES de aplicar,
+y muestra los dos síntomas (mandó `Ficha completa:` de la propiedad del link y cerró pidiendo
+el presupuesto).
+
+**Primera lectura en tráfico real (16-sep, 11 h después, 4 conversaciones nuevas, todas por
+link; Ines derivó sola por ser colega).** Poca muestra: tendencia, no prueba.
+
+- Funcionó, visto en las ejecuciones: el extractor llenó barrio/operación/tipo/ambientes
+  desde el link en **4 de 4** (Tania solo escribió "me gustaría ver este departamento" y quedó
+  San Telmo/compra/depto/1). Zona preguntada 0, reemplazo ofrecido 0, desajuste marcado 0.
+  **Mariana** (`599ff9db`, 550.000 USD): respuesta primero ("sí, figura como apta crédito"),
+  cierre en NIVEL 2 (crédito), **salteó "Ambientes" aunque la lista lo pedía** (exec 15480),
+  y derivó a los 57 s cuando preguntó si el precio se negociaba.
+- A medias: omitir `Ficha completa:` se cumplió 1 de 2 (Viki exec 15514 sí; Mariana 15480
+  no, la escribió el agente mismo).
+- **Hallazgo grande, PREEXISTENTE:** el extractor anota como presupuesto el precio de la ficha.
+  Presupuesto = precio en 105 de 252 leads por link (30 días); en **74** el cliente no
+  escribió ni un número. Mariana es uno (550.000 = el chalet). El asesor recibe un dato falso
+  y el bot nunca pregunta el presupuesto. La regla 27 ya lo prohibía y el nano lo hizo igual:
+  no se arregla con texto, va un guard. **Propuesto, no aplicado.**
+- Preexistentes vistos en Viki (`d04559b5`): mostró un depto "Apto mascotas: No" a una clienta
+  con gato; `Formato_Mensajes` duplica fichas y **mete un `Video:` vacío que el agente no
+  escribió** (verificado comparando salida del agente vs Formato); la 3.ª pregunta de
+  presupuesto salió porque el mensaje con el número llegó con la ejecución ya en curso
+  (exec 15518 solo vio "Te cuento") — la ventana sin lock — y además pasó el máximo de 2.
+- Script para leer ejecuciones por conversación: `scratch/_ejecuciones-viki.mjs <conv> <desde> <hasta>`.
+
+**Presupuesto con cita — APLICADO 16-sep 12:48 (AR)** (`scratch/aplicar-presupuesto-con-cita.mjs`)
+
+- Extractor: el presupuesto solo existe si el lead lo dio; campo nuevo `presupuesto_cita` (textual).
+  Nodo `Execute a SQL query`: guarda el presupuesto solo si la cita está en lo que el lead escribió
+  o dijo por audio (`n8n_chat_histories` + `wa_messages`), no es pregunta, y trae el número
+  (entero/miles/millones) o lo acepta con palabras. Si la nueva no vale, conserva la guardada que
+  sí; los viejos sin cita se limpian solos en el próximo mensaje.
+- Sofía: el **rango de presupuesto se pregunta temprano** (la pregunta siguiente a la ficha), sin
+  anclarlo en el precio del link (pedido de Leonardo; el parche del 15 decía "anotalo como
+  referencia" y "va al final"). Repetidas se controlan por enlace Y dirección.
+- Diseños descartados con datos: lista de palabras v1 borraba 5 de 14 presupuestos reales; v2
+  dejaba pasar a Mariana ("¿el valor es final?").
+- Verificación: modelo real sobre 18 conversaciones × 2 corridas → inventados 4/10 → 0/10, reales
+  7/7 (incl. audio). SQL exacto sobre tabla temporal: 14/14 con chequeo exacto de claves. 6,6 ms
+  por consulta (`n8n_chat_histories` sin índice por `session_id`, 18k filas: índice opcional).
+- **Custodia:** el primer `--apply` abortó: a las 12:43 se cambió el respaldo del agente de Sonnet a
+  DeepSeek (el prompt quedó idéntico). A las 12:47:39 se revirtió. Mi escritura (12:48:14) tomó ese
+  estado; no se borró nada ajeno (tres backups en `scratch/n8n-backups/PRISMA-2026-09-16-*`).
+- **Trampas propias:** pasé "corrida1" por argv a un script que importa `sql-produccion.mjs` (lo
+  ejecuta como SQL; error de sintaxis, nada escrito). Python metió retrocesos `\x08` por `\b`.
+- **SIN TRÁFICO TODAVÍA:** 0 ejecuciones después de aplicar. Primer control: que el nodo SQL no
+  devuelva error (si falla, falla en silencio y la ficha deja de actualizarse). A las 13:21 se
+  comprobó que tampoco entraron mensajes de clientes a `wa_messages`: no hubo nada sin procesar.
+
+**DeepSeek y luna (16-sep, tarde).** DeepSeek descartado para Sofía por datos (política: datos en
+China; términos de API: ley china y consentimiento de cada usuario final); ahorro vs luna ~US$5/mes.
+Gasto real OpenAI 30 días US$77,79 (mini US$61,63). Comparación luna vs mini con turnos reales:
+luna 0 fallas de reglas vs mini 6 y 9; luna peor en avisar antes de tiempo y en no buscar la
+propiedad sin nombre. Detalle en la memoria `modelos-precios-y-datos-2026-09` y en
+`scratch/comparar-modelos/`. Hallazgo: propiedad del link no encontrada (57%) presentada como si
+fuera la del link (Claudia).
+
+**APLICADO 16-sep 14:10 (AR), con OK de Leonardo:**
+1. Prompt "el nombre no frena la propiedad" (`scratch/aplicar-prompt-nombre-no-frena.mjs`): si al
+   saludo contestan sin nombre, se busca la propiedad en ese turno. Banco: Tania no buscada luna 3/3
+   → 0/3, mini 2/3 → 0/3; saludo inicial 12/12 sin búsqueda.
+2. **Sofía pasa a `gpt-5.6-luna`** (`scratch/aplicar-modelo-luna.mjs`; volver:
+   `--volver --apply`). Segunda ronda con el prompt nuevo, leída a mano: luna 1 falla real en 60
+   turnos, mini 15. Opciones (8000, medium) y respaldo Claude Sonnet sin cambios. Luna no tiene
+   versión con fecha.
+- Verificación independiente del flujo vivo: 10/10 OK. **Sin tráfico real todavía** (ningún mensaje
+  de cliente desde 12:29). Vigilante armado para la primera ejecución.
+- Pendientes que NO se tocaron: Claudia (propiedad del link no encontrada presentada igual); Sonia
+  colega no detectada; Sofía siguió contestando 30 min después de "Handoff activado" (16-sep 08:59).
+- **Primer tráfico real con luna (15:34-15:40):** Elian RRE, colega. Saludo correcto, extractor sin
+  presupuesto inventado, SQL con cita ok (150 y 144 ms). Segundo turno: buscó Vedia al 4800 (92%),
+  detectó colega y derivó a Micaela sin calificar. 0 errores. El silencio de 12:29 a 15:34 fue real
+  (Meta conectado, suscripción ok, código de entrada sin cambios).
+- **BUG PREEXISTENTE ENCONTRADO:** el mensaje de derivación de Sofía se descarta en
+  `/api/n8n/reply` porque `Gestion_Handoff` ya apagó el bot ("Bot pausado: respuesta descartada").
+  Elian no recibió respuesta. Confirmado en 4 ejecuciones; en 30 días ~76 de 109 derivaciones sin
+  mensaje. Detalle y arreglo propuesto en la memoria `derivacion-sin-mensaje-al-cliente`. SIN tocar.
+
+---
+
 ## 2026-09-16 — ACM: cuatro pedidos de los asesores (link, Laundry, antigüedad, sumar por link)
 
 **De dónde salió:** `system_feedback` de Central. Carolina Etcheverry (16-sep, `a251b9b4` link de
