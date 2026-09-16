@@ -61,7 +61,15 @@ export function FarmingPage() {
   }
 
   const borrar = async (z: ZonaFarming) => {
-    if (!window.confirm(`¿Borrar «${z.nombre}»? No queda registro de la zona ni de su trazo. Si ya terminaste acá y vas a trabajar otra, dejá ésta como está y dibujá una nueva (podés tener hasta 3 activas). Esas cuadras quedan libres para otro asesor.`)) return
+    // El servidor decide entre borrar y archivar según si la zona tiene tarjetas cargadas
+    // (esta pantalla no lo sabe de antemano: pedirlo costaría una consulta por zona en cada
+    // carga de Farming). Por eso el texto tiene que ser honesto con los DOS desenlaces.
+    if (
+      !window.confirm(
+        `¿Borrar «${z.nombre}»?\n\nSi tenés tarjetas cargadas en esta zona, no se pierde nada: la zona se archiva y tus tarjetas, tus propietarios y su historial quedan guardados.\n\nSi no tenés ninguna, se borra del todo y no queda registro.\n\nEn los dos casos, esas cuadras vuelven a estar libres para que otro asesor las dibuje.`,
+      )
+    )
+      return
     try {
       const r = await pedir(`/api/farming/zonas/${z.id}`, { method: "DELETE" })
       // Si la zona tenía tarjetas cargadas, el servidor no la borró: la archivó (spec, "nunca
