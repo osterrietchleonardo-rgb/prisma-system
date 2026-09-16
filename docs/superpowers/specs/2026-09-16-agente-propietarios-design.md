@@ -63,19 +63,58 @@ para el ACM y para la ficha de captación.
 5. **Guardarraíles.** Lo que nunca se dice ni se hace (§5).
 6. **Traza y medición.** Un turno, una fila: herramientas, razón, tokens, costo, resultado (§7).
 
-### 2.2 El grafo
+### 2.2 Las tres puertas de entrada (Leonardo, 16/9)
+
+El agente **no es "el agente de las fichas de prospección"**: es el agente de propietarios, y se
+habilita sobre un contacto venga de donde venga. Tres puertas, un solo agente:
+
+| Puerta | Quién la abre | Volumen hoy |
+|---|---|---|
+| **Ficha de prospección** "Dueño vende" | el asesor que la cargó | 7 en septiembre |
+| **Campaña** sobre un segmento de propietarios | el director, al lanzarla | cientos, según la lista |
+| **A mano**, desde el chat o la ficha del contacto | el asesor | suelto |
+
+Lo que las une es un **conmutador por contacto**: qué agente atiende esta conversación
+(`propietarios`, `compradores`, `ninguno`). Es el mismo interruptor por agencia del plan del 15/9,
+pero un escalón más abajo, y es lo que permite que el bot de compradores siga en n8n mientras el de
+propietarios corre en código, sobre los mismos números de WhatsApp.
+
+**Problema real que esto resuelve, y que hoy está latente:** las campañas tienen una casilla
+"Bot IA" (`wa_campaigns.bot_active_on_reply`) que, cuando el contacto responde, **prende el bot de
+compradores**. Si mañana se lanza una campaña a dueños con esa casilla, Sofía les va a ofrecer
+propiedades para comprar. El conmutador es lo que evita eso: la campaña declara qué agente atiende.
+
+### 2.3 El primer mensaje lo escribe el agente, no una plantilla fija
+
+Fuera de las 24 horas, Meta obliga a usar una plantilla aprobada. Pero **la plantilla es el sobre,
+no la carta**: el texto variable lo escribe el agente para cada dueño, como ya hace el Super Agente
+de seguimiento (`armarVariables`: su frase va en `{{2}}`, con la línea de baja desde el segundo
+toque). Así el primer mensaje puede nombrar lo que el dueño hizo público y lo que cargó el asesor
+—el barrio, que está publicada hace 150 días, que tuvo 643 visualizaciones— en vez de un texto
+igual para todos.
+
+Reglas del primer mensaje: solo datos que el dueño publicó o dio él mismo (nada que suene a
+vigilancia), se presenta con el nombre de la agencia y del asistente, dice por qué escribe, y ofrece
+la baja. Cuando el dueño contesta, se abre la ventana de 24 horas y la conversación es libre.
+
+**Cambio necesario en el motor de campañas:** hoy una variable de campaña solo admite texto fijo o
+el nombre/celular del contacto (`VarEntry: manual | field`). Hay que sumarle un modo `agente`: el
+texto de cada destinatario lo escribe el agente justo antes de enviar, con los guardarraíles puestos.
+Es el mismo camino que ya usa el ejecutor del seguimiento, movido al envío de campañas.
+
+### 2.4 El grafo
 
 ```
-A) Ficha "Dueño Vende" cargada          B) El dueño responde                 C) Silencio
+A) Ficha, campaña o alta a mano         B) El dueño responde                 C) Silencio
    ↓                                       ↓                                    ↓
-   candidato de captación                  ventana 45 s + candado               reloj del seguimiento
+   conmutador: agente = propietarios       ventana 45 s + candado               reloj del seguimiento
    ↓                                       ↓                                    ↓
-   el asesor aprueba el 1er toque          contexto (ficha + charla + zona)     ¿toca el 2º/3er toque?
-   ↓                                       ↓                                    (15 y 30 días, tope 3)
-   plantilla de propietarios               AGENTE (loop con herramientas)       ↓
-                                           ↓                                    plantilla distinta
-                                           guardarraíles → responder            o abandonar
-                                           ↓
+   el AGENTE escribe el 1er mensaje        contexto (ficha + charla + zona)     ¿toca el 2º/3er toque?
+   (dentro de la plantilla aprobada)        ↓                                    (15 y 30 días, tope 3)
+   ↓                                       AGENTE (loop con herramientas)       ↓
+   el asesor lo aprueba (fase 1)            ↓                                   el AGENTE escribe
+   ↓                                       guardarraíles → responder            el toque siguiente
+   envío                                    ↓                                   o abandona
                                            ultracalificación + aviso al asesor
 ```
 
@@ -143,7 +182,23 @@ en el filtro.
 
 ---
 
-## 6. Cadencia y modo sombra con humano en el lazo
+## 6. El modo campaña (y por qué cambia el riesgo)
+
+Con la ficha de prospección son 7 contactos por mes y el asesor aprueba uno por uno. Con una campaña
+pueden ser cientos en un día, y ahí el riesgo deja de ser la calidad del texto y pasa a ser **el
+número de WhatsApp de la agencia**: en julio un envío masivo desde el número de Central hundió la
+calidad y Meta bloqueó la cuenta.
+
+Lo que el diseño exige para el modo campaña:
+- **Lista propia, no comprada**, y con origen declarado por el director al crearla.
+- **Tope diario propio** además del de Meta (hoy tier 2K = 2.000 por día) y del goteo que ya existe.
+- **Arranque de a poco**: los primeros días un lote chico, mirando respuestas y bajas antes de abrir.
+- **Freno automático**: si suben las bajas o caen las entregas, la campaña se pausa sola y avisa.
+- **Una conversación por contacto**: el agente atiende a cada uno con su propio hilo y su cadencia;
+  la campaña solo elige a quién se le abre la puerta.
+- El asesor asignado sigue siendo el dueño de la relación; si no hay, el director.
+
+## 7. Cadencia y modo sombra con humano en el lazo
 
 - Toques a los 0, 15 y 30 días, plantillas distintas, y corte. Si contesta, manda el diálogo.
 - **La sombra acá es distinta**: como no hay bot actual contra el cual comparar, el agente redacta
@@ -153,7 +208,7 @@ en el filtro.
 
 ---
 
-## 7. Medición
+## 8. Medición
 
 Cuántos responden · cuántos aceptan reunión · cuántas captaciones · objeciones por tipo · campos de
 §3 completados por conversación · mensajes aprobados sin cambios · costo por captación. Sin esto no
@@ -161,7 +216,7 @@ se sabe si el agente sirve, y es lo que hoy nadie puede contestar.
 
 ---
 
-## 8. Fases
+## 9. Fases
 
 | Fase | Qué |
 |---|---|
@@ -173,10 +228,12 @@ se sabe si el agente sirve, y es lo que hoy nadie puede contestar.
 
 ---
 
-## 9. Decisiones de Leonardo
+## 10. Decisiones de Leonardo
 
 1. ¿El primer toque siempre con OK del asesor? (recomendado: sí)
 2. Cuando el dueño responde, ¿conversa el agente o va directo al asesor en la fase 1? (recomendado:
    conversa, con el asesor aprobando cada mensaje)
 3. ¿Se ofrece el informe de zona del ACM como gancho? (recomendado: sí, es lo que nos diferencia)
 4. ¿Arrancamos con las 7 fichas reales o esperamos a juntar 20? (recomendado: las 7, una por una)
+5. ¿La primera campaña de propietarios se arma con la lista de quién? (recomendado: recién después
+   de que las 7 fichas muestren que los dueños responden; el orden importa por el riesgo del número)
