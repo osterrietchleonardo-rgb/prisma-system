@@ -1371,6 +1371,64 @@ git commit -m "docs(farming): etapa 2 — spec, guia del asesor y bitacora"
 
 ---
 
+### Task 7: El aviso de que borrar y redibujar no dejan rastro
+
+> **Orden de ejecución:** esta tarea va DESPUÉS de la Task 5 y ANTES de la Task 6 (docs). Está
+> escrita al final del archivo para no renumerar las tareas que ya estaban en marcha.
+
+**De dónde sale:** pedido de Leonardo del 16-sep. Preguntó si las zonas quedaban con
+trazabilidad y filtros para ver la evolución de cada asesor. Verificado contra producción ese
+día: **borrar una zona la borra de verdad** (la fila desaparece con sus compartidos) y
+**redibujar pisa el trazo anterior** sin guardarlo. Su decisión, textual: *«si se borran o se
+redibujan, no pasa nada, queda lo último y lo visible. (con una nota que la trazabilidad se
+pierde, que si ya terminó con esta zona y empieza por otra, que cree otro registro)»*.
+
+Así que **no se guarda historial de versiones ni se archiva nada**: el comportamiento queda
+igual. Lo único que cambia es que la pantalla lo diga antes, en las dos puertas por donde se
+pierde información.
+
+**Files:**
+- Modify: `components/farming/mapa-farming.tsx` (el `CUADRO`, modo `redibujar`)
+- Modify: `components/farming/farming-page.tsx` (el `window.confirm` de `borrar`)
+
+**Interfaces:** ninguna nueva. Solo cambian dos textos.
+
+- [ ] **Step 1: El aviso al reemplazar el trazo**
+
+En `components/farming/mapa-farming.tsx`, dentro de `CUADRO.redibujar`, reemplazar `texto` por:
+
+```ts
+    texto: "El dibujo nuevo reemplaza al anterior y el viejo no queda guardado en ningún lado. Si ya terminaste con esta zona y vas a trabajar otra, mejor dibujá una zona nueva. Si pisa la zona de un colega, no se guarda y te lo marcamos en rojo.",
+```
+
+No se toca `CUADRO.nueva` ni `CUADRO.sumar`: sumar un pedazo no pierde nada.
+
+- [ ] **Step 2: El aviso al borrar**
+
+En `components/farming/farming-page.tsx`, en `borrar`, reemplazar el texto del `window.confirm`
+por:
+
+```ts
+    if (!window.confirm(`¿Borrar «${z.nombre}»? No queda registro de la zona ni de su trazo. Si ya terminaste acá y vas a trabajar otra, dejá ésta como está y dibujá una nueva (podés tener hasta 3 activas). Esas cuadras quedan libres para otro asesor.`)) return
+```
+
+El comentario `// ETAPA 3:` que está arriba de esa línea se mantiene tal cual.
+
+- [ ] **Step 3: Verificar que no rompió nada**
+
+Run: `npx tsc --noEmit -p tsconfig.json 2>&1 | grep -E "components/farming"` → sin líneas.
+Run: `npm test` → todo verde (ningún test afirma sobre estos textos; si alguno lo hace,
+actualizarlo es parte de esta tarea).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add components/farming/mapa-farming.tsx components/farming/farming-page.tsx
+git commit -m "feat(farming): avisar que borrar y redibujar no dejan rastro de la zona"
+```
+
+---
+
 ## Lo que esta etapa deja listo para la 3
 
 - `farming_avisos_marca` ya tiene la columna `direccion_id` y el estado `convertido`: cuando exista `farming_direcciones`, «crear tarjeta de relevamiento» escribe ahí. El lugar exacto está marcado con `// ETAPA 3:` en `avisos-en-zona.tsx`.
