@@ -28,6 +28,13 @@ describe("unidadesTotales", () => {
     expect(unidadesTotales({ pisos: null, unidades_por_piso: null, unidades_manual: null })).toBeNull()
     expect(unidadesTotales({ pisos: 8, unidades_por_piso: null, unidades_manual: null })).toBeNull()
   })
+
+  it("rechaza números negativos o cero: no muestra «-15 unidades» en el preview", () => {
+    expect(unidadesTotales({ pisos: -5, unidades_por_piso: 3, unidades_manual: null })).toBeNull()
+    expect(unidadesTotales({ pisos: 0, unidades_por_piso: 4, unidades_manual: null })).toBeNull()
+    expect(unidadesTotales({ pisos: null, unidades_por_piso: null, unidades_manual: 0 })).toBeNull()
+    expect(unidadesTotales({ pisos: null, unidades_por_piso: null, unidades_manual: -3 })).toBeNull()
+  })
 })
 
 describe("normalizarDireccion", () => {
@@ -55,31 +62,50 @@ describe("normalizarDireccion", () => {
 
 describe("validarDireccion", () => {
   it("con calle y tipo alcanza", () => {
-    expect(validarDireccion({ calle: "Conde", tipo: "edificio" })).toEqual([])
+    const res = validarDireccion({ calle: "Conde", tipo: "edificio" })
+    expect(res.errores).toEqual([])
+    expect(res.avisos).toEqual([])
   })
 
   it("sin calle no se guarda, y lo dice en criollo", () => {
-    const e = validarDireccion({ tipo: "casa" })
-    expect(e).toHaveLength(1)
-    expect(e[0]).toMatch(/calle/i)
+    const res = validarDireccion({ tipo: "casa" })
+    expect(res.errores).toHaveLength(1)
+    expect(res.errores[0]).toMatch(/calle/i)
   })
 
   it("un tipo que no existe se rechaza", () => {
-    expect(validarDireccion({ calle: "Conde", tipo: "castillo" as any })).toHaveLength(1)
+    const res = validarDireccion({ calle: "Conde", tipo: "castillo" as any })
+    expect(res.errores).toHaveLength(1)
   })
 
-  it("pisos sin unidades por piso avisa, porque el total quedaría en blanco", () => {
-    const e = validarDireccion({ calle: "Conde", tipo: "edificio", pisos: 8 })
-    expect(e.some((x) => /unidades/i.test(x))).toBe(true)
+  it("pisos sin unidades por piso avisa, pero no bloquea: errores vacío, avisos lleno", () => {
+    const res = validarDireccion({ calle: "Conde", tipo: "edificio", pisos: 8 })
+    expect(res.errores).toEqual([])
+    expect(res.avisos.some((x) => /unidades/i.test(x))).toBe(true)
   })
 
-  it("un precio sin moneda no se guarda", () => {
-    const e = validarDireccion({ calle: "Conde", tipo: "casa", precio_pedido: 180000 })
-    expect(e.some((x) => /moneda/i.test(x))).toBe(true)
+  it("unidades por piso sin pisos avisa, pero no bloquea: errores vacío", () => {
+    const res = validarDireccion({ calle: "Conde", tipo: "edificio", unidades_por_piso: 4 })
+    expect(res.errores).toEqual([])
+    expect(res.avisos.some((x) => /pisos/i.test(x))).toBe(true)
   })
 
-  it("junta todos los problemas, no corta en el primero", () => {
-    expect(validarDireccion({ pisos: 8, precio_pedido: 1 }).length).toBeGreaterThan(2)
+  it("un precio sin moneda avisa, pero no bloquea: errores vacío", () => {
+    const res = validarDireccion({ calle: "Conde", tipo: "casa", precio_pedido: 180000 })
+    expect(res.errores).toEqual([])
+    expect(res.avisos.some((x) => /moneda/i.test(x))).toBe(true)
+  })
+
+  it("cartel de inmobiliaria sin nombre avisa, pero no bloquea: errores vacío", () => {
+    const res = validarDireccion({ calle: "Conde", tipo: "casa", cartel: "inmobiliaria" })
+    expect(res.errores).toEqual([])
+    expect(res.avisos.some((x) => /inmobiliaria/i.test(x))).toBe(true)
+  })
+
+  it("junta todos los problemas en sus respectivos vectores: errores con errores, avisos con avisos", () => {
+    const res = validarDireccion({ pisos: 8, precio_pedido: 1 })
+    expect(res.errores.length).toBeGreaterThan(0) // calle y tipo
+    expect(res.avisos.length).toBeGreaterThan(0) // pisos sin unidades, precio sin moneda
   })
 })
 

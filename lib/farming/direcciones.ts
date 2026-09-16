@@ -69,8 +69,12 @@ export function etiquetaDe(etapa: EtapaDireccion): string {
 export function unidadesTotales(
   e: Pick<EntradaDireccion, "pisos" | "unidades_por_piso" | "unidades_manual">,
 ): number | null {
-  if (e.pisos && e.unidades_por_piso) return e.pisos * e.unidades_por_piso
-  return e.unidades_manual ?? null
+  if (e.pisos && e.unidades_por_piso) {
+    const total = e.pisos * e.unidades_por_piso
+    return total > 0 ? total : null
+  }
+  const manual = e.unidades_manual ?? null
+  return manual != null && manual > 0 ? manual : null
 }
 
 /**
@@ -93,22 +97,29 @@ export function normalizarDireccion(calle: string, altura?: string | null): stri
 
 const CLAVES_TIPO = TIPOS.map((t) => t.clave) as string[]
 
-/** Todos los problemas juntos, en criollo. Vacío = se puede guardar. */
-export function validarDireccion(e: Partial<EntradaDireccion>): string[] {
+/**
+ * Validación en dos niveles: lo que bloquea la guardia y lo que avisa.
+ *
+ * `errores` vacío = se puede guardar. Nunca vacío = no se guarda.
+ * `avisos` nunca bloquean: el asesor está en la vereda con el teléfono, no llena todo de una.
+ */
+export function validarDireccion(e: Partial<EntradaDireccion>): { errores: string[]; avisos: string[] } {
   const errores: string[] = []
+  const avisos: string[] = []
 
+  // Obligatorios: la calle y el tipo. Lo demás se completa después.
   if (!e.calle?.trim()) errores.push("Falta la calle.")
   if (!e.tipo || !CLAVES_TIPO.includes(e.tipo)) errores.push("Elegí qué tipo de propiedad es.")
 
   // Si carga pisos, hace falta el otro número: si no, el total queda en blanco y el indicador
-  // de «unidades potenciales» miente.
-  if (e.pisos && !e.unidades_por_piso) errores.push("Pusiste los pisos: falta cuántas unidades hay por piso.")
-  if (e.unidades_por_piso && !e.pisos) errores.push("Pusiste las unidades por piso: faltan los pisos.")
+  // de «unidades potenciales» miente. Pero no bloquea la guardia.
+  if (e.pisos && !e.unidades_por_piso) avisos.push("Pusiste los pisos: falta cuántas unidades hay por piso.")
+  if (e.unidades_por_piso && !e.pisos) avisos.push("Pusiste las unidades por piso: faltan los pisos.")
 
-  if (e.precio_pedido != null && !e.moneda) errores.push("Un precio sin moneda no dice nada: elegí USD o pesos.")
+  if (e.precio_pedido != null && !e.moneda) avisos.push("Un precio sin moneda no dice nada: elegí USD o pesos.")
   if (e.cartel === "inmobiliaria" && !e.inmobiliaria_cartel?.trim()) {
-    errores.push("Decinos de qué inmobiliaria es el cartel.")
+    avisos.push("Decinos de qué inmobiliaria es el cartel.")
   }
 
-  return errores
+  return { errores, avisos }
 }
