@@ -15,6 +15,18 @@
 // POR QUE EL PANEL SE MIDE Y NO SE FIJA: con un panel de alto fijo (40% de la placa), en 4:5 las
 // casillas de datos se metian abajo del aviso legal y el logo se montaba encima. Salio probando
 // el mockup con la foto real, antes de que llegara a produccion.
+//
+// FIX ROUND 1 (16-sep-2026): con el `reservadoAbajo` REAL del cliente (319 px: su aviso legal mide
+// 165 px de franja a 1080 de ancho, mas el logo y los margenes — medido con `armarFranjaLegal`
+// sobre su texto de verdad), el formato cuadrado desbordaba: ni soltando las 5 casillas ni
+// achicando el titulo al minimo alcanzaba, y el precio se dibujaba abajo de la franja legal. La
+// causa era `Math.min(altoPanel, techoPanel)`: el piso del 45% se hacia cumplir con un clamp que
+// tapaba el desborde en vez de evitarlo — exactamente la colision que este diseño existia para
+// prevenir. La solucion agrega una cuarta palanca (soltar la bajada) y vuelve al 45% una
+// PREFERENCIA en vez de una ley: recien si ni soltando casillas, ni soltando la bajada, ni
+// achicando el titulo alcanza, se le pide a la foto que ceda hasta un piso duro del 30%. Y si ni
+// asi entra, la funcion ya no lo esconde: devuelve `desborda: true` para que la ruta lo registre.
+// Ver el comentario en el bucle de `medirPanel` para el orden exacto de las cuatro palancas.
 import sharp from "sharp";
 import type { OverlayOptions } from "sharp";
 import { anchoDelTexto, comoPaths, contornosDeTexto, repartirEnRenglones } from "@/lib/tipografia/contornos";
@@ -36,8 +48,21 @@ const CUERPO_DATO_REF = 28;
 const ALTO_LINEA_REF = 5;       // la linea de acento debajo del titulo
 const AIRE_REF = 40;            // separacion entre bloques del panel
 
-/** La foto nunca baja de esto: el panel no se puede comer la propiedad. */
-const PISO_FOTO = 0.45;
+/**
+ * La foto prefiere no bajar de esto: el panel no deberia comerse la propiedad. Es una preferencia
+ * y no una ley — se cede solo si soltar la bajada Y las casillas Y achicar el titulo al minimo
+ * no alcanzan igual.
+ */
+const PISO_FOTO_PREFERIDO = 0.45;
+
+/**
+ * Piso duro: la foto NUNCA baja de esto, pase lo que pase. Es la ultima de las cuatro palancas.
+ * Si ni con la foto en el 30% entra el contenido, no se sigue bajando la foto: se acepta que el
+ * panel se pase (`desborda: true`) antes que dejar la placa sin nada de propiedad a la vista.
+ * Medido el 16-sep-2026 con el `reservadoAbajo` real del cliente (319 px): en el formato cuadrado
+ * el 45% no alcanzaba, pero el 30% si.
+ */
+const PISO_FOTO_MINIMO = 0.3;
 
 const COLOR_PANEL = "#12161c";
 const COLOR_TITULO = "#ffffff";
@@ -67,6 +92,8 @@ export interface MedidaPanel {
   altoFoto: number;
   cuerpoTitulo: number;
   renglonesTitulo: string[];
+  /** Si la bajada pedida entro, o se solto para hacer lugar (la tercera palanca, ver el bucle). */
+  bajadaDibujada: boolean;
   /** Donde termina lo ultimo que se dibuja. Tiene que caer arriba de lo reservado. */
   fondoDelContenido: number;
   casillas: Casilla[];
@@ -76,6 +103,13 @@ export interface MedidaPanel {
   yLinea: number;
   yBajada: number;
   yPrecio: number;
+  /**
+   * Tiene que ser SIEMPRE false. Si es true, ni soltando casillas y bajada, ni achicando el
+   * titulo al minimo, ni bajando la foto hasta su piso duro del 30% alcanzo: el contenido se va
+   * a dibujar encima de lo reservado (aviso legal, logo). La funcion no lo esconde: quien llama
+   * tiene que registrarlo.
+   */
+  desborda: boolean;
 }
 
 export interface PlacaArmada {
@@ -89,6 +123,8 @@ export interface PlacaArmada {
   datosDibujados: number;
   /** <1 = la foto se achica (nitida). >1 = se agranda (sale blanda). */
   escalaFoto: number;
+  /** Ver `MedidaPanel.desborda`. Tiene que ser SIEMPRE false; si no, hay que registrarlo. */
+  desborda: boolean;
 }
 
 /**
@@ -112,77 +148,105 @@ export function medirPanel(opciones: {
 
   const margen = ent(MARGEN_REF);
   const anchoUtil = ancho - margen * 2;
-  const techoPanel = alto * (1 - PISO_FOTO);
+  const techoPreferido = alto * (1 - PISO_FOTO_PREFERIDO);
+  const techoMinimo = alto * (1 - PISO_FOTO_MINIMO);
   const datosPedidos = (contenido.datos ?? []).filter(Boolean);
+  // Si no hay bajada pedida, no hay nada que soltar: la unica opcion es "no dibujarla" siempre.
+  const opcionesBajada = contenido.bajada ? [true, false] : [false];
 
   let mejor: MedidaPanel | null = null;
 
-  // El orden de los dos for es la decision de diseno: para CADA cuerpo de titulo (de grande a
-  // chico) se prueba con TODAS las casillas puestas y recien despues, si no entra, se van
-  // soltando de a una. Eso significa que se sueltan TODAS las casillas al cuerpo de titulo mas
-  // grande antes de achicar el titulo ni un solo paso. Es al reves de "primero se achica la
-  // letra, recien si no alcanza se sueltan casillas": en una placa inmobiliaria el titular ES
-  // el mensaje (lo que hace parar el pulgar en el feed) y las casillas de datos son decoracion
-  // informativa. Preferimos un titulo grande sin casillas a un titulo chico con todas.
-  for (const cuerpoRef of CUERPOS_TITULO_REF) {
-    for (let cuantosDatos = datosPedidos.length; cuantosDatos >= 0; cuantosDatos--) {
-      const cuerpoTitulo = ent(cuerpoRef);
-      const renglones = repartirEnRenglones(contenido.titulo || "", cuerpoTitulo, anchoUtil);
+  // Las cuatro palancas, de la mas barata a la mas cara — este orden es el que importa, y es
+  // al reves de "primero se achica la letra": en una placa inmobiliaria el titular ES el mensaje
+  // (lo que hace parar el pulgar en el feed) y la foto es la prueba de que la propiedad existe;
+  // las casillas y la bajada son decoracion informativa, prescindible antes que cualquiera de
+  // esas dos. Y por encima de las cuatro, una regla que no tiene excepcion: la franja del aviso
+  // legal (mas el logo) NUNCA se pisa a proposito — eso es lo que devuelve `reservadoAbajo`.
+  //   1) soltar las casillas de datos, de a una      (la mas barata: es la unica decoracion)
+  //   2) soltar la bajada entera                     (mas cara que una casilla: es una oracion)
+  //   3) achicar el cuerpo del titulo, un escalon     (cara: el titulo pierde peso en el feed)
+  //   4) bajar el piso de la foto del 45% al 30%      (la mas cara: la propiedad se ve mas chica)
+  // El bucle repite las tres primeras palancas ENTERAS con el piso preferido de la foto (45%)
+  // antes de tocar la cuarta: recien si NINGUNA combinacion de titulo+bajada+casillas entra en
+  // ese 45%, se repite la busqueda entera permitiendole a la foto bajar hasta el piso duro (30%).
+  // Asi salio el choque del fix (16-sep-2026, ver el comentario de mas arriba): con el
+  // `reservadoAbajo` real (319 px) el formato cuadrado no entraba ni al minimo del titulo sin
+  // soltar tambien la bajada, y ni asi entraba dentro del 45% — necesitaba el 30%.
+  for (const techo of [techoPreferido, techoMinimo]) {
+    for (const cuerpoRef of CUERPOS_TITULO_REF) {
+      for (const conBajada of opcionesBajada) {
+        for (let cuantosDatos = datosPedidos.length; cuantosDatos >= 0; cuantosDatos--) {
+          const cuerpoTitulo = ent(cuerpoRef);
+          const renglones = repartirEnRenglones(contenido.titulo || "", cuerpoTitulo, anchoUtil);
 
-      const yTitulo = ent(AIRE_ARRIBA_REF) + cuerpoTitulo;
-      const fondoTitulo = yTitulo + (renglones.length - 1) * cuerpoTitulo * INTERLINEA_TITULO;
+          const yTitulo = ent(AIRE_ARRIBA_REF) + cuerpoTitulo;
+          const fondoTitulo = yTitulo + (renglones.length - 1) * cuerpoTitulo * INTERLINEA_TITULO;
 
-      const yLinea = fondoTitulo + ent(AIRE_REF);
-      let y = yLinea + ent(ALTO_LINEA_REF);
+          const yLinea = fondoTitulo + ent(AIRE_REF);
+          let y = yLinea + ent(ALTO_LINEA_REF);
 
-      const cuerpoBajada = ent(CUERPO_BAJADA_REF);
-      const yBajada = contenido.bajada ? y + ent(AIRE_REF) + cuerpoBajada : y;
-      y = yBajada;
+          const dibujarBajada = Boolean(contenido.bajada) && conBajada;
+          const cuerpoBajada = ent(CUERPO_BAJADA_REF);
+          const yBajada = dibujarBajada ? y + ent(AIRE_REF) + cuerpoBajada : y;
+          y = yBajada;
 
-      const cuerpoPrecio = ent(CUERPO_PRECIO_REF);
-      const yPrecio = contenido.precio ? y + ent(AIRE_REF) + cuerpoPrecio : y;
-      y = yPrecio;
+          const cuerpoPrecio = ent(CUERPO_PRECIO_REF);
+          const yPrecio = contenido.precio ? y + ent(AIRE_REF) + cuerpoPrecio : y;
+          y = yPrecio;
 
-      // Las casillas: se colocan a lo ancho y la que no entra corta la fila.
-      const cuerpoDato = ent(CUERPO_DATO_REF);
-      const altoCasilla = cuerpoDato + ent(26);
-      const yCasillas = cuantosDatos > 0 ? y + ent(AIRE_REF) + altoCasilla : y;
-      const casillas: Casilla[] = [];
-      if (cuantosDatos > 0) {
-        let x = margen;
-        for (const texto of datosPedidos.slice(0, cuantosDatos)) {
-          const anchoTexto = anchoDelTexto(texto, cuerpoDato);
-          const anchoCasilla = anchoTexto + ent(36);
-          if (x + anchoCasilla > ancho - margen) break;
-          casillas.push({ texto, left: x, top: yCasillas - altoCasilla, ancho: anchoCasilla, alto: altoCasilla });
-          x += anchoCasilla + ent(12);
+          // Las casillas: se colocan a lo ancho y la que no entra corta la fila.
+          const cuerpoDato = ent(CUERPO_DATO_REF);
+          const altoCasilla = cuerpoDato + ent(26);
+          const yCasillas = cuantosDatos > 0 ? y + ent(AIRE_REF) + altoCasilla : y;
+          const casillas: Casilla[] = [];
+          if (cuantosDatos > 0) {
+            let x = margen;
+            for (const texto of datosPedidos.slice(0, cuantosDatos)) {
+              const anchoTexto = anchoDelTexto(texto, cuerpoDato);
+              const anchoCasilla = anchoTexto + ent(36);
+              if (x + anchoCasilla > ancho - margen) break;
+              casillas.push({ texto, left: x, top: yCasillas - altoCasilla, ancho: anchoCasilla, alto: altoCasilla });
+              x += anchoCasilla + ent(12);
+            }
+          }
+          const fondoDelContenido = (casillas.length ? yCasillas : y) + ent(AIRE_REF);
+
+          const altoPanel = Math.ceil(fondoDelContenido + reservadoAbajo);
+
+          const entra = altoPanel <= techo;
+          const esElUltimoIntento =
+            techo === techoMinimo &&
+            cuerpoRef === CUERPOS_TITULO_REF[CUERPOS_TITULO_REF.length - 1] &&
+            conBajada === opcionesBajada[opcionesBajada.length - 1] &&
+            cuantosDatos === 0;
+
+          if (entra || esElUltimoIntento) {
+            // Si `entra`, el clamp no hace nada (altoPanel ya es <= techo). Si es el ultimo
+            // intento y NO entra, el clamp es lo que fija la foto en su piso duro del 30% — y
+            // por eso `desborda` queda en true: el contenido de verdad no entraba ahi.
+            const altoPanelFinal = Math.min(altoPanel, Math.ceil(techo));
+            mejor = {
+              altoPanel: altoPanelFinal,
+              altoFoto: alto - altoPanelFinal,
+              cuerpoTitulo,
+              renglonesTitulo: renglones,
+              bajadaDibujada: dibujarBajada,
+              fondoDelContenido: 0, // se completa abajo, ya en coordenadas de la placa
+              casillas,
+              datosDibujados: casillas.length,
+              margen,
+              yTitulo,
+              yLinea,
+              yBajada,
+              yPrecio,
+              desborda: !entra,
+            };
+            break;
+          }
         }
+        if (mejor) break;
       }
-      const fondoDelContenido = (casillas.length ? yCasillas : y) + ent(AIRE_REF);
-
-      const altoPanel = Math.ceil(fondoDelContenido + reservadoAbajo);
-
-      const entra = altoPanel <= techoPanel;
-      const esElUltimoIntento =
-        cuerpoRef === CUERPOS_TITULO_REF[CUERPOS_TITULO_REF.length - 1] && cuantosDatos === 0;
-
-      if (entra || esElUltimoIntento) {
-        mejor = {
-          altoPanel: Math.min(altoPanel, Math.ceil(techoPanel)),
-          altoFoto: alto - Math.min(altoPanel, Math.ceil(techoPanel)),
-          cuerpoTitulo,
-          renglonesTitulo: renglones,
-          fondoDelContenido: 0, // se completa abajo, ya en coordenadas de la placa
-          casillas,
-          datosDibujados: casillas.length,
-          margen,
-          yTitulo,
-          yLinea,
-          yBajada,
-          yPrecio,
-        };
-        break;
-      }
+      if (mejor) break;
     }
     if (mejor) break;
   }
@@ -305,7 +369,7 @@ export async function armarPlacaConFoto(opciones: {
     left: m.margen,
   });
 
-  if (contenido.bajada) {
+  if (contenido.bajada && m.bajadaDibujada) {
     const cuerpo = ent(CUERPO_BAJADA_REF);
     const r = await renglon(contenido.bajada, m.margen, cuerpo, ancho, COLOR_BAJADA);
     letrasSinDibujo += r.rotas;
@@ -346,5 +410,6 @@ export async function armarPlacaConFoto(opciones: {
     letrasSinDibujo,
     datosDibujados: m.datosDibujados,
     escalaFoto: +escalaFoto.toFixed(2),
+    desborda: m.desborda,
   };
 }

@@ -55,6 +55,25 @@ describe("medirPanel", () => {
     const m = medirPanel({ ancho: 1080, alto: 1920, reservadoAbajo: 200, contenido: CONTENIDO });
     for (const c of m.casillas) expect(c.left + c.ancho).toBeLessThanOrEqual(1080 - m.margen);
   });
+
+  it("con el aviso legal REAL del cliente, nada se mete abajo de la franja", async () => {
+    // El aviso legal de Central mide 165px de franja a 1080 de ancho: con el logo y los margenes,
+    // reservadoAbajo real = 319, no los 200 de las otras pruebas. Medido el 16-sep-2026 con
+    // armarFranjaLegal sobre su texto de verdad. Con 319 el formato cuadrado desbordaba: el
+    // precio se dibujaba abajo de la franja legal.
+    for (const [ancho, alto] of [[1080, 1920], [1080, 1350], [1080, 1080]]) {
+      const m = medirPanel({ ancho, alto, reservadoAbajo: 319, contenido: CONTENIDO });
+      expect(m.fondoDelContenido, `${ancho}x${alto}`).toBeLessThanOrEqual(alto - 319);
+      expect(m.desborda, `${ancho}x${alto}`).toBe(false);
+    }
+  });
+
+  it("la foto cede antes que el contenido pise el aviso legal", async () => {
+    // El piso del 45% es una preferencia, no una ley. Lo que NO se negocia es la franja legal.
+    const m = medirPanel({ ancho: 1080, alto: 1080, reservadoAbajo: 319, contenido: CONTENIDO });
+    expect(m.altoFoto).toBeLessThan(1080 * 0.45);
+    expect(m.altoFoto).toBeGreaterThanOrEqual(1080 * 0.3);
+  });
 });
 
 describe("armarPlacaConFoto", () => {
