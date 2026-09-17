@@ -47,8 +47,8 @@ create index if not exists gcba_puertas_smp_idx on public.gcba_puertas (smp);
 
 create table if not exists public.gcba_parcela_cache (
   smp            text primary key,
-  geom_lote      geometry(MultiPolygon, 4326),
-  geom_manzana   geometry(MultiPolygon, 4326),
+  geom_lote      geometry(Geometry, 4326),     -- epok devuelve MultiPolygon, pero un Polygon también tiene que entrar
+  geom_manzana   geometry(Geometry, 4326),
   catastro       jsonb,                       -- respuesta de epok catastro/parcela
   volumenes      jsonb,                       -- VolumenOficial[] de las teselas, ya en lon/lat
   manzana_tipo   text,                        -- TIPICA | ATIPICA según la tesela manzana
