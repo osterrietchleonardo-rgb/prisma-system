@@ -26,9 +26,11 @@ interface AsesorHeaderProps {
   agencyId?: string
   userRole?: string
   aiCredits?: { allocated: number; consumed: number } | null
+  /** Si a este asesor el director lo eligió para recibir los leads del chat de la web. */
+  verChatWeb?: boolean
 }
 
-export function AsesorHeader({ userName, userEmail, agencyName, agencyId, userRole }: AsesorHeaderProps) {
+export function AsesorHeader({ userName, userEmail, agencyName, agencyId, userRole, verChatWeb }: AsesorHeaderProps) {
   const pathname = usePathname()
   const [customTitle, setCustomTitle] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -79,6 +81,7 @@ export function AsesorHeader({ userName, userEmail, agencyName, agencyId, userRo
                 agencyId={agencyId}
                 userName={userName}
                 userRole={userRole}
+                verChatWeb={verChatWeb}
                 onSelect={() => setOpen(false)}
               />
             </SheetContent>

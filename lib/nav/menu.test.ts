@@ -229,3 +229,21 @@ describe("grupoActivo", () => {
     expect(grupoActivo("director", "/director/algo-que-no-existe")).toBeNull()
   })
 })
+
+describe("la bandeja del chat web: quién la ve en el menú (Leonardo, 17/9)", () => {
+  const nombres = (rol: "director" | "asesor", opciones = {}) =>
+    menuPara(rol, opciones).flatMap((g) => g.items.map((i) => i.name))
+
+  it("el director la ve siempre", () => {
+    expect(nombres("director")).toContain("Chat de la web")
+  })
+
+  it("un asesor cualquiera NO la ve: adentro hay teléfonos de gente que no es cliente", () => {
+    expect(nombres("asesor")).not.toContain("Chat de la web")
+    expect(nombres("asesor", { verChatWeb: false })).not.toContain("Chat de la web")
+  })
+
+  it("el asesor que el director eligió, sí", () => {
+    expect(nombres("asesor", { verChatWeb: true })).toContain("Chat de la web")
+  })
+})

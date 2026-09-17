@@ -415,10 +415,13 @@ export function ConfiguracionChatWeb() {
             </span>
           </li>
           <li className="flex gap-2">
-            <span aria-hidden>4.</span>
-            <span>
-              <strong>La bandeja.</strong> Las conversaciones del chat van a aparecer acá mismo,
-              como una bandeja más.
+            <span aria-hidden>✓</span>
+            <span className="text-muted-foreground">
+              <strong>La bandeja</strong> ya está:{" "}
+              <a href="/director/chat-web/bandeja" className="underline">
+                ver las conversaciones
+              </a>
+              . La ves vos, y el asesor que elijas arriba (solo los que quieren sumarse al equipo).
             </span>
           </li>
         </ol>

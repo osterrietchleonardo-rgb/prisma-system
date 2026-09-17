@@ -32,6 +32,8 @@ interface SidebarNavProps {
   onSelect?: () => void
   /** Contadores por id de renglón, ej. `{ equipo: 3 }`. */
   badges?: Record<string, number | undefined>
+  /** Si esta persona ve la bandeja del chat web (director siempre; asesor, si lo eligieron). */
+  verChatWeb?: boolean
 }
 
 const claveGuardado = (rol: Rol) => `prisma.menu.abiertos.${rol}`
@@ -53,9 +55,9 @@ function guardar(rol: Rol, abiertos: Record<string, boolean>) {
   }
 }
 
-export function SidebarNav({ rol, agencyId, onSelect, badges }: SidebarNavProps) {
+export function SidebarNav({ rol, agencyId, onSelect, badges, verChatWeb }: SidebarNavProps) {
   const pathname = usePathname()
-  const grupos = menuPara(rol, { agencyId })
+  const grupos = menuPara(rol, { agencyId, verChatWeb })
   const activo = grupoActivo(rol, pathname, agencyId)
 
   // Arranca con el grupo de la página activa abierto. Es determinista (sale del
