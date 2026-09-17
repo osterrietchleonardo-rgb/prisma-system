@@ -36,6 +36,13 @@ export interface ContornoAjeno {
 export interface RespuestaZonas {
   mias: ZonaFarming[]
   compartidas_conmigo: ZonaFarming[]
+  /**
+   * Las zonas ARCHIVADAS que puedo mirar (mías o compartidas conmigo). Balde propio, nunca
+   * mezcladas con `mias`: el mapa, los topes y el control de choque leen `mias` y tienen que
+   * seguir viendo SOLO zonas activas — las cuadras de una archivada ya están libres.
+   * Se miran (tarjetas, gente, historial) y no se trabajan.
+   */
+  archivadas: ZonaFarming[]
   ajenas: ContornoAjeno[]
   /** Solo para el director: todas las activas de la agencia, completas. Vacío para el asesor. */
   equipo: ZonaFarming[]
@@ -93,7 +100,9 @@ export interface FilaDireccion {
 }
 
 export interface RespuestaDirecciones {
-  zona: { id: string; nombre: string }
+  /** `estado` viene del servidor para que la pantalla diga «archivada» con el dato de la base
+   *  y no solo con lo que le llegó por props. Una zona `liberada` nunca llega hasta acá. */
+  zona: { id: string; nombre: string; estado: "activa" | "archivada" }
   direcciones: FilaDireccion[]
 }
 

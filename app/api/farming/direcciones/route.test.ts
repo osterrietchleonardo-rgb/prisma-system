@@ -34,6 +34,7 @@ const Z_MIA = "10000000-0000-0000-0000-000000000001"
 const Z_JUAN = "10000000-0000-0000-0000-000000000002"
 const Z_LIBERADA = "10000000-0000-0000-0000-000000000003"
 const Z_AJENA = "10000000-0000-0000-0000-000000000004"
+const Z_ARCHIVADA = "10000000-0000-0000-0000-000000000005"
 
 const sesion = { userId: YO, agencyId: AGENCIA, role: "asesor" }
 vi.mock("@/lib/auth/tenant-validation", () => ({ requireTenant: vi.fn(async () => ({ ...sesion })) }))
@@ -49,6 +50,7 @@ const zonasFixture = () => [
   { id: Z_JUAN, agency_id: AGENCIA, owner_user_id: JUAN, nombre: "De Juan", geojson: cuadrado, estado: "activa" },
   { id: Z_LIBERADA, agency_id: AGENCIA, owner_user_id: YO, nombre: "Vieja", geojson: cuadrado, estado: "liberada" },
   { id: Z_AJENA, agency_id: OTRA_AGENCIA, owner_user_id: "u-x", nombre: "Otra agencia", geojson: cuadrado, estado: "activa" },
+  { id: Z_ARCHIVADA, agency_id: AGENCIA, owner_user_id: YO, nombre: "Vieja", geojson: cuadrado, estado: "archivada" },
 ]
 
 function nuevaBase(extra: Record<string, any[]> = {}) {
@@ -87,7 +89,7 @@ describe("GET /api/farming/direcciones", () => {
     const r = await pedirGET(`zona_id=${Z_MIA}`)
     const d = await r.json()
     expect(r.status).toBe(200)
-    expect(d.zona).toEqual({ id: Z_MIA, nombre: "Colegiales" })
+    expect(d.zona).toEqual({ id: Z_MIA, nombre: "Colegiales", estado: "activa" })
     expect(d.direcciones.map((x: any) => x.id)).toEqual(["d1", "d2", "d3"])
   })
 
@@ -110,6 +112,24 @@ describe("GET /api/farming/direcciones", () => {
 
   it("sin zona_id: 400", async () => {
     expect((await pedirGET("")).status).toBe(400)
+  })
+
+  /**
+   * UNA ZONA ARCHIVADA SE MIRA. Es la promesa del cartel del borrado («tus tarjetas, tus
+   * propietarios y su historial quedan guardados»): si este GET contestara 404, esas tarjetas
+   * estarían en la base y no habría UNA sola pantalla de PRISMA desde donde verlas.
+   */
+  it("una zona archivada SÍ devuelve sus tarjetas, y dice que está archivada", async () => {
+    nuevaBase({
+      farming_direcciones: [
+        { id: "d-vieja", zona_id: Z_ARCHIVADA, agency_id: AGENCIA, calle: "Peron", altura: "100", tipo: "casa", etapa: "relevado", orden: 0, created_at: "2026-01-01T00:00:00.000Z", creada_por: YO },
+      ],
+    })
+    const r = await pedirGET(`zona_id=${Z_ARCHIVADA}`)
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.direcciones.map((x: any) => x.id)).toEqual(["d-vieja"])
+    expect(d.zona.estado).toBe("archivada")
   })
 })
 
@@ -320,6 +340,20 @@ describe("POST /api/farming/direcciones", () => {
     expect(r.status).toBe(409)
     expect(base.tablas.farming_direcciones).toHaveLength(1)
     expect(base.tablas.farming_avisos_marca).toHaveLength(0)
+  })
+
+  /**
+   * UNA ZONA ARCHIVADA NO SE TRABAJA. La otra mitad de la regla: se lee (el GET de arriba) y no
+   * se escribe. Sin este par de pruebas, cualquiera de las dos mitades se puede romper sola —
+   * un `estado = 'activa'` de más deja el trabajo inalcanzable, uno de menos deja escribir en
+   * una zona cuyas cuadras ya son de otro asesor.
+   */
+  it("crear una tarjeta en una zona archivada: se rechaza y no escribe nada", async () => {
+    const r = await pedirPOST({ zona_id: Z_ARCHIVADA, calle: "Peron", tipo: "casa" })
+    const d = await r.json()
+    expect(r.status).toBe(409)
+    expect(d.error).toMatch(/archivada/i)
+    expect(base.tablas.farming_direcciones).toHaveLength(0)
   })
 
   it("un 23505 real de Postgres (dos pedidos concurrentes que pasan el chequeo previo) también da 409", async () => {

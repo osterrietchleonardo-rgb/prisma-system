@@ -29,6 +29,7 @@ const cuadrado = {
 
 const Z_MIA = "10000000-0000-0000-0000-000000000001"
 const Z_JUAN = "10000000-0000-0000-0000-000000000002"
+const Z_ARCHIVADA = "10000000-0000-0000-0000-000000000003"
 
 const D_MIA = "20000000-0000-0000-0000-000000000001"
 const D_MIA_2 = "20000000-0000-0000-0000-000000000002"
@@ -52,6 +53,7 @@ const { PATCH, DELETE } = await import("./[pid]/route")
 const zonasFixture = () => [
   { id: Z_MIA, agency_id: AGENCIA, owner_user_id: YO, nombre: "Colegiales", geojson: cuadrado, estado: "activa" },
   { id: Z_JUAN, agency_id: AGENCIA, owner_user_id: JUAN, nombre: "De Juan", geojson: cuadrado, estado: "activa" },
+  { id: Z_ARCHIVADA, agency_id: AGENCIA, owner_user_id: YO, nombre: "Vieja", geojson: cuadrado, estado: "archivada" },
 ]
 
 const direccionFixture = (id: string, zonaId: string, agencyId: string, extra: any = {}) => ({
@@ -324,6 +326,22 @@ describe("PATCH /api/farming/direcciones/[id]/propietarios/[pid]", () => {
     expect(d.propietario.telefono).toBe("preguntar en el kiosco")
   })
 
+  // MISMO CAMPO, MISMO CONTRATO. En el ALTA, `vinculo: null` (o "") quiere decir «dejalo en el
+  // default»; acá contestaba 400. El mismo formulario que funciona al crear no puede fallar al
+  // corregir: la columna es `not null default 'propietario'` y ese es el valor que se escribe.
+  it("vinculo null es «el default», igual que en el alta: 200 y queda propietario", async () => {
+    const r = await patch(D_MIA, P_DE_MIA, { vinculo: null })
+    expect(r.status).toBe(200)
+    const fila = base.tablas.farming_propietarios.find((x: any) => x.id === P_DE_MIA)!
+    expect(fila.vinculo).toBe("propietario")
+  })
+
+  it("vinculo en blanco tampoco es un vínculo inválido: es el default", async () => {
+    const r = await patch(D_MIA, P_DE_MIA, { vinculo: "" })
+    expect(r.status).toBe(200)
+    expect(base.tablas.farming_propietarios.find((x: any) => x.id === P_DE_MIA)!.vinculo).toBe("propietario")
+  })
+
   it("un vínculo fuera de la lista: 400, no escribe", async () => {
     const r = await patch(D_MIA, P_DE_MIA, { vinculo: "vecino" })
     const d = await r.json()
@@ -407,6 +425,52 @@ describe("PATCH /api/farming/direcciones/[id]/propietarios/[pid]", () => {
     const r = await patch(D_MIA, "abc", { piso: "9" })
     expect(r.status).toBe(404)
     expect(consulto).toBe(false)
+  })
+})
+
+/**
+ * UNA ZONA ARCHIVADA SE MIRA, NO SE TRABAJA — también acá. El cartel del borrado promete que
+ * «tus propietarios y su historial quedan guardados»: si el GET diera 404, esa gente estaría en
+ * la base y fuera del alcance de toda la aplicación. Y al revés: sumar, corregir o borrar gente
+ * en una zona cuyas cuadras ya son de otro asesor no puede pasar.
+ */
+describe("propietarios de una tarjeta en zona archivada", () => {
+  const D_VIEJA = "20000000-0000-0000-0000-000000000009"
+  const P_VIEJO = "30000000-0000-0000-0000-000000000009"
+
+  beforeEach(() => {
+    base.tablas.farming_direcciones.push(direccionFixture(D_VIEJA, Z_ARCHIVADA, AGENCIA))
+    base.tablas.farming_propietarios.push({
+      id: P_VIEJO, direccion_id: D_VIEJA, agency_id: AGENCIA, creado_por: YO,
+      piso: null, unidad: null, nombre: "Marta", vinculo: "propietario",
+      telefono: null, email: null, notas: null, tracking_log_id: null, created_at: "2026-09-16T10:00:00.000Z",
+    })
+  })
+
+  it("GET: la gente SÍ se lee", async () => {
+    const r = await leer(D_VIEJA)
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.propietarios.map((x: any) => x.id)).toEqual([P_VIEJO])
+  })
+
+  it("POST: no se suma gente nueva", async () => {
+    const antes = base.tablas.farming_propietarios.length
+    const r = await post(D_VIEJA, { nombre: "Nuevo" })
+    expect(r.status).toBe(409)
+    expect(base.tablas.farming_propietarios).toHaveLength(antes)
+  })
+
+  it("PATCH: no se corrige", async () => {
+    const r = await patch(D_VIEJA, P_VIEJO, { nombre: "Marta Gómez" })
+    expect(r.status).toBe(409)
+    expect(base.tablas.farming_propietarios.find((x: any) => x.id === P_VIEJO)!.nombre).toBe("Marta")
+  })
+
+  it("DELETE: no se borra", async () => {
+    const r = await borrar(D_VIEJA, P_VIEJO)
+    expect(r.status).toBe(409)
+    expect(base.tablas.farming_propietarios.find((x: any) => x.id === P_VIEJO)).toBeDefined()
   })
 })
 

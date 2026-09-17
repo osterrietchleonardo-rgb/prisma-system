@@ -8,21 +8,10 @@ import { NextResponse } from "next/server"
 import { booleanPointInPolygon, point } from "@turf/turf"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { responderError, zonaAccesible } from "@/lib/farming/servidor"
-import { normalizarDireccion, validarDireccion } from "@/lib/farming/direcciones"
+import { rechazoDeZona, responderError, zonaAccesible } from "@/lib/farming/servidor"
+import { normalizarDireccion, tieneAlturaComparable, validarDireccion } from "@/lib/farming/direcciones"
 
 export const dynamic = "force-dynamic"
-
-/**
- * La misma condición, carácter por carácter, que el `where` del índice parcial
- * `farming_direcciones_sin_repetir_idx`: sin esto, una puerta "s/n" (o vacía) terminaría
- * chocando contra cualquier otra de la misma calle, que es justo lo que el índice evita.
- */
-function tieneAlturaComparable(altura?: string | null): boolean {
-  const a = (altura || "").trim()
-  if (!a) return false
-  return !["s/n", "sn", "s.n."].includes(a.toLowerCase())
-}
 
 /** `Number(null)` es 0 y `Number("")` también: sobre el valor crudo, no sobre un cast directo,
  *  para que un aviso_id ausente sea `null` (caminata) y no "el aviso 0" (aviso). */
@@ -49,9 +38,12 @@ export async function GET(req: Request) {
     if (!zonaId) return NextResponse.json({ error: "Falta la zona" }, { status: 400 })
 
     const admin = createAdminClient()
-    const { zona, puede } = await zonaAccesible(admin, zonaId, agencyId, userId)
-    if (!zona) return NextResponse.json({ error: "No encontramos esa zona activa" }, { status: 404 })
-    if (!puede) return NextResponse.json({ error: "Esa zona es de un colega" }, { status: 403 })
+    // "leer": una zona ARCHIVADA sí contesta acá. Sus tarjetas están en la base y el asesor
+    // tiene que poder verlas — es exactamente lo que le promete el cartel al archivarla.
+    const acceso = await zonaAccesible(admin, zonaId, agencyId, userId, "leer")
+    const no = rechazoDeZona(acceso)
+    if (no) return no
+    const zona = acceso.zona!
 
     // `agency_id` es una columna denormalizada (ver el comentario de la migración): filtrar por
     // ella también acá, y no solo confiar en `zona_id`, hace que una fila mal escrita falle
@@ -71,7 +63,12 @@ export async function GET(req: Request) {
       .order("created_at", { ascending: true })
     if (error) throw error
 
-    return NextResponse.json({ zona: { id: zona.id, nombre: zona.nombre }, direcciones: data || [] })
+    // `estado` viaja: la pantalla tiene que poder decir «esta zona está archivada» con el dato
+    // del servidor y no solo con lo que le pasaron por props.
+    return NextResponse.json({
+      zona: { id: zona.id, nombre: zona.nombre, estado: zona.estado },
+      direcciones: data || [],
+    })
   } catch (e) {
     return responderError(e, "direcciones de la zona")
   }
@@ -95,9 +92,11 @@ export async function POST(req: Request) {
     if (!zonaId) return NextResponse.json({ error: "Falta la zona" }, { status: 400 })
 
     const admin = createAdminClient()
-    const { zona, puede } = await zonaAccesible(admin, zonaId, agencyId, userId)
-    if (!zona) return NextResponse.json({ error: "No encontramos esa zona activa" }, { status: 404 })
-    if (!puede) return NextResponse.json({ error: "Esa zona es de un colega" }, { status: 403 })
+    // "escribir": en una zona ARCHIVADA no nace ninguna tarjeta nueva. Se mira, no se trabaja.
+    const acceso = await zonaAccesible(admin, zonaId, agencyId, userId, "escribir")
+    const no = rechazoDeZona(acceso)
+    if (no) return no
+    const zona = acceso.zona!
 
     // La última puerta antes de la base: la pantalla ya validó, pero el body puede venir de
     // cualquier lado. `errores` bloquea (400, no se escribe nada); `avisos` NO bloquea: la

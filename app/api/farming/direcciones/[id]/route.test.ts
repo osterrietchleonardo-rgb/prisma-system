@@ -28,10 +28,13 @@ const cuadrado = {
 const Z_MIA = "10000000-0000-0000-0000-000000000001"
 const Z_JUAN = "10000000-0000-0000-0000-000000000002"
 const Z_AJENA = "10000000-0000-0000-0000-000000000004"
+const Z_ARCHIVADA = "10000000-0000-0000-0000-000000000005"
 
 const D_MIA = "20000000-0000-0000-0000-000000000001"
 const D_JUAN = "20000000-0000-0000-0000-000000000002"
 const D_AJENA = "20000000-0000-0000-0000-000000000003"
+const D_ARCHIVADA = "20000000-0000-0000-0000-000000000004"
+const D_VECINA = "20000000-0000-0000-0000-000000000005"
 
 const sesion = { userId: YO, agencyId: AGENCIA, role: "asesor" }
 vi.mock("@/lib/auth/tenant-validation", () => ({ requireTenant: vi.fn(async () => ({ ...sesion })) }))
@@ -46,6 +49,7 @@ const zonasFixture = () => [
   { id: Z_MIA, agency_id: AGENCIA, owner_user_id: YO, nombre: "Colegiales", geojson: cuadrado, estado: "activa" },
   { id: Z_JUAN, agency_id: AGENCIA, owner_user_id: JUAN, nombre: "De Juan", geojson: cuadrado, estado: "activa" },
   { id: Z_AJENA, agency_id: OTRA_AGENCIA, owner_user_id: "u-x", nombre: "Otra agencia", geojson: cuadrado, estado: "activa" },
+  { id: Z_ARCHIVADA, agency_id: AGENCIA, owner_user_id: YO, nombre: "Vieja", geojson: cuadrado, estado: "archivada" },
 ]
 
 const direccionFixture = (id: string, zonaId: string, agencyId: string, extra: any = {}) => ({
@@ -93,6 +97,7 @@ function nuevaBase(extra: Record<string, any[]> = {}) {
       direccionFixture(D_MIA, Z_MIA, AGENCIA),
       direccionFixture(D_JUAN, Z_JUAN, AGENCIA),
       direccionFixture(D_AJENA, Z_MIA, OTRA_AGENCIA),
+      direccionFixture(D_ARCHIVADA, Z_ARCHIVADA, AGENCIA),
     ],
     ...extra,
   })
@@ -226,6 +231,146 @@ describe("PATCH /api/farming/direcciones/[id]", () => {
     const d = await r.json()
     expect(r.status).toBe(200)
     expect(d.direccion.orden).toBe(5)
+  })
+})
+
+/**
+ * CORREGIR UNA TARJETA TAMBIÉN PUEDE CREAR UN DUPLICADO. `calle` y `altura` se editan, así que
+ * el mismo choque que el alta frena desde el primer día llega también por acá — y llegaba sin
+ * chequeo previo ni traducción del 23505: el asesor veía el texto crudo del índice único, en
+ * inglés, adentro del diálogo, mientras estaba ARREGLANDO algo.
+ */
+describe("PATCH: la misma puerta dos veces en la misma zona", () => {
+  beforeEach(() => {
+    nuevaBase({
+      farming_direcciones: [
+        direccionFixture(D_MIA, Z_MIA, AGENCIA, { calle: "Peron", altura: "100" }),
+        direccionFixture(D_VECINA, Z_MIA, AGENCIA, { calle: "Av. Ejemplo", altura: "1200" }),
+      ],
+    })
+  })
+
+  it("editar la altura hasta pisar a la vecina: 409 en criollo, con el nombre de la puerta, y no escribe", async () => {
+    const r = await patch(D_MIA, { calle: "av ejemplo", altura: "1200" })
+    const d = await r.json()
+    expect(r.status).toBe(409)
+    expect(d.error).toContain("Av. Ejemplo")
+    expect(d.error).toContain("1200")
+    expect(d.error).not.toMatch(/duplicate key|constraint/i)
+    const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!
+    expect(fila.calle).toBe("Peron")
+  })
+
+  it("una tarjeta NO es su propio duplicado: guardar la misma calle y altura que ya tiene es 200", async () => {
+    const r = await patch(D_MIA, { calle: "Peron", altura: "100", observaciones: "toco otra cosa" })
+    expect(r.status).toBe(200)
+  })
+
+  it("sin altura comparable (s/n) no hay choque posible, igual que el índice parcial", async () => {
+    base.tablas.farming_direcciones.find((x: any) => x.id === D_VECINA)!.altura = "s/n"
+    const r = await patch(D_MIA, { calle: "Av. Ejemplo", altura: "S/N" })
+    expect(r.status).toBe(200)
+  })
+
+  it("la MISMA puerta en OTRA zona no choca: el índice es por zona", async () => {
+    base.tablas.farming_direcciones.find((x: any) => x.id === D_VECINA)!.zona_id = Z_JUAN
+    const r = await patch(D_MIA, { calle: "Av. Ejemplo", altura: "1200" })
+    expect(r.status).toBe(200)
+  })
+
+  it("un PATCH que no toca ni calle ni altura no gasta la consulta de duplicados", async () => {
+    const tocadas: string[] = []
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => { tocadas.push(tabla); return fromOriginal(tabla) }) as typeof base.from
+    const r = await patch(D_MIA, { encargado_nombre: "Doña Rosa" })
+    expect(r.status).toBe(200)
+    // farming_direcciones: una vez el candado, una vez el update. Ni una tercera para duplicados.
+    expect(tocadas.filter((t) => t === "farming_direcciones")).toHaveLength(2)
+  })
+
+  // Mismo caso que el POST: dos ediciones concurrentes pueden pasar las dos el chequeo en JS, y
+  // el candado de verdad es el índice de Postgres. Ese 23505 tampoco puede salir en inglés.
+  it("un 23505 real de Postgres en el UPDATE también da 409, no un 500 con el texto crudo", async () => {
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => {
+      const q: any = fromOriginal(tabla)
+      if (tabla === "farming_direcciones") {
+        const updateReal = q.update
+        q.update = (payload: any) => {
+          const encadenado = updateReal(payload) // es el mismo `q`, con op="update" ya seteado
+          encadenado.then = (resolve: any) =>
+            resolve({ data: null, error: { code: "23505", message: "duplicate key value violates unique constraint" } })
+          return encadenado
+        }
+      }
+      return q
+    }) as typeof base.from
+
+    const r = await patch(D_MIA, { calle: "Otra", altura: "9" })
+    const d = await r.json()
+    expect(r.status).toBe(409)
+    expect(d.error).toContain("ya está cargada")
+    expect(d.error).not.toMatch(/duplicate key|constraint/i)
+  })
+})
+
+/**
+ * LA FORMA DEL BODY, no solo el valor. El alta ya casteaba `calle`/`altura` con String() y
+ * exigía `Number.isFinite` en lat/lng; el PATCH no hacía ni una cosa ni la otra, así que
+ * `calle: 1200`, `lat: "abc"` y `orden: "x"` llegaban crudos a Postgres y volvían como un 500
+ * en inglés. Las dos puertas de la tarjeta tienen que tratar el body igual.
+ */
+describe("PATCH: la forma de los campos", () => {
+  it("calle numérica (1200 sin comillas) no revienta: se guarda como string, igual que en el alta", async () => {
+    const r = await patch(D_MIA, { calle: 1200 })
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.direccion.calle).toBe("1200")
+  })
+
+  it("una altura numérica también se guarda como string", async () => {
+    const r = await patch(D_MIA, { altura: 1200 })
+    expect((await r.json()).direccion.altura).toBe("1200")
+  })
+
+  it("lat que no es un número: 400, y no escribe", async () => {
+    const r = await patch(D_MIA, { lat: "abc" })
+    expect(r.status).toBe(400)
+    expect(base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!.lat).toBeNull()
+  })
+
+  it("orden que no es un número: 400, y no escribe", async () => {
+    const r = await patch(D_MIA, { orden: "x" })
+    expect(r.status).toBe(400)
+    expect(base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!.orden).toBe(0)
+  })
+
+  it("un precio que no es un número: 400", async () => {
+    expect((await patch(D_MIA, { precio_pedido: "mucha plata" })).status).toBe(400)
+  })
+
+  it("lat y lng de verdad sí se guardan", async () => {
+    const r = await patch(D_MIA, { lat: -34.555, lng: -58.455 })
+    expect(r.status).toBe(200)
+    expect((await r.json()).direccion.lat).toBe(-34.555)
+  })
+})
+
+// La otra mitad de «se mira, no se trabaja»: la tarjeta de una zona archivada se lista (ver el
+// GET de /api/farming/direcciones) pero no se cambia ni se borra desde ningún lado.
+describe("una tarjeta de zona archivada no se escribe", () => {
+  it("PATCH: se rechaza y no escribe", async () => {
+    const r = await patch(D_ARCHIVADA, { encargado_nombre: "Doña Rosa" })
+    const d = await r.json()
+    expect(r.status).toBe(409)
+    expect(d.error).toMatch(/archivada/i)
+    expect(base.tablas.farming_direcciones.find((x: any) => x.id === D_ARCHIVADA)!.encargado_nombre).toBeNull()
+  })
+
+  it("DELETE: se rechaza y no borra", async () => {
+    const r = await borrar(D_ARCHIVADA)
+    expect(r.status).toBe(409)
+    expect(base.tablas.farming_direcciones.find((x: any) => x.id === D_ARCHIVADA)).toBeDefined()
   })
 })
 

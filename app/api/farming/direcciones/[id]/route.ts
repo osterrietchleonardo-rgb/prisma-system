@@ -6,8 +6,8 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { direccionAccesible, responderError } from "@/lib/farming/servidor"
-import { ETAPAS, valoresImposibles } from "@/lib/farming/direcciones"
+import { direccionAccesible, rechazoDeDireccion, responderError } from "@/lib/farming/servidor"
+import { ETAPAS, normalizarDireccion, tieneAlturaComparable, valoresImposibles } from "@/lib/farming/direcciones"
 
 export const dynamic = "force-dynamic"
 
@@ -48,11 +48,13 @@ const COLUMNAS_EDITABLES = [
   "proxima_accion_en",
 ] as const
 
+/** Las DOS operaciones de este archivo escriben, así que las dos piden acceso de "escribir":
+ *  una tarjeta de zona archivada se lee (por el GET de la lista) pero no se cambia ni se borra. */
 async function candado(admin: ReturnType<typeof createAdminClient>, id: string, agencyId: string, userId: string) {
-  const { direccion, puede } = await direccionAccesible(admin, id, agencyId, userId)
-  if (!direccion) return { ok: false as const, resp: NextResponse.json({ error: "No encontramos esa tarjeta" }, { status: 404 }) }
-  if (!puede) return { ok: false as const, resp: NextResponse.json({ error: "Esa tarjeta es de la zona de un colega" }, { status: 403 }) }
-  return { ok: true as const, direccion }
+  const acceso = await direccionAccesible(admin, id, agencyId, userId, "escribir")
+  const no = rechazoDeDireccion(acceso)
+  if (no) return { ok: false as const, resp: no }
+  return { ok: true as const, direccion: acceso.direccion }
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -65,6 +67,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const body = await req.json().catch(() => ({}))
 
+    // La MISMA conversión que hace el alta, y por el mismo motivo: si `calle` o `altura` llegan
+    // como número JSON (un cliente que no castea el formulario), `.trim()` revienta más abajo
+    // con un TypeError, y lo que se compara contra los duplicados tiene que ser el MISMO string
+    // que se guarda. Las dos puertas de la tarjeta tienen que tratar el body igual.
+    if (body && typeof body === "object") {
+      if (body.calle != null) body.calle = String(body.calle)
+      if (body.altura != null) body.altura = String(body.altura)
+    }
+
     // Antes de tocar la base: una etapa fuera de las siete del check de la migración, o
     // cualquier otro valor imposible (tipo, cartel, moneda, pisos, unidades_por_piso,
     // unidades_manual fuera de lo que la migración acepta), es un error del que se avisa (400),
@@ -75,9 +86,51 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (Object.prototype.hasOwnProperty.call(body, "etapa") && !CLAVES_ETAPA.includes(body.etapa)) {
       errores.push("Esa etapa no existe.")
     }
+    // `orden` es `integer not null` y solo se puede tocar desde acá (el alta lo fija en 0): un
+    // `orden: "x"` no rompe ninguna regla de negocio, rompe el cast de Postgres y vuelve como
+    // un 500 en inglés. Mismo criterio que lat/lng/precio en valoresImposibles.
+    if (
+      Object.prototype.hasOwnProperty.call(body, "orden") &&
+      (typeof body.orden !== "number" || !Number.isInteger(body.orden))
+    ) {
+      errores.push("El orden tiene que ser un número entero.")
+    }
     errores.push(...valoresImposibles(body))
     if (errores.length > 0) {
       return NextResponse.json({ error: errores.join(" ") }, { status: 400 })
+    }
+
+    // La misma puerta dos veces en la misma zona: el alta ya lo frena, y corregir una tarjeta
+    // TAMBIÉN puede crear el duplicado (calle y altura se editan). Sin esto, el asesor que está
+    // arreglando algo se llevaba el texto crudo de Postgres —«duplicate key value violates
+    // unique constraint farming_direcciones_sin_repetir_idx»— adentro del diálogo.
+    const tocaLaPuerta =
+      Object.prototype.hasOwnProperty.call(body, "calle") || Object.prototype.hasOwnProperty.call(body, "altura")
+    if (tocaLaPuerta) {
+      const calle = Object.prototype.hasOwnProperty.call(body, "calle") ? body.calle : c.direccion.calle
+      const altura = Object.prototype.hasOwnProperty.call(body, "altura") ? body.altura : c.direccion.altura
+      // Sin altura comparable ("", "s/n") no hay puerta que pueda chocar: la misma condición
+      // que el índice parcial de la migración.
+      if (tieneAlturaComparable(altura)) {
+        const { data: existentes, error: eDup } = await admin
+          .from("farming_direcciones")
+          .select("id, calle, altura")
+          .eq("zona_id", c.direccion.zona_id)
+          .eq("agency_id", agencyId)
+          .neq("id", params.id) // ella misma no es su propio duplicado
+        if (eDup) throw eDup
+
+        const normalizadaNueva = normalizarDireccion(String(calle ?? ""), altura)
+        const choque = (existentes || []).find(
+          (d: any) => tieneAlturaComparable(d.altura) && normalizarDireccion(d.calle, d.altura) === normalizadaNueva,
+        )
+        if (choque) {
+          return NextResponse.json(
+            { error: `Esa puerta ya está cargada en esta zona: ${choque.calle} ${choque.altura}` },
+            { status: 409 },
+          )
+        }
+      }
     }
 
     // ETAPA 3-B: cuando el PATCH cambia `etapa`, acá va el insert en farming_contactos que
@@ -94,6 +147,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       .eq("id", params.id)
       .select("*")
       .single()
+    // El chequeo de arriba da el mensaje lindo; el índice parcial es el candado de verdad: dos
+    // ediciones concurrentes contra la misma puerta pueden pasar las dos el chequeo en JS. Un
+    // 23505 acá es el MISMO duplicado, con el mismo 409 — nunca el texto crudo de Postgres.
+    if ((error as any)?.code === "23505") {
+      return NextResponse.json({ error: "Esa puerta ya está cargada en esta zona." }, { status: 409 })
+    }
     if (error) throw error
 
     return NextResponse.json({ direccion: data })

@@ -3,16 +3,14 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { responderError, zonaAccesible } from "@/lib/farming/servidor"
+import { rechazoDeZona, responderError, zonaAccesible } from "@/lib/farming/servidor"
 
 export const dynamic = "force-dynamic"
 
-/** El acceso a la zona se valida igual en las dos operaciones. */
+/** El acceso a la zona se valida igual en las dos operaciones, y las dos ESCRIBEN: descartar y
+ *  deshacer tocan farming_avisos_marca, así que una zona archivada las rechaza. */
 async function permiso(admin: ReturnType<typeof createAdminClient>, zonaId: string, agencyId: string, userId: string) {
-  const { zona, puede } = await zonaAccesible(admin, zonaId, agencyId, userId)
-  if (!zona) return { error: "No encontramos esa zona activa", status: 404 as const }
-  if (!puede) return { error: "Esa zona es de un colega", status: 403 as const }
-  return null
+  return rechazoDeZona(await zonaAccesible(admin, zonaId, agencyId, userId, "escribir"))
 }
 
 /** `Number(null)` es 0 y `Number("")` también: sobre el string crudo, no sobre el resultado,
@@ -40,7 +38,7 @@ export async function POST(req: Request) {
 
     const admin = createAdminClient()
     const no = await permiso(admin, zonaId, agencyId, userId)
-    if (no) return NextResponse.json({ error: no.error }, { status: no.status })
+    if (no) return no
 
     // Descartar dos veces el mismo aviso no puede fallar ni duplicar. Un check-then-insert deja
     // una ventana: dos pedidos genuinamente concurrentes (doble tap, reintento de una red que
@@ -78,7 +76,7 @@ export async function DELETE(req: Request) {
 
     const admin = createAdminClient()
     const no = await permiso(admin, zonaId, agencyId, userId)
-    if (no) return NextResponse.json({ error: no.error }, { status: no.status })
+    if (no) return no
 
     const { error } = await admin.from("farming_avisos_marca").delete().eq("zona_id", zonaId).eq("aviso_id", avisoId)
     if (error) throw error

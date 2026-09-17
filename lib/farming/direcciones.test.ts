@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { unidadesTotales, normalizarDireccion, validarDireccion, partirDireccion, tipoDesdeAviso, TIPOS, ETAPAS } from "./direcciones"
+import { unidadesTotales, normalizarDireccion, validarDireccion, valoresImposibles, partirDireccion, tieneAlturaComparable, tipoDesdeAviso, TIPOS, ETAPAS } from "./direcciones"
 
 /**
  * Las reglas de la tarjeta de la caminata. Lo que sostiene este archivo:
@@ -188,21 +188,121 @@ describe("partirDireccion", () => {
   it("vacío da calle vacía y altura null", () => {
     expect(partirDireccion("")).toEqual({ calle: "", altura: null })
   })
+
+  // Es la regla que sostiene el botón «crear tarjeta» apagado en «A la venta en mi zona»:
+  // `mercado_avisos.direccion` puede venir null (62 de 67.577 avisos, 0,09%, contado el
+  // 16-sep-2026) y sin calle el alta contesta «Falta la calle.» — el botón no podía funcionar
+  // NUNCA para ese aviso. La pantalla decide con ESTA función, la misma con la que arma el
+  // cuerpo del POST, así que lo que se controla es exactamente lo que iba a viajar.
+  it("un aviso sin dirección no da calle: por eso «crear tarjeta» se apaga en vez de fallar", () => {
+    for (const crudo of [null, "", "   "]) {
+      expect(partirDireccion(crudo).calle.trim()).toBe("")
+    }
+    // Y uno que SÍ la trae puede convertirse.
+    expect(partirDireccion("Conde 900").calle.trim()).toBe("Conde")
+  })
 })
 
+/**
+ * EL VOCABULARIO ES EL DE LA BASE, NO EL QUE SUENA BIEN.
+ *
+ * Los nombres de acá son los valores REALES de `mercado_avisos.tipo`, los mismos que ya están
+ * escritos en `lib/mapa/tipos-propiedad.ts` (el módulo que arma los filtros del mapa contra esa
+ * columna) y contados en producción el 16-sep-2026 sobre 67.577 avisos:
+ *
+ *   Departamento 64.644 · PH 852 · Casa 506 · Terrenos 490 · Local comercial 464 ·
+ *   Cochera 261 · Oficina comercial 236 · Edificio 38 · Depósito 27 ·
+ *   Fondo de comercio 22 · Bodega-Galpon 20 · Consultorio 10
+ *
+ * La versión anterior de estas pruebas afirmaba "Local", "Oficina" y "Terreno" —tres cadenas
+ * que NO existen en la columna—, así que pasaba en verde mientras 1.190 avisos reales caían en
+ * "Otro" y la tarjeta le pedía al asesor «Unidades» en vez de pisos × unidades. Una prueba que
+ * no puede fallar contra el bug no es una prueba: por eso cada caso de acá está escrito con el
+ * string tal cual viene de la base.
+ */
 describe("tipoDesdeAviso", () => {
-  it("mapea los seis tipos conocidos del portal", () => {
+  it("los tipos contados en producción se mapean a una clave de verdad, no a «otro»", () => {
     expect(tipoDesdeAviso("Departamento")).toBe("edificio")
-    expect(tipoDesdeAviso("Casa")).toBe("casa")
     expect(tipoDesdeAviso("PH")).toBe("ph")
-    expect(tipoDesdeAviso("Local")).toBe("local")
-    expect(tipoDesdeAviso("Oficina")).toBe("oficina")
-    expect(tipoDesdeAviso("Terreno")).toBe("lote")
+    expect(tipoDesdeAviso("Casa")).toBe("casa")
+    expect(tipoDesdeAviso("Terrenos")).toBe("lote")
+    expect(tipoDesdeAviso("Local comercial")).toBe("local")
+    expect(tipoDesdeAviso("Oficina comercial")).toBe("oficina")
+    expect(tipoDesdeAviso("Edificio")).toBe("edificio")
   })
 
-  it("cualquier otra cosa, u null, cae en otro", () => {
+  // Los nombres inventados: si alguien vuelve a escribirlos en el switch, siguen sin existir en
+  // la columna, y este test lo deja dicho para que nadie los "arregle" de nuevo.
+  it("«Local», «Oficina» y «Terreno» en singular NO existen en mercado_avisos: caen en otro", () => {
+    expect(tipoDesdeAviso("Local")).toBe("otro")
+    expect(tipoDesdeAviso("Oficina")).toBe("otro")
+    expect(tipoDesdeAviso("Terreno")).toBe("otro")
+  })
+
+  it("lo que no es una puerta a la que golpear cae en otro, a propósito", () => {
+    // 340 avisos entre los cinco: no hay un propietario viviendo ahí para captar.
     expect(tipoDesdeAviso("Cochera")).toBe("otro")
+    expect(tipoDesdeAviso("Depósito")).toBe("otro")
+    expect(tipoDesdeAviso("Bodega-Galpon")).toBe("otro")
+    expect(tipoDesdeAviso("Consultorio")).toBe("otro")
+    expect(tipoDesdeAviso("Fondo de comercio")).toBe("otro")
+  })
+
+  it("un tipo que el portal invente mañana, o ninguno, cae en otro: nunca se inventa un tipo", () => {
+    expect(tipoDesdeAviso("Castillo")).toBe("otro")
     expect(tipoDesdeAviso(null)).toBe("otro")
+  })
+
+  it("todo lo que devuelve es una clave de TIPOS: nada que la base rechace con un 23514", () => {
+    const claves = TIPOS.map((t) => t.clave)
+    const vocabulario = [
+      "Departamento", "PH", "Casa", "Terrenos", "Local comercial", "Cochera",
+      "Oficina comercial", "Edificio", "Depósito", "Fondo de comercio", "Bodega-Galpon", "Consultorio",
+    ]
+    for (const t of vocabulario) expect(claves).toContain(tipoDesdeAviso(t))
+  })
+})
+
+describe("tieneAlturaComparable", () => {
+  // La misma condición que el `where` del índice parcial: sin esto, dos lotes «s/n» de la misma
+  // calle serían la misma puerta.
+  it("una altura de verdad sí compara", () => {
+    expect(tieneAlturaComparable("1200")).toBe(true)
+  })
+
+  it("vacía, nula o «sin número» no comparan nunca", () => {
+    expect(tieneAlturaComparable(null)).toBe(false)
+    expect(tieneAlturaComparable("")).toBe(false)
+    expect(tieneAlturaComparable("  ")).toBe(false)
+    expect(tieneAlturaComparable("s/n")).toBe(false)
+    expect(tieneAlturaComparable("S/N")).toBe(false)
+    expect(tieneAlturaComparable("sn")).toBe(false)
+    expect(tieneAlturaComparable("s.n.")).toBe(false)
+  })
+})
+
+/**
+ * LA FORMA, no solo el valor. `lat`, `lng` y `precio_pedido` son columnas numéricas sin `check`
+ * en la migración: un `lat: "abc"` no rompe una regla de negocio, rompe el CAST de Postgres
+ * (22P02) y vuelve como un 500 en inglés adentro del diálogo. Acá se corta, y se corta en el
+ * único lugar que miran las DOS puertas —el alta y la edición—, así que las dos contestan igual.
+ */
+describe("valoresImposibles: la forma de los números", () => {
+  it("una latitud que no es número: error", () => {
+    expect(valoresImposibles({ lat: "abc" as any })).toHaveLength(1)
+    expect(valoresImposibles({ lng: "abc" as any })).toHaveLength(1)
+    expect(valoresImposibles({ precio_pedido: "mucha plata" as any })).toHaveLength(1)
+  })
+
+  it("NaN e Infinity tampoco son números que Postgres pueda guardar", () => {
+    expect(valoresImposibles({ lat: Number.NaN })).toHaveLength(1)
+    expect(valoresImposibles({ lng: Number.POSITIVE_INFINITY })).toHaveLength(1)
+  })
+
+  it("un número de verdad pasa, y ausente o null no es un error (el PATCH manda datos parciales)", () => {
+    expect(valoresImposibles({ lat: -34.56, lng: -58.45, precio_pedido: 120000 })).toEqual([])
+    expect(valoresImposibles({})).toEqual([])
+    expect(valoresImposibles({ lat: null, lng: null, precio_pedido: null })).toEqual([])
   })
 })
 

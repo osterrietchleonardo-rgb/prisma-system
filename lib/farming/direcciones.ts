@@ -128,19 +128,52 @@ export function partirDireccion(direccion: string | null): { calle: string; altu
   return { calle, altura: m[2] }
 }
 
-/** El tipo de propiedad que trae `mercado_avisos` (texto libre del portal) mapeado a las siete
- *  claves cerradas de `TIPOS`. Cualquier valor que el portal no cubra explícitamente —o que no
- *  venga— cae en "otro": nunca se inventa un tipo. */
+/**
+ * El tipo de propiedad que trae `mercado_avisos` mapeado a las siete claves cerradas de
+ * `TIPOS`.
+ *
+ * LOS NOMBRES SON LOS DE LA BASE, NO INVENTADOS. El vocabulario real de `mercado_avisos.tipo`
+ * está escrito en `lib/mapa/tipos-propiedad.ts` (que es quien arma los filtros del mapa contra
+ * esos mismos valores) y contado en producción el 16-sep-2026 sobre 67.577 avisos:
+ *
+ *   Departamento 64.644 · PH 852 · Casa 506 · Terrenos 490 · Local comercial 464 ·
+ *   Cochera 261 · Oficina comercial 236 · Edificio 38 · Depósito 27 ·
+ *   Fondo de comercio 22 · Bodega-Galpon 20 · Consultorio 10
+ *
+ * Se escribe "Terrenos" (plural), "Local comercial" y "Oficina comercial" porque así vienen:
+ * con "Terreno", "Local" y "Oficina" a secas, esos 1.190 avisos caían en "Otro" y la tarjeta le
+ * pedía al asesor «Unidades» en vez de pisos × unidades.
+ *
+ * Lo que cae en "otro" cae a propósito: Cochera, Depósito, Bodega-Galpon, Consultorio y Fondo
+ * de comercio NO son puertas a las que golpear —no hay un propietario viviendo ahí para
+ * captar—, así que no merecen una clave propia en la caminata. Y cualquier valor nuevo que el
+ * portal invente mañana también cae ahí: nunca se inventa un tipo.
+ */
 export function tipoDesdeAviso(tipo: string | null): TipoDireccion {
   switch (tipo) {
     case "Departamento": return "edificio"
     case "Casa": return "casa"
     case "PH": return "ph"
-    case "Local": return "local"
-    case "Oficina": return "oficina"
-    case "Terreno": return "lote"
+    case "Terrenos": return "lote"
+    case "Local comercial": return "local"
+    case "Oficina comercial": return "oficina"
+    case "Edificio": return "edificio"
     default: return "otro"
   }
+}
+
+/**
+ * La misma condición, carácter por carácter, que el `where` del índice parcial
+ * `farming_direcciones_sin_repetir_idx`: sin esto, una puerta "s/n" (o vacía) terminaría
+ * chocando contra cualquier otra de la misma calle, que es justo lo que el índice evita.
+ *
+ * Vive acá, y no adentro de un `route.ts`, porque la usan el ALTA y la EDICIÓN de una tarjeta:
+ * dos copias del mismo `if` se separan sin que nadie se entere.
+ */
+export function tieneAlturaComparable(altura?: string | null): boolean {
+  const a = (altura || "").trim()
+  if (!a) return false
+  return !["s/n", "sn", "s.n."].includes(a.toLowerCase())
 }
 
 const CLAVES_TIPO = TIPOS.map((t) => t.clave) as string[]
@@ -196,6 +229,17 @@ export function valoresImposibles(e: Partial<EntradaDireccion>): string[] {
   if (e.cartel != null && !CARTELES_VALIDOS.includes(e.cartel as any)) {
     errores.push("Ese tipo de cartel no existe.")
   }
+
+  // LA FORMA, no solo el valor. `lat`, `lng` y `precio_pedido` son columnas numéricas sin
+  // `check` en la migración: un `lat: "abc"` no rompe ninguna regla de negocio, rompe el CAST
+  // de Postgres (22P02) y vuelve como un 500 en inglés. Se corta acá, que es el único lugar
+  // que miran las DOS puertas —el alta y la edición— así que las dos contestan lo mismo.
+  // No se controla el RANGO (que la latitud caiga entre -90 y 90): la migración no lo pide, y
+  // esta función es el espejo de sus `check`, ni más ni menos.
+  const numeroRoto = (v: unknown) => typeof v !== "number" || !Number.isFinite(v)
+  if (e.lat != null && numeroRoto(e.lat)) errores.push("La latitud tiene que ser un número.")
+  if (e.lng != null && numeroRoto(e.lng)) errores.push("La longitud tiene que ser un número.")
+  if (e.precio_pedido != null && numeroRoto(e.precio_pedido)) errores.push("El precio tiene que ser un número.")
 
   return errores
 }

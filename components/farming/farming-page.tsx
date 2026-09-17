@@ -67,7 +67,7 @@ export function FarmingPage() {
     // carga de Farming). Por eso el texto tiene que ser honesto con los DOS desenlaces.
     if (
       !window.confirm(
-        `¿Borrar «${z.nombre}»?\n\nSi tenés tarjetas cargadas en esta zona, no se pierde nada: la zona se archiva y tus tarjetas, tus propietarios y su historial quedan guardados.\n\nSi no tenés ninguna, se borra del todo y no queda registro.\n\nEn los dos casos, esas cuadras vuelven a estar libres para que otro asesor las dibuje.`,
+        `¿Borrar «${z.nombre}»?\n\nSi tenés tarjetas cargadas en esta zona, no se pierde nada: la zona se archiva y tus tarjetas, tus propietarios y su historial quedan guardados. Los vas a poder leer en «Relevamiento», eligiendo la zona archivada, aunque ya no los puedas cambiar.\n\nSi no tenés ninguna, se borra del todo y no queda registro.\n\nEn los dos casos, esas cuadras vuelven a estar libres para que otro asesor las dibuje.`,
       )
     )
       return
@@ -77,7 +77,7 @@ export function FarmingPage() {
       // se pierde trabajo por apretar un botón"). El mensaje depende de lo que respondió.
       toast.success(
         r.accion === "archivada"
-          ? "Zona archivada. Tus tarjetas y su historial quedan guardados; esas cuadras vuelven a estar libres."
+          ? "Zona archivada. Tus tarjetas y su historial quedan guardados: los leés en «Relevamiento», eligiendo la zona archivada. Esas cuadras vuelven a estar libres."
           : "Zona borrada",
       )
       await recargar()
@@ -172,8 +172,10 @@ export function FarmingPage() {
 
           <TabsContent value="relevamiento" className="mt-0 data-[state=inactive]:hidden">
             {/* Las compartidas conmigo también cuentan: el tablero de la zona se trabaja entre
-                los dos. */}
-            <Relevamiento zonas={[...datos.mias, ...datos.compartidas_conmigo]} />
+                los dos. Y las ARCHIVADAS van al final, de solo lectura: al archivar le
+                prometimos al asesor que sus tarjetas, su gente y su historial quedaban
+                guardados — esta es la única pantalla donde puede verlos. */}
+            <Relevamiento zonas={[...datos.mias, ...datos.compartidas_conmigo, ...datos.archivadas]} />
           </TabsContent>
         </Tabs>
       )}

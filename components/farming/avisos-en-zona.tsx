@@ -29,6 +29,15 @@ function Tarjeta({
   onDescartar: (a: AvisoEnZona) => void
   onCrearTarjeta: (a: AvisoEnZona) => void
 }) {
+  // La calle se saca con la MISMA función que usa `crearTarjeta` al armar el cuerpo: así lo que
+  // se controla acá es exactamente lo que va a viajar, no una aproximación.
+  //
+  // `mercado_avisos.direccion` puede venir en null: son 62 de 67.577 avisos (0,09%, contado el
+  // 16-sep-2026). Sin calle, el alta contesta «Falta la calle.» y el botón no puede funcionar
+  // NUNCA para ese aviso. Se apaga y se dice por qué — no se inventa una calle con el barrio,
+  // que sería cargar en el tablero una puerta que no existe.
+  const sinCalle = !partirDireccion(aviso.direccion).calle.trim()
+
   return (
     <div className="flex gap-3 rounded-xl border border-zinc-200 bg-card p-3 dark:border-zinc-800">
       {aviso.foto ? (
@@ -85,11 +94,20 @@ function Tarjeta({
             variant="ghost"
             size="sm"
             className="h-11 gap-1.5 text-xs"
+            disabled={sinCalle}
             onClick={() => onCrearTarjeta(aviso)}
           >
             <ClipboardPlus className="h-3.5 w-3.5" /> crear tarjeta
           </Button>
         </div>
+
+        {/* LÍNEA VISIBLE y no un globito: en el celular no se abren, y un botón apagado sin
+            explicación se lee como que el sistema está roto. */}
+        {sinCalle && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            No se puede crear la tarjeta: este aviso no trae la dirección.
+          </p>
+        )}
       </div>
     </div>
   )
@@ -257,15 +275,18 @@ export function AvisosEnZona({ zonas }: { zonas: ZonaFarming[] }) {
     const mio = gen.current
     setUltimaCreada(null)
     try {
-      // Las DOS mitades: la tarjeta que se creó y la marca que quedó "convertido". Primero la
-      // tarjeta: si este es un reintento después de que la marca fallara sola la vez anterior,
-      // la tarjeta ya no existe y el 404 se banca acá — si no, la marca quedaría "convertido"
-      // apuntando para siempre a una tarjeta borrada, y el aviso nunca volvería a esta lista.
+      // El ORDEN de las dos mitades ya no lo maneja esta pantalla: el DELETE de la tarjeta
+      // borra él mismo su marca de farming_avisos_marca —y la borra ANTES que la tarjeta, que
+      // es donde vive la regla (ver app/api/farming/direcciones/[id]/route.ts)—. Un 404 acá es
+      // el reintento de un deshacer que ya había borrado la tarjeta: se banca y se sigue.
       try {
         await pedir(`/api/farming/direcciones/${direccionId}`, { method: "DELETE" })
       } catch (e: any) {
         if (e.status !== 404) throw e
       }
+      // Este segundo DELETE es un no-op inofensivo cuando el de arriba funcionó (la marca ya no
+      // está). Se deja porque sigue haciendo falta en el caso en que la tarjeta ya no existía:
+      // ahí nadie borró la marca, y sin esto el aviso no volvería nunca a la lista.
       await pedir(`/api/farming/avisos/marca?zona_id=${encodeURIComponent(zonaId)}&aviso_id=${a.id}`, { method: "DELETE" })
       if (gen.current !== mio) return
       setAvisos((prev) => [a, ...prev])

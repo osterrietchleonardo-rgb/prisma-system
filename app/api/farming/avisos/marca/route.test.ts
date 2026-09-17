@@ -23,6 +23,7 @@ const cuadrado = { type: "Polygon", coordinates: [[[-58.46, -34.56], [-58.45, -3
 const Z_MIA = "10000000-0000-0000-0000-000000000001"
 const Z_JUAN = "10000000-0000-0000-0000-000000000002"
 const Z_AJENA = "10000000-0000-0000-0000-000000000004"
+const Z_ARCHIVADA = "10000000-0000-0000-0000-000000000005"
 
 const sesion = { userId: YO, agencyId: AGENCIA, role: "asesor" }
 vi.mock("@/lib/auth/tenant-validation", () => ({ requireTenant: async () => ({ ...sesion }) }))
@@ -42,6 +43,7 @@ beforeEach(() => {
       { id: Z_MIA, agency_id: AGENCIA, owner_user_id: YO, nombre: "Colegiales", geojson: cuadrado, estado: "activa" },
       { id: Z_JUAN, agency_id: AGENCIA, owner_user_id: JUAN, nombre: "De Juan", geojson: cuadrado, estado: "activa" },
       { id: Z_AJENA, agency_id: "ag-2", owner_user_id: "u-x", nombre: "Otra", geojson: cuadrado, estado: "activa" },
+      { id: Z_ARCHIVADA, agency_id: AGENCIA, owner_user_id: YO, nombre: "Vieja", geojson: cuadrado, estado: "archivada" },
     ],
     farming_zonas_compartidas: [],
     farming_avisos_marca: [],
@@ -136,5 +138,23 @@ describe("DELETE (deshacer)", () => {
     ["aviso que no es número", `zona_id=${Z_MIA}&aviso_id=x`],
   ])("%s: 400", async (_, qs) => {
     expect((await deshacer(qs)).status).toBe(400)
+  })
+})
+
+// Descartar y deshacer ESCRIBEN en farming_avisos_marca, y una zona archivada ya no se trabaja:
+// sus cuadras volvieron a estar libres y puede haberlas dibujado otro asesor.
+describe("zona archivada: se mira, no se marca", () => {
+  it("descartar en una zona archivada: se rechaza y no escribe", async () => {
+    const r = await descartar({ zona_id: Z_ARCHIVADA, aviso_id: 42, es_dueno_directo: false })
+    expect(r.status).toBe(409)
+    expect((await r.json()).error).toMatch(/archivada/i)
+    expect(base.tablas.farming_avisos_marca).toHaveLength(0)
+  })
+
+  it("deshacer en una zona archivada: se rechaza y la marca queda", async () => {
+    base.tablas.farming_avisos_marca.push({ zona_id: Z_ARCHIVADA, aviso_id: 42, aviso_es_dueno_directo: false, user_id: YO, estado: "descartado", direccion_id: null, created_at: "" })
+    const r = await deshacer(`zona_id=${Z_ARCHIVADA}&aviso_id=42`)
+    expect(r.status).toBe(409)
+    expect(base.tablas.farming_avisos_marca).toHaveLength(1)
   })
 })

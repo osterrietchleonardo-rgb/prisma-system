@@ -128,20 +128,40 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     if (eCuenta) throw eCuenta
 
     if ((count ?? 0) > 0) {
+      // Archivar es de la MISMA familia que liberar (el director), y en una zona compartida el
+      // colega se encuentra el tablero fuera de su lista de trabajo sin haber tocado nada. Por
+      // eso queda FIRMADO con las tres columnas que la etapa 1 ya creó para esto: cuándo, quién
+      // y por qué. Un historial sin firma no es un historial.
+      const ahora = new Date().toISOString()
       const { error } = await admin
         .from("farming_zonas")
-        .update({ estado: "archivada", updated_at: new Date().toISOString() })
+        .update({
+          estado: "archivada",
+          liberada_en: ahora,
+          liberada_por: userId,
+          motivo_liberacion: "Archivada por su dueño al borrar la zona",
+          updated_at: ahora,
+        })
         .eq("id", zona.id)
         .eq("owner_user_id", userId)
       if (error) throw error
       return NextResponse.json({ ok: true, accion: "archivada", tarjetas: count })
     }
 
-    // La FK con on delete cascade se lleva las compartidas en la base real; el doble de
-    // prueba no sabe de cascadas, así que se borran explícito. Es inocuo en producción.
-    const { error: e1 } = await admin.from("farming_zonas_compartidas").delete().eq("zona_id", zona.id)
+    // LA ZONA VA PRIMERO, y el orden importa: contar y borrar no son un solo paso, así que
+    // entre las dos consultas un colega de una zona compartida puede cargar una tarjeta. Ahí el
+    // `on delete restrict` de farming_direcciones.zona_id frena el borrado con un 23503 en
+    // inglés crudo; se traduce, y el segundo intento va a encontrar la tarjeta y archivar, que
+    // es lo correcto. Si las compartidas se borraran primero, ese 23503 dejaría la zona viva
+    // pero SIN sus compartidos: el colega perdería el tablero sin que nadie lo decidiera.
+    const { error: e1 } = await admin.from("farming_zonas").delete().eq("id", zona.id).eq("owner_user_id", userId)
+    if ((e1 as any)?.code === "23503") {
+      return NextResponse.json({ error: "Esta zona ya tiene tarjetas, probá de nuevo" }, { status: 409 })
+    }
     if (e1) throw e1
-    const { error: e2 } = await admin.from("farming_zonas").delete().eq("id", zona.id).eq("owner_user_id", userId)
+    // La FK con on delete cascade ya se llevó las compartidas en la base real; el doble de
+    // prueba no sabe de cascadas, así que se borran explícito. Es inocuo en producción.
+    const { error: e2 } = await admin.from("farming_zonas_compartidas").delete().eq("zona_id", zona.id)
     if (e2) throw e2
 
     return NextResponse.json({ ok: true, accion: "borrada" })

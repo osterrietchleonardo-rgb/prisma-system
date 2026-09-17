@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { responderError, zonaAccesible } from "@/lib/farming/servidor"
+import { rechazoDeZona, responderError, zonaAccesible } from "@/lib/farming/servidor"
 import { armarAviso, atajosVisibles, POR_PAGINA, SENALES, type ConteosSenales, type FilaAviso, type Senal } from "@/lib/farming/avisos"
 
 export const dynamic = "force-dynamic"
@@ -37,9 +37,13 @@ export async function GET(req: Request) {
     const desde = Number.isFinite(desdeCruda) ? Math.max(0, Math.floor(desdeCruda)) : 0
 
     const admin = createAdminClient()
-    const { zona, puede } = await zonaAccesible(admin, zonaId, agencyId, userId)
-    if (!zona) return NextResponse.json({ error: "No encontramos esa zona activa" }, { status: 404 })
-    if (!puede) return NextResponse.json({ error: "Esa zona es de un colega" }, { status: 403 })
+    // "leer": listar lo que se publica adentro de un polígono no escribe nada. Una zona
+    // archivada contesta igual (la pantalla no la ofrece, pero la respuesta es honesta); lo que
+    // NO se puede es descartar ni convertir avisos ahí, y eso lo corta /avisos/marca.
+    const acceso = await zonaAccesible(admin, zonaId, agencyId, userId, "leer")
+    const no = rechazoDeZona(acceso)
+    if (no) return no
+    const zona = acceso.zona!
 
     // Lo ya descartado NI lo ya convertido en tarjeta vuelven a aparecer: los dos van a la
     // consulta, no se filtran después, para que la página no quede corta ni los conteos

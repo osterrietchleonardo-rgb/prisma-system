@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { direccionAccesible, responderError, FORMA_UUID } from "@/lib/farming/servidor"
+import { direccionAccesible, rechazoDeDireccion, responderError, FORMA_UUID } from "@/lib/farming/servidor"
 import { VINCULOS } from "@/lib/farming/direcciones"
 import { normalizePhoneE164 } from "@/lib/whatsapp/phone"
 
@@ -41,9 +41,10 @@ async function candado(admin: ReturnType<typeof createAdminClient>, direccionId:
     return { ok: false as const, resp: NextResponse.json({ error: "No encontramos ese propietario en esta tarjeta" }, { status: 404 }) }
   }
 
-  const { direccion, puede } = await direccionAccesible(admin, direccionId, agencyId, userId)
-  if (!direccion) return { ok: false as const, resp: NextResponse.json({ error: "No encontramos esa tarjeta" }, { status: 404 }) }
-  if (!puede) return { ok: false as const, resp: NextResponse.json({ error: "Esa tarjeta es de la zona de un colega" }, { status: 403 }) }
+  // Las dos operaciones de este archivo ESCRIBEN (editar y borrar una persona): "escribir".
+  // En una zona archivada la gente se mira desde el GET de la lista, pero no se toca.
+  const no = rechazoDeDireccion(await direccionAccesible(admin, direccionId, agencyId, userId, "escribir"))
+  if (no) return { ok: false as const, resp: no }
 
   const { data: propietario, error } = await admin
     .from("farming_propietarios")
@@ -79,8 +80,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string; pi
     }
 
     // Un vínculo fuera de las cinco del check de la migración: 400, no un 500 de Postgres.
-    if (Object.prototype.hasOwnProperty.call(body, "vinculo") && !CLAVES_VINCULO.includes(body.vinculo)) {
-      return NextResponse.json({ error: "Ese vínculo no existe." }, { status: 400 })
+    //
+    // `null` (o "") NO es un vínculo inválido: es «dejalo en el default», exactamente lo mismo
+    // que significa en el ALTA. El mismo campo no puede tener dos contratos según por qué
+    // puerta entre — un formulario que manda el campo vacío no puede funcionar al crear y
+    // fallar con 400 al corregir. La columna es `not null default 'propietario'`, así que el
+    // valor que se escribe es ese, nunca null.
+    if (Object.prototype.hasOwnProperty.call(body, "vinculo")) {
+      if (body.vinculo == null || body.vinculo === "") {
+        body.vinculo = "propietario"
+      } else if (!CLAVES_VINCULO.includes(body.vinculo)) {
+        return NextResponse.json({ error: "Ese vínculo no existe." }, { status: 400 })
+      }
     }
 
     const payload: Record<string, unknown> = { updated_at: new Date().toISOString() }

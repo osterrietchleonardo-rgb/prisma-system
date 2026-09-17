@@ -13,7 +13,7 @@
 // Nada importante en un globito: en el celular no se abren. Lo que el asesor necesita leer va
 // como línea visible.
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Loader2, MapPinOff, Pencil, Plus, Trash2, Users } from "lucide-react"
+import { Archive, Loader2, MapPinOff, Pencil, Plus, Trash2, Users } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -68,11 +68,16 @@ const plata = (n: number | null, moneda: string | null) => {
 
 function Tarjeta({
   d,
+  soloLectura,
   onEditar,
   onPersonas,
   onBorrar,
 }: {
   d: FilaDireccion
+  /** La zona está archivada: la tarjeta se lee entera, pero nada de lo que escribe se toca.
+   *  Los botones quedan a la vista y apagados —no escondidos— para que no parezca que el
+   *  trabajo se perdió: está todo acá, solo que esta zona ya no se trabaja. */
+  soloLectura: boolean
   onEditar: (d: FilaDireccion) => void
   onPersonas: (d: FilaDireccion) => void
   onBorrar: (d: FilaDireccion) => void
@@ -133,10 +138,10 @@ function Tarjeta({
       {d.observaciones && <p className="mt-1 text-xs text-muted-foreground">{d.observaciones}</p>}
 
       <div className="mt-2 flex flex-wrap gap-2">
-        <Button variant="ghost" size="sm" className="h-11 gap-1.5 text-xs" onClick={() => onEditar(d)}>
+        <Button variant="ghost" size="sm" className="h-11 gap-1.5 text-xs" disabled={soloLectura} onClick={() => onEditar(d)}>
           <Pencil className="h-3.5 w-3.5" /> editar
         </Button>
-        <Button variant="ghost" size="sm" className="h-11 gap-1.5 text-xs" onClick={() => onPersonas(d)}>
+        <Button variant="ghost" size="sm" className="h-11 gap-1.5 text-xs" disabled={soloLectura} onClick={() => onPersonas(d)}>
           <Users className="h-3.5 w-3.5" /> personas
         </Button>
         {/* El que destruye no puede parecerse a los otros dos: va en rojo y al otro extremo de
@@ -146,6 +151,7 @@ function Tarjeta({
           variant="ghost"
           size="sm"
           className="ml-auto h-11 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+          disabled={soloLectura}
           onClick={() => onBorrar(d)}
         >
           <Trash2 className="h-3.5 w-3.5" /> borrar
@@ -246,14 +252,26 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
     return <p className="text-sm text-muted-foreground">Dibujá una zona en «Mis zonas» y acá vas a poder cargar lo que camines.</p>
   }
 
+  // Archivada = se mira, no se trabaja. El servidor manda el estado con la lista (`datos`), y
+  // hasta que llegue vale el que vino con la zona: así los botones ya nacen apagados y no
+  // aparecen encendidos por un instante en una zona que no acepta escrituras.
+  const zonaElegida = zonas.find((z) => z.id === zonaId)
+  const soloLectura = (datos?.zona.estado ?? zonaElegida?.estado) === "archivada"
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         {zonas.length > 1 && (
           <Select value={zonaId} onValueChange={setZonaId}>
-            <SelectTrigger className="h-10 w-56"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-11 w-56 md:h-10"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {zonas.map((z) => <SelectItem key={z.id} value={z.id}>{z.nombre}</SelectItem>)}
+              {/* La archivada se ofrece, y se ofrece DICIENDO que lo está: si no, el asesor
+                  elige una zona donde no va a poder cargar nada y no entiende por qué. */}
+              {zonas.map((z) => (
+                <SelectItem key={z.id} value={z.id}>
+                  {z.nombre}{z.estado === "archivada" ? " · archivada" : ""}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         )}
@@ -264,10 +282,23 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
               ? "No pudimos traer las direcciones de esta zona."
               : "Buscando…"}
         </p>
-        <Button className="ml-auto h-11 gap-1.5" onClick={() => setCreando(true)}>
+        <Button className="ml-auto h-11 gap-1.5" disabled={soloLectura} onClick={() => setCreando(true)}>
           <Plus className="h-4 w-4" /> agregar dirección
         </Button>
       </div>
+
+      {/* LÍNEA VISIBLE, nunca un globito: en el celular no se abren, y esto es justo lo que hay
+          que entender antes de tocar un botón apagado. */}
+      {soloLectura && (
+        <p className="flex items-start gap-2 rounded-xl border border-zinc-200 bg-muted p-3 text-sm dark:border-zinc-800">
+          <Archive className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Esta zona está archivada: sus cuadras volvieron a estar libres. Tus tarjetas, tus
+            propietarios y su historial quedaron guardados y los podés leer acá, pero no se
+            pueden cambiar.
+          </span>
+        </p>
+      )}
 
       {cargando && direcciones.length === 0 ? (
         <div className="flex h-40 items-center justify-center">
@@ -301,7 +332,7 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
               ) : (
                 <div className="grid gap-3 lg:grid-cols-2">
                   {filas.map((d) => (
-                    <Tarjeta key={d.id} d={d} onEditar={setEditando} onPersonas={setViendoPersonas} onBorrar={borrar} />
+                    <Tarjeta key={d.id} d={d} soloLectura={soloLectura} onEditar={setEditando} onPersonas={setViendoPersonas} onBorrar={borrar} />
                   ))}
                 </div>
               )}

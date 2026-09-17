@@ -9,7 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
 import { areaKm2, choquesContra, MAX_KM2, MAX_ZONAS_ACTIVAS, validarDibujo } from "@/lib/farming/geometria"
 import { armarRespuesta, armarZona, candidatasParaChoque, type FilaZona } from "@/lib/farming/armar"
-import { cargarContexto, COLUMNAS_ZONA, responderError } from "@/lib/farming/servidor"
+import { cargarArchivadas, cargarContexto, COLUMNAS_ZONA, responderError } from "@/lib/farming/servidor"
 
 export const dynamic = "force-dynamic"
 
@@ -21,7 +21,21 @@ export async function GET() {
     const { userId, agencyId, role } = await requireTenant()
     const admin = createAdminClient()
     const ctx = await cargarContexto(admin, agencyId)
-    return NextResponse.json(armarRespuesta({ ...ctx, userId, role }))
+    // Las archivadas viajan en su PROPIO balde (`archivadas`), nunca dentro de `mias`: el
+    // mapa, el tope de zonas y el control de choque leen `mias` y tienen que seguir viendo
+    // solo activas. Se cargan aparte por lo mismo (ver cargarArchivadas).
+    const arch = await cargarArchivadas(admin, agencyId, userId)
+    return NextResponse.json(
+      armarRespuesta({
+        ...ctx,
+        archivadas: arch.filas,
+        // Los compartidos de las dos poblaciones: `armarZona` los usa para poner nombre a
+        // «compartida con», y una zona archivada compartida tiene que seguir diciéndolo.
+        compartidas: [...ctx.compartidas, ...arch.compartidas],
+        userId,
+        role,
+      }),
+    )
   } catch (e) {
     return responderError(e, "listar")
   }

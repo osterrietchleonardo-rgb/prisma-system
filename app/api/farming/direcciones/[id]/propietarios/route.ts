@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { direccionAccesible, responderError } from "@/lib/farming/servidor"
+import { direccionAccesible, rechazoDeDireccion, responderError } from "@/lib/farming/servidor"
 import { VINCULOS } from "@/lib/farming/direcciones"
 import { normalizePhoneE164 } from "@/lib/whatsapp/phone"
 
@@ -39,9 +39,10 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     const { userId, agencyId } = await requireTenant()
     const admin = createAdminClient()
 
-    const { direccion, puede } = await direccionAccesible(admin, params.id, agencyId, userId)
-    if (!direccion) return NextResponse.json({ error: "No encontramos esa tarjeta" }, { status: 404 })
-    if (!puede) return NextResponse.json({ error: "Esa tarjeta es de la zona de un colega" }, { status: 403 })
+    // "leer": la gente de una tarjeta de zona archivada se puede mirar. Es lo que promete el
+    // cartel al archivar («tus propietarios y su historial quedan guardados»).
+    const no = rechazoDeDireccion(await direccionAccesible(admin, params.id, agencyId, userId, "leer"))
+    if (no) return no
 
     // `agency_id` además del `direccion_id`, igual que el GET de direcciones: una fila mal
     // escrita en la columna denormalizada falla cerrada en vez de filtrarse.
@@ -64,9 +65,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const { userId, agencyId } = await requireTenant()
     const admin = createAdminClient()
 
-    const { direccion, puede } = await direccionAccesible(admin, params.id, agencyId, userId)
-    if (!direccion) return NextResponse.json({ error: "No encontramos esa tarjeta" }, { status: 404 })
-    if (!puede) return NextResponse.json({ error: "Esa tarjeta es de la zona de un colega" }, { status: 403 })
+    // "escribir": en una zona archivada no se suma gente nueva.
+    const no = rechazoDeDireccion(await direccionAccesible(admin, params.id, agencyId, userId, "escribir"))
+    if (no) return no
 
     const body = await req.json().catch(() => ({}))
 
