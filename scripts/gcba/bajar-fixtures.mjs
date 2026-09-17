@@ -40,7 +40,7 @@ async function bajar(url, archivo) {
 
 fs.mkdirSync(DESTINO, { recursive: true });
 for (const [smp, [lng, lat]] of Object.entries(PARCELAS)) {
-  const sm = smp.slice(0, 7);
+  const sm = smp.slice(0, smp.lastIndexOf("-")); // la manzana puede tener letra: 042-077A
   const t = tesela(lng, lat);
   console.log(smp, `tesela ${t.z}/${t.x}/${t.y}`);
   for (const capa of CAPAS) {
