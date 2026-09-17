@@ -5,7 +5,7 @@ import { analizarManzana, huellaPorRegla, edificabilidadPorRegla } from "./lfi-r
 import type { Poligono } from "./tipos";
 
 // Manzana sintética de 100 × 100 m con esquina en (-58.48, -34.57). 1 m ≈ 1/91700° en lng y 1/110540° en lat.
-// El lote va al MEDIO del lado (x=40): a 20 m de la esquina entra también en la banda del lado oeste y la huella crece (es la regla, no un bug).
+// El lote va al MEDIO del lado sur (x=40): queda a 40 m del lado oeste, fuera de su banda de 25 m, así la huella es solo la del frente. A 20 m de la esquina entraba también en la banda oeste y medía 241 m² en vez de 216,5.
 const DX = 1 / 91700, DY = 1 / 110540;
 const O: [number, number] = [-58.48, -34.57];
 const rect = (x0: number, y0: number, w: number, h: number): Poligono => ({
@@ -46,6 +46,17 @@ describe("la línea de frente interno a ¼ (art. 6.4.2)", () => {
     expect(e.rango!.piso).toBeCloseTo(8.66 * 16 * 6, -1);
     expect(e.rango!.techo).toBeGreaterThan(e.rango!.piso);
     expect(e.m2Vendibles).toBeCloseTo(e.m2Construibles * 0.8, 3);
+  });
+  it("manzana atípica (50 × 50): sin banda, el rango es conservador — piso = banda mínima de 16 m; techo = piso más los retirados", () => {
+    const chica = rect(0, 0, 50, 50);
+    const lote = rect(20, 0, 8.66, 30);
+    const usam = edificabilidadPorRegla(lote, chica, "USAM");
+    expect(usam.modo).toBe("regla");
+    expect(usam.huella).toBeNull();
+    expect(usam.rango!.piso).toBeCloseTo(8.66 * 16 * 6, -1);
+    expect(usam.rango!.techo).toBeCloseTo(usam.rango!.piso + 8.66 * 16 * (0.9 + 0.7), -1);
+    const baja = edificabilidadPorRegla(lote, chica, "USAB1");
+    expect(baja.rango!.techo).toBeCloseTo(baja.rango!.piso, 6); // sin retirados el rango se cierra en un punto
   });
 });
 
