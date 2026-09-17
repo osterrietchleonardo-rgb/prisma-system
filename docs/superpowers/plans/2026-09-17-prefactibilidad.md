@@ -3277,14 +3277,15 @@ git commit -m "feat(prefactibilidad): ficha pública imprimible con el plano del
 ### Task 18: Validación con 20 parcelas y evidencia
 
 **Files:**
-- Create: `scripts/gcba/validar-20-parcelas.mjs`
+- Create: `scripts/gcba/validar-20-parcelas.mts` (corre con `tsx`: los módulos de `lib/prefactibilidad` se importan entre sí sin extensión y Node solo no los resuelve)
+- Modify: `package.json` (devDependency `tsx`)
 - Create: `docs/superpowers/specs/evidencia/prefactibilidad/2026-09-XX-validacion-20-parcelas.md` (lo escribe el script)
 
 - [ ] **Step 1: El script** — para cada parcela de la lista (las 5 de los fixtures más 15 típicas elegidas del CSV con `tipo_mza=TIPICA`, `uni_edif_2=0`, sin área especial, no esquina; repartidas en las 7 unidades), pide al GCBA en vivo (Task 11), calcula con `calcularEdificabilidadOficial`, y baja la página de TodoProps `https://www.todoprops.com/terrenos/caba/parcela/<SMP>` leyendo con una expresión regular "Superficie edificable por planta" y "pisos de tejido". Escribe una tabla Markdown: `smp | unidad | m²/planta nuestro | m²/planta TodoProps | diferencia % | niveles nuestro | niveles TodoProps | regla del cuarto m² | resultado`.
 
 ```js
-// scripts/gcba/validar-20-parcelas.mjs
-//   node scripts/gcba/validar-20-parcelas.mjs
+// scripts/gcba/validar-20-parcelas.mts
+//   npx tsx scripts/gcba/validar-20-parcelas.mts   (npm i -D tsx una vez)
 // Escribe docs/superpowers/specs/evidencia/prefactibilidad/<fecha>-validacion-20-parcelas.md.
 // Sale con código 1 si alguna parcela en modo oficial difiere más de 5 % de TodoProps en m²/planta.
 import fs from "node:fs"; import path from "node:path"; import { fileURLToPath } from "node:url";
@@ -3323,12 +3324,12 @@ console.log(fallas ? `\nX ${fallas} parcelas fuera de tolerancia. NO habilitar e
 process.exit(fallas ? 1 : 0);
 ```
 
-- [ ] **Step 2: Correr** — `node scripts/gcba/validar-20-parcelas.mjs`. Expected: `OK: las 20 dentro de tolerancia`. Si alguna falla, investigar (¿tesela partida sin unir? ¿lote de epok distinto al de TodoProps?), arreglar con test de regresión, volver a correr. **Si no se llega a 0 fallas, no se habilita el menú** (la Task 15 se revierte con `git revert` del commit del menú).
+- [ ] **Step 2: Correr** — `npm i -D tsx` (una vez) y `npx tsx scripts/gcba/validar-20-parcelas.mts`. Expected: `OK: las 20 dentro de tolerancia`. Si alguna falla, investigar (¿tesela partida sin unir? ¿lote de epok distinto al de TodoProps?), arreglar con test de regresión, volver a correr. **Si no se llega a 0 fallas, no se habilita el menú** (la Task 15 se revierte con `git revert` del commit del menú).
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add scripts/gcba/validar-20-parcelas.mjs docs/superpowers/specs/evidencia/prefactibilidad
+git add scripts/gcba/validar-20-parcelas.mts package.json package-lock.json docs/superpowers/specs/evidencia/prefactibilidad
 git commit -m "test(prefactibilidad): validación de 20 parcelas contra TodoProps, con la evidencia"
 ```
 
