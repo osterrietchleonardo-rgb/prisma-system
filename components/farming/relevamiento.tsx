@@ -13,47 +13,48 @@
 // Nada importante en un globito: en el celular no se abren. Lo que el asesor necesita leer va
 // como línea visible.
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Archive, Loader2, MapPinOff, Pencil, Plus, Trash2, Users } from "lucide-react"
+import { Archive, Columns3, List, Loader2, MapPinOff, Pencil, Plus, Trash2, Users } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 import { pedir } from "@/lib/farming/cliente"
 import { ETAPAS, TIPOS } from "@/lib/farming/direcciones"
+import { fechaCorta, fechaDeInstante } from "@/lib/farming/fechas"
 import type { FilaDireccion, RespuestaDirecciones, ZonaFarming } from "@/lib/farming/tipos"
 import { DireccionDialog } from "./direccion-dialog"
 import { Propietarios } from "./propietarios"
+import { Tablero } from "./tablero"
 
 const etiquetaTipo = (t: FilaDireccion["tipo"]) => TIPOS.find((x) => x.clave === t)?.etiqueta ?? t
 
-/**
- * Para las columnas `date` (`relevada_en`, `proxima_accion_en`): «2026-09-16» → «16/9/2026».
- * Se corta el string y NO se pasa por `new Date`: un `date` de Postgres parseado así se lee
- * como medianoche UTC y en Buenos Aires cae un día antes. En un cuaderno de caminata la fecha
- * ES el dato.
- */
-function fechaCorta(iso: string | null): string | null {
-  if (!iso) return null
-  const [a, m, d] = iso.slice(0, 10).split("-")
-  if (!a || !m || !d) return null
-  return `${Number(d)}/${Number(m)}/${a}`
-}
+type Vista = "lista" | "tablero"
+
+/** Dónde queda anotado qué vista prefiere el asesor. Un solo lugar: el que lee y el que
+ *  escribe tienen que usar la misma llave o la elección se pierde en silencio. */
+const LLAVE_VISTA = "farming:vista-relevamiento"
 
 /**
- * Para `fuera_de_zona_desde`, que es `timestamptz` y NO una fecha suelta. Acá sí se pasa por
- * `new Date`, porque el valor trae la hora y la zona: es un instante de verdad. Cortarle el
- * string sería leer el día en UTC, y un trazo redibujado a las 22:00 en Buenos Aires diría que
- * la dirección quedó afuera al día siguiente.
+ * Lo que el asesor eligió la última vez, si se puede leer. `localStorage` TIRA —una ventana de
+ * incógnito, el sitio con los datos bloqueados, una vista previa— y ahí la pantalla tiene que
+ * abrir igual: sin el try/catch, una excepción acá dejaba Relevamiento entero en blanco.
  */
-function fechaDeInstante(iso: string | null): string | null {
-  if (!iso) return null
-  const t = new Date(iso)
-  if (Number.isNaN(t.getTime())) return null
-  return t.toLocaleDateString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
-    day: "numeric",
-    month: "numeric",
-    year: "numeric",
-  })
+function vistaGuardada(): Vista | null {
+  try {
+    const v = window.localStorage.getItem(LLAVE_VISTA)
+    return v === "lista" || v === "tablero" ? v : null
+  } catch {
+    return null
+  }
+}
+
+function guardarVista(v: Vista) {
+  try {
+    window.localStorage.setItem(LLAVE_VISTA, v)
+  } catch {
+    // Que no se pueda recordar la elección no es motivo para romperle la pantalla a nadie: la
+    // vista cambia igual, solo que la próxima vez arranca en la lista.
+  }
 }
 
 const plata = (n: number | null, moneda: string | null) => {
@@ -179,6 +180,21 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
   const [editando, setEditando] = useState<FilaDireccion | null>(null)
   const [viendoPersonas, setViendoPersonas] = useState<FilaDireccion | null>(null)
 
+  // La LISTA es la que arranca: es la vista probada, la que sirve en pantalla chica y la que ya
+  // conoce el asesor. Lo que eligió la última vez se lee después de montar, nunca en el
+  // `useState` inicial: el servidor no tiene `localStorage`, y leerlo ahí haría que lo que
+  // dibuja el servidor y lo que dibuja el navegador no coincidan.
+  const [vista, setVista] = useState<Vista>("lista")
+  useEffect(() => {
+    const v = vistaGuardada()
+    if (v) setVista(v)
+  }, [])
+
+  const elegirVista = (v: Vista) => {
+    setVista(v)
+    guardarVista(v)
+  }
+
   // Cuenta las cargas: si el asesor cambia de zona con un pedido en vuelo, la respuesta vieja
   // no puede pisar la lista de la nueva. Mismo patrón que «A la venta en mi zona».
   const gen = useRef(0)
@@ -235,6 +251,11 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
     )
   }
 
+  // Después de mover una tarjeta en el tablero. Es el mismo camino que `guardada` para una
+  // fila que ya existía: la fila del servidor —que ya viene con la etapa, la próxima acción y
+  // su fecha nuevas— pisa a la vieja, y la tarjeta aparece sola en su columna nueva.
+  const movida = (d: FilaDireccion) => guardada(d, false)
+
   const borrar = async (d: FilaDireccion) => {
     if (
       !window.confirm(
@@ -287,7 +308,35 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
               ? "No pudimos traer las direcciones de esta zona."
               : "Buscando…"}
         </p>
-        <Button className="ml-auto h-11 gap-1.5" disabled={soloLectura} onClick={() => setCreando(true)}>
+        {/* El interruptor lista ↔ tablero. La lista NO se tira: es la que sirve en pantalla
+            chica y la que ya está probada, y por eso es la que arranca. Dos botones de verdad,
+            de 44 px, con el nombre escrito al lado del dibujito: un ícono solo no se entiende. */}
+        <div className="ml-auto flex items-center gap-1 rounded-xl border border-zinc-200 p-1 dark:border-zinc-800">
+          <button
+            type="button"
+            aria-pressed={vista === "lista"}
+            onClick={() => elegirVista("lista")}
+            className={cn(
+              "inline-flex h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-medium md:h-9",
+              vista === "lista" ? "bg-muted text-foreground" : "text-muted-foreground",
+            )}
+          >
+            <List className="h-4 w-4" /> lista
+          </button>
+          <button
+            type="button"
+            aria-pressed={vista === "tablero"}
+            onClick={() => elegirVista("tablero")}
+            className={cn(
+              "inline-flex h-11 items-center gap-1.5 rounded-lg px-3 text-xs font-medium md:h-9",
+              vista === "tablero" ? "bg-muted text-foreground" : "text-muted-foreground",
+            )}
+          >
+            <Columns3 className="h-4 w-4" /> tablero
+          </button>
+        </div>
+
+        <Button className="h-11 gap-1.5" disabled={soloLectura} onClick={() => setCreando(true)}>
           <Plus className="h-4 w-4" /> agregar dirección
         </Button>
       </div>
@@ -314,6 +363,11 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
           <p className="text-sm text-muted-foreground">{fallo}</p>
           <Button variant="outline" className="h-11" onClick={() => traer()}>Reintentar</Button>
         </div>
+      ) : vista === "tablero" ? (
+        // Las mismas tarjetas, mirada como método: seis columnas y ningún movimiento sin su
+        // línea de historial. En una zona archivada el tablero se ve y no se mueve —el cartel
+        // que lo explica es el de arriba, que vale para las dos vistas.
+        <Tablero direcciones={direcciones} soloLectura={soloLectura} onMovida={movida} />
       ) : (
         ETAPAS.map((e) => {
           const filas = direcciones.filter((d) => d.etapa === e.clave)
