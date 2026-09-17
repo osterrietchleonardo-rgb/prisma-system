@@ -75,6 +75,7 @@ export function ConfiguracionChatWeb() {
   const [leyendo, setLeyendo] = useState(false)
   const [aviso, setAviso] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null)
   const [errores, setErrores] = useState<Record<string, string>>({})
+  const [copiado, setCopiado] = useState(false)
 
   const [widget, setWidget] = useState<Widget | null>(null)
   const [paginas, setPaginas] = useState<PaginaLeida[]>([])
@@ -182,6 +183,22 @@ export function ConfiguracionChatWeb() {
       setAviso({ tipo: "error", texto: "No se pudo leer el sitio." })
     } finally {
       setLeyendo(false)
+    }
+  }
+
+  // El origen sale del navegador: en local apunta a local, en producción a producción, sin
+  // depender de que alguien configure una variable a mano.
+  const codigoParaLaWeb = widget
+    ? `<script src="${typeof window === "undefined" ? "" : window.location.origin}/api/chat-web/widget-js?w=${widget.id}" async></script>`
+    : ""
+
+  async function copiarCodigo() {
+    try {
+      await navigator.clipboard.writeText(codigoParaLaWeb)
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2000)
+    } catch {
+      setAviso({ tipo: "error", texto: "No se pudo copiar: seleccionalo a mano." })
     }
   }
 
@@ -475,11 +492,14 @@ export function ConfiguracionChatWeb() {
             </span>
           </li>
           <li className="flex gap-2">
-            <span aria-hidden>3.</span>
+            <span aria-hidden>{widget ? "✓" : "3."}</span>
             <span>
-              <strong>El código para pegar en tu web.</strong> Todavía no está: aparece acá, para
-              copiar y pegar, cuando el asistente esté terminado. Hasta entonces no tendría a quién
-              contestarle.
+              <strong>El código para pegar en tu web.</strong>{" "}
+              {widget ? (
+                <>Está abajo: una línea, antes de <code>&lt;/body&gt;</code>.</>
+              ) : (
+                "Aparece acá en cuanto guardes."
+              )}
             </span>
           </li>
           <li className="flex gap-2">
@@ -494,6 +514,35 @@ export function ConfiguracionChatWeb() {
           </li>
         </ol>
       </Card>
+
+      {widget && (
+        <Card className="space-y-3 p-4 sm:p-5">
+          <div>
+            <h2 className="font-medium">El código para tu web</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Una línea, pegada antes de <code>&lt;/body&gt;</code> en tu sitio. Dibuja el botón del
+              chat y nada más: no lee tu página, no le cambia los estilos y no manda datos a ningún
+              otro lado.
+            </p>
+          </div>
+
+          <pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 text-xs">
+            <code>{codigoParaLaWeb}</code>
+          </pre>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" className="h-11" onClick={copiarCodigo}>
+              {copiado ? "¡Copiado!" : "Copiar el código"}
+            </Button>
+            {!widget.activo && (
+              <span className="text-xs text-muted-foreground">
+                Mientras el chat esté apagado, esa línea no hace nada: probalo primero y prendelo
+                cuando estés listo.
+              </span>
+            )}
+          </div>
+        </Card>
+      )}
 
       <div className="sticky bottom-0 flex justify-end bg-background/80 py-3 backdrop-blur">
         <div className="flex items-center gap-3">
