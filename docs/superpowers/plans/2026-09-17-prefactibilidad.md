@@ -1420,8 +1420,8 @@ create index if not exists gcba_puertas_lote_idx on public.gcba_puertas (lote_ca
 
 create table if not exists public.gcba_parcela_cache (
   smp            text primary key,
-  geom_lote      geometry(Geometry, 4326),     -- epok devuelve MultiPolygon, pero un Polygon también tiene que entrar
-  geom_manzana   geometry(Geometry, 4326),
+  geom_lote      jsonb,                        -- GeoJSON tal cual lo devuelve epok (PostgREST no convierte JSON a geometry al escribir)
+  geom_manzana   jsonb,
   catastro       jsonb,                       -- respuesta de epok catastro/parcela
   volumenes      jsonb,                       -- VolumenOficial[] de las teselas, ya en lon/lat
   manzana_tipo   text,                        -- TIPICA | ATIPICA según la tesela manzana
@@ -1429,7 +1429,6 @@ create table if not exists public.gcba_parcela_cache (
   consultado_en  timestamptz not null default now()
 );
 comment on table public.gcba_parcela_cache is 'Lo que se le pidió en vivo al catastro (epok) y a Ciudad 3D. La segunda consulta no toca al GCBA.';
-create index if not exists gcba_parcela_cache_geom_idx on public.gcba_parcela_cache using gist (geom_lote);
 
 -- Solo lectura para la app; escriben los scripts y el servidor con service_role.
 alter table public.gcba_parcelas_cur enable row level security;
@@ -2355,7 +2354,7 @@ git commit -m "feat(prefactibilidad): plano SVG del lote y la huella, apto para 
   - `GET /api/prefactibilidad/direcciones?q=` → `{ direcciones: DireccionUsig[] }` (solo CABA; máx 5).
   - `POST /api/prefactibilidad/analizar` body `{ calle: string; altura: number; direccion: string }` → `{ prefactibilidad: Prefactibilidad }` | 404 `{ error: "No encontramos ese número. Probá con otro número de la misma cuadra" }` | 502 `{ error: "El catastro de la Ciudad no está respondiendo, probá en unos minutos" }`.
   - `GET /api/prefactibilidad` → `{ prefactibilidades: Array<{ id, direccion, smp, modo, token, creado_en, user_id }> }` (asesor: las suyas; director: la agencia).
-  - `POST /api/prefactibilidad` body `{ prefactibilidad: Prefactibilidad }` → `{ id }`.
+  - `POST /api/prefactibilidad` body `{ smp: string; direccion: string }` → `{ id }` (el servidor recalcula y guarda SU resultado; el navegador no manda números).
   - `GET /api/prefactibilidad/[id]` → `{ prefactibilidad, token, creado_en }`; `DELETE` → `{ ok: true }`.
   - `POST /api/prefactibilidad/[id]/compartir` → `{ token, path: "/prefactibilidad/<token>" }` (reutiliza el token si ya existe).
 
@@ -2449,7 +2448,10 @@ export function dependenciasSupabase(admin: SupabaseClient): Dependencias {
         return { smp: data.smp, geomLote: data.geom_lote, geomManzana: data.geom_manzana, catastro: data.catastro, volumenes: data.volumenes ?? [], manzanaTipo: data.manzana_tipo, esquinaOficial: Boolean(data.esquina_oficial) } as CacheParcela;
       },
       async guardar(c) {
-        await admin.from("gcba_parcela_cache").upsert({ smp: c.smp, geom_lote: c.geomLote, geom_manzana: c.geomManzana, catastro: c.catastro, volumenes: c.volumenes, manzana_tipo: c.manzanaTipo, esquina_oficial: c.esquinaOficial, consultado_en: new Date().toISOString() }, { onConflict: "smp" });
+        // Si la caché no se puede escribir, el análisis sale igual; pero tiene que quedar en el log,
+        // si no la parcela se le pide al GCBA en cada consulta sin que nadie se entere.
+        const { error } = await admin.from("gcba_parcela_cache").upsert({ smp: c.smp, geom_lote: c.geomLote, geom_manzana: c.geomManzana, catastro: c.catastro, volumenes: c.volumenes, manzana_tipo: c.manzanaTipo, esquina_oficial: c.esquinaOficial, consultado_en: new Date().toISOString() }, { onConflict: "smp" });
+        if (error) console.error("Prefactibilidad: no se pudo guardar la caché de la parcela", c.smp, error.message);
       },
     },
   };
@@ -2524,10 +2526,14 @@ export async function POST(req: Request) {
 
 ```ts
 // app/api/prefactibilidad/route.ts
-// GET: "Mis prefactibilidades" (asesor: las suyas; director: la agencia). POST: guardar el informe.
+// GET: "Mis prefactibilidades" (asesor: las suyas; director: la agencia). POST: guardar el informe
+// (recalculado en el servidor a partir de la parcela).
 import { NextResponse } from "next/server";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { analizarParcela, ParcelaNoEncontrada } from "@/lib/prefactibilidad/analizar";
+import { dependenciasSupabase } from "@/lib/prefactibilidad/dependencias-supabase";
+import { GcbaNoResponde } from "@/lib/prefactibilidad/gcba";
 
 export const dynamic = "force-dynamic";
 
@@ -2552,13 +2558,20 @@ export async function POST(req: Request) {
   try {
     const { userId, agencyId } = await requireTenant();
     const body = await req.json().catch(() => null);
-    const p = body?.prefactibilidad;
-    if (!p?.smp || !p?.direccion || !p?.edificabilidad?.modo) return NextResponse.json({ error: "No hay un análisis para guardar." }, { status: 400 });
+    const smp = typeof body?.smp === "string" ? body.smp.trim().toLowerCase() : "";
+    const direccion = typeof body?.direccion === "string" ? body.direccion.trim() : "";
+    if (!smp || !direccion) return NextResponse.json({ error: "No hay un análisis para guardar." }, { status: 400 });
+    // Lo que se guarda (y después se comparte por link) lo calcula el SERVIDOR de nuevo: el navegador
+    // solo dice qué parcela. Así nadie puede guardar números que PRISMA no calculó. Con la caché de la
+    // parcela ya caliente, cuesta una consulta de Código y una de terrenos.
     const admin = createAdminClient();
+    const p = await analizarParcela(smp, direccion, dependenciasSupabase(admin));
     const { data, error } = await admin.from("prefactibilidades").insert({ agency_id: agencyId, user_id: userId, direccion: p.direccion, smp: p.smp, modo: p.edificabilidad.modo, resultado: p }).select("id").single();
     if (error) throw error;
     return NextResponse.json({ id: data.id });
   } catch (e: any) {
+    if (e instanceof ParcelaNoEncontrada) return NextResponse.json({ error: e.message }, { status: 404 });
+    if (e instanceof GcbaNoResponde) return NextResponse.json({ error: e.message }, { status: 502 });
     console.error("Prefactibilidad guardar error:", e);
     return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 500 });
   }
@@ -3039,7 +3052,7 @@ export function PrefactibilidadModule({ esDirector = false }: { esDirector?: boo
 
   const guardar = async () => {
     if (!p) return;
-    const r = await fetch("/api/prefactibilidad", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prefactibilidad: p }) });
+    const r = await fetch("/api/prefactibilidad", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ smp: p.smp, direccion: p.direccion }) });
     const j = await r.json();
     if (r.ok) { setIdGuardada(j.id); setRecargar((n) => n + 1); } else setError(j.error || "No se pudo guardar.");
   };
