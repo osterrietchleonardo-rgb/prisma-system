@@ -24,9 +24,15 @@ export function baseFalsa(inicial: Record<string, Fila[]>, rpcs: Record<string, 
     let tope: number | null = null
     let unico = false
     let quizas = false
+    let pedirCuenta = false
+    let soloCabecera = false
 
     const q: any = {
-      select: () => q,
+      select: (_cols?: string, opciones?: { count?: "exact"; head?: boolean }) => {
+        pedirCuenta = opciones?.count === "exact"
+        soloCabecera = !!opciones?.head
+        return q
+      },
       insert: (f: any) => { op = "insert"; carga = f; return q },
       update: (p: any) => { op = "update"; carga = p; return q },
       delete: () => { op = "delete"; return q },
@@ -38,9 +44,12 @@ export function baseFalsa(inicial: Record<string, Fila[]>, rpcs: Record<string, 
       limit: (n: number) => { tope = n; return q },
       single: () => { unico = true; return q },
       maybeSingle: () => { unico = true; quizas = true; return q },
-      then: (resolve: (r: { data: any; error: any }) => void) => {
+      // `count` viaja igual que en el cliente real cuando se pidió con `{ count: "exact" }`:
+      // sin declararlo acá, el `resolve({ data, count, error })` de más abajo no compila.
+      then: (resolve: (r: { data: any; count?: number | null; error: any }) => void) => {
         const pasa = (f: Fila) => filtros.every((p) => p(f))
         let res: Fila[]
+        let count: number | null = null
         if (op === "insert") {
           const nuevas = (Array.isArray(carga) ? carga : [carga]).map((f: Fila) => ({
             id: `id-${siguienteId++}`,
@@ -79,15 +88,19 @@ export function baseFalsa(inicial: Record<string, Fila[]>, rpcs: Record<string, 
           }
         } else {
           res = filas().filter(pasa)
+          // select(..., { count: "exact" }) cuenta las filas que pasaron el filtro, ANTES del
+          // límite — como el real: un `.limit()` no achica el total, solo lo que viaja.
+          count = pedirCuenta ? res.length : null
           if (orden) {
             const { col, asc } = orden
             res = [...res].sort((a, b) => (a[col] < b[col] ? -1 : a[col] > b[col] ? 1 : 0) * (asc ? 1 : -1))
           }
           if (tope !== null) res = res.slice(0, tope)
         }
-        const data = unico ? (res[0] ?? null) : res
+        // Con head:true no viajan filas, solo el número (como el real).
+        const data = soloCabecera ? null : unico ? (res[0] ?? null) : res
         const error = unico && !quizas && !data ? { message: "no rows", code: "PGRST116" } : null
-        return resolve({ data, error })
+        return resolve({ data, count, error })
       },
     }
     return q

@@ -982,4 +982,34 @@ Es la segunda solapa de Farming, al lado de "Mis zonas". **No tenés que cargar 
 
 **Si movés el trazo, la lista se acomoda sola.** No hay nada guardado: se calcula cada vez que entrás. Si agrandás la zona aparecen las propiedades nuevas, y si sacás una cuadra se van las de esa cuadra.
 
-> 🔜 La solapa **"Relevamiento"** —el tablero donde vas moviendo las direcciones según avanzás— llega en la próxima etapa, junto con el botón para pasar una de estas propiedades al tablero.
+**Para pasarla a tu relevamiento** está el botón **"crear tarjeta"**, al lado de "descartar". La propiedad se suma a la solapa "Relevamiento" con lo que el aviso ya sabe (dirección, tipo, precio) y desaparece de esta lista. Si te arrepentís, tenés **deshacer** ahí mismo. Y si esa puerta ya estaba en tu tablero, te lo dice en vez de cargarla dos veces.
+
+### "Relevamiento"
+
+La tercera solapa: **lo que caminaste vos**. Acá va lo que el portal no tiene —que es la mayoría—: el edificio de la esquina, la casa con el cartel de dueño, el PH que te comentó el encargado.
+
+**Para cargar una puerta:** "+ agregar dirección". Lo único obligatorio es **la calle y el tipo de propiedad**. Nada más. Todo lo demás lo completás cuando puedas, desde la oficina o al otro día.
+
+- **El buscador de arriba** te encuentra la dirección y le pone la ubicación en el mapa. Si no aparece, **escribila a mano igual**: se guarda lo mismo, sin ubicación.
+- **Las unidades no se cargan a mano.** Ponés 8 pisos y 4 unidades por piso, y el sistema dice **32 unidades**. Si es una casa, ponés 1.
+- **El encargado va con nombre**, no con un sí/no: "Roberto, turno mañana" sirve; "tiene encargado" no sirve para nada.
+- **Podés marcar que está a la venta aunque no esté publicada**: el cartel de dueño en el balcón también es información.
+- Si escribís algo incompleto —los pisos sin las unidades, por ejemplo— **te avisa pero te deja guardar igual**. Estás parado en la vereda, no llenando una planilla.
+
+**Las personas de cada dirección** se cargan desde la tarjeta, en "personas": nombre, piso, unidad, vínculo y teléfono. El teléfono queda como link para llamar de un toque. Un edificio puede tener muchos propietarios conocidos, cada uno con su unidad.
+
+**La lista está agrupada por etapa.** Por ahora todo nace en "Relevado"; mover las tarjetas entre columnas llega en la próxima etapa.
+
+**Si una dirección queda fuera de tu zona** —porque la cargaste del otro lado de la línea, o porque moviste el trazo— la tarjeta te lo dice y **la podés seguir trabajando igual**. No se borra nada.
+
+**Ojo con borrar una tarjeta:** se borra la dirección, sus propietarios y todo su historial, y no se puede deshacer. Distinto es **borrar una zona**: si tenés tarjetas cargadas, la zona **se archiva** y tu trabajo queda guardado; las cuadras sí vuelven a estar libres para otro asesor.
+
+**Dónde quedan las tarjetas de una zona archivada.** En el mismo desplegable de "Relevamiento", con la palabra **"archivada"** al lado del nombre. La elegís y ves todo lo que habías cargado. Arriba te aparece un renglón que te lo recuerda: **esa zona se lee, no se trabaja** — sus cuadras ya son de quien las dibuje ahora.
+
+- Las **tarjetas** se leen enteras, como siempre.
+- **"ver personas"** sigue funcionando: abrís la puerta y ahí están tus propietarios con su piso, su unidad, el vínculo, las notas y **el teléfono para llamar de un toque**. Lo que no aparece es el formulario para sumar a alguien, ni el lápiz, ni el tacho.
+- Los botones de **agregar dirección, editar y borrar** quedan apagados.
+
+Si querés volver a trabajar esas calles, dibujá la zona de nuevo desde "Mis zonas"; las tarjetas viejas se quedan donde están, en la zona archivada.
+
+> 🔜 El tablero con las 6 columnas —donde vas moviendo cada dirección según avanzás, y que se anota solo quién hizo qué y cuándo—, los indicadores del método y el botón para pasar un propietario a tu pipeline de Tracking llegan en la próxima etapa.

@@ -70,7 +70,7 @@ describe("armarRespuesta", () => {
   const compartidas = [{ zona_id: "z-maria", user_id: YO, agregado_por: MARIA, created_at: "" }]
 
   it("asesor: mías, compartidas conmigo, y el resto como contorno", () => {
-    const r = armarRespuesta({ filas, compartidas, perfiles, userId: YO, role: "asesor" })
+    const r = armarRespuesta({ filas, archivadas: [], compartidas, perfiles, userId: YO, role: "asesor" })
     expect(r.mias.map((z) => z.id)).toEqual(["z-mia"])
     expect(r.compartidas_conmigo.map((z) => z.id)).toEqual(["z-maria"])
     expect(r.ajenas.map((z) => z.id)).toEqual(["z-juan"])
@@ -82,10 +82,46 @@ describe("armarRespuesta", () => {
   })
 
   it("director: nada propio, todas en equipo", () => {
-    const r = armarRespuesta({ filas, compartidas, perfiles, userId: DIRECTOR, role: "director" })
+    const r = armarRespuesta({ filas, archivadas: [], compartidas, perfiles, userId: DIRECTOR, role: "director" })
     expect(r.mias).toEqual([])
     expect(r.equipo.map((z) => z.id)).toEqual(["z-mia", "z-juan", "z-maria"])
     expect(r.ajenas.map((z) => z.id)).toEqual(["z-mia", "z-juan", "z-maria"])
+  })
+
+  // Las archivadas van en su PROPIO balde. Si alguien las mezclara en `mias` —que es lo que
+  // leen el mapa, el tope de zonas y el control de choque— volverían a bloquear cuadras que
+  // archivar acababa de liberar, y el asesor no podría redibujar ahí. Este test muere si
+  // `archivadas` deja de existir o si su contenido se cuela en cualquiera de los otros baldes.
+  it("las archivadas van aparte: nunca en mias, ni en compartidas_conmigo, ni en ajenas, ni en equipo", () => {
+    const archivada = { ...fila("z-vieja", YO, "Vieja"), estado: "archivada" as const }
+    const r = armarRespuesta({ filas, archivadas: [archivada], compartidas, perfiles, userId: YO, role: "asesor" })
+    expect(r.archivadas.map((z) => z.id)).toEqual(["z-vieja"])
+    expect(r.archivadas[0].estado).toBe("archivada")
+    expect(r.mias.map((z) => z.id)).toEqual(["z-mia"])
+    expect(r.compartidas_conmigo.map((z) => z.id)).toEqual(["z-maria"])
+    expect(r.ajenas.map((z) => z.id)).toEqual(["z-juan"])
+    expect(r.equipo).toEqual([])
+  })
+
+  it("una archivada COMPARTIDA sigue diciendo con quién: el colega que la trabajaba tiene que verse", () => {
+    const archivada = { ...fila("z-vieja", YO, "Vieja"), estado: "archivada" as const }
+    const r = armarRespuesta({
+      filas,
+      archivadas: [archivada],
+      compartidas: [...compartidas, { zona_id: "z-vieja", user_id: JUAN, agregado_por: YO, created_at: "" }],
+      perfiles,
+      userId: YO,
+      role: "asesor",
+    })
+    expect(r.archivadas[0].compartida_con).toEqual([{ id: JUAN, nombre: "Juan Pérez" }])
+  })
+
+  // El contorno se dibuja para no chocar, y contra una archivada NO se choca: sus cuadras están
+  // libres. Dibujarla sería mostrarle al asesor una pared que el servidor no controla.
+  it("una archivada NO se dibuja como contorno", () => {
+    const archivada = { ...fila("z-vieja", YO, "Vieja"), estado: "archivada" as const }
+    const datos = armarRespuesta({ filas, archivadas: [archivada], compartidas, perfiles, userId: YO, role: "asesor" })
+    expect(contornosParaDibujar(datos).map((z) => z.id)).not.toContain("z-vieja")
   })
 })
 
@@ -94,7 +130,7 @@ describe("contornosParaDibujar", () => {
   // (de María) y 2 mías.
   const filasConDosMias = [fila("z-ajena", JUAN, "Ajena"), fila("z-compartida", MARIA, "Compartida"), fila("z-mia1", YO, "Mía 1"), fila("z-mia2", YO, "Mía 2")]
   const compartidas = [{ zona_id: "z-compartida", user_id: YO, agregado_por: MARIA, created_at: "" }]
-  const datos = armarRespuesta({ filas: filasConDosMias, compartidas, perfiles, userId: YO, role: "asesor" })
+  const datos = armarRespuesta({ filas: filasConDosMias, archivadas: [], compartidas, perfiles, userId: YO, role: "asesor" })
 
   it("sin excluirId trae las 4: la ajena, la compartida y las 2 mías como 'vos'", () => {
     const c = contornosParaDibujar(datos)

@@ -122,6 +122,7 @@ describe("DELETE", () => {
     base.tablas.farming_zonas_compartidas.push({ zona_id: "z-mia", user_id: JUAN, agregado_por: YO, created_at: "" })
     const r = await borrar("z-mia")
     expect(r.status).toBe(200)
+    expect((await r.json())).toEqual({ ok: true, accion: "borrada" })
     expect(base.tablas.farming_zonas.find((z) => z.id === "z-mia")).toBeUndefined()
     expect(base.tablas.farming_zonas_compartidas.filter((c) => c.zona_id === "z-mia")).toEqual([])
   })
@@ -131,9 +132,98 @@ describe("DELETE", () => {
     expect(base.tablas.farming_zonas.find((z) => z.id === "z-juan")).toBeDefined()
   })
 
+  // Contar y borrar no son un solo paso: entre las dos consultas, un colega de una zona
+  // compartida puede cargar una tarjeta. Ahí el `on delete restrict` de la migración frena el
+  // borrado con un 23503, que sin traducir sale como un 500 con texto en inglés («update or
+  // delete on table "farming_zonas" violates foreign key constraint…»).
+  it("si una tarjeta aparece entre el conteo y el borrado: 409 en criollo, no un 23503 crudo", async () => {
+    base.tablas.farming_zonas_compartidas.push({ zona_id: "z-mia", user_id: JUAN, agregado_por: YO, created_at: "" })
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => {
+      const q: any = fromOriginal(tabla)
+      if (tabla === "farming_zonas") {
+        const deleteReal = q.delete
+        q.delete = () => {
+          const encadenado = deleteReal.call(q)
+          encadenado.then = (resolve: any) =>
+            resolve({ data: null, error: { code: "23503", message: 'violates foreign key constraint "farming_direcciones_zona_id_fkey"' } })
+          return encadenado
+        }
+      }
+      return q
+    }) as typeof base.from
+
+    const r = await borrar("z-mia")
+    const d = await r.json()
+    expect(r.status).toBe(409)
+    expect(d.error).toBe("Esta zona ya tiene tarjetas, probá de nuevo")
+    // Y los compartidos NO se perdieron por el camino: la zona sigue viva con su gente.
+    expect(base.tablas.farming_zonas_compartidas.filter((c) => c.zona_id === "z-mia")).toHaveLength(1)
+  })
+
   it("una zona liberada no se puede borrar: 404 y sigue en la base", async () => {
     const r = await borrar("z-liberada")
     expect(r.status).toBe(404)
     expect(base.tablas.farming_zonas.find((z) => z.id === "z-liberada")).toBeDefined()
+  })
+
+  // Task 9: la migración pasa farming_direcciones.zona_id a `on delete restrict`, así que
+  // borrar una zona con tarjetas cargadas tiene que archivarla en vez de intentar (y fallar) el
+  // borrado. Spec: "Sin ninguna tarjeta cargada → se borra de verdad. Con tarjetas → pasa a
+  // archivada. Las cuadras se liberan igual, y las tarjetas con su historial quedan accesibles."
+  describe("con tarjetas: archiva en vez de borrar", () => {
+    beforeEach(() => {
+      base.tablas.farming_direcciones = [
+        { id: "d-1", zona_id: "z-mia", agency_id: AGENCIA, calle: "Peron", altura: "100" },
+      ]
+    })
+
+    it("archiva: 200, accion 'archivada', y la fila SIGUE en la base con estado archivada", async () => {
+      const r = await borrar("z-mia")
+      expect(r.status).toBe(200)
+      expect(await r.json()).toEqual({ ok: true, accion: "archivada", tarjetas: 1 })
+      const fila = base.tablas.farming_zonas.find((z) => z.id === "z-mia")
+      expect(fila).toBeDefined()
+      expect(fila!.estado).toBe("archivada")
+    })
+
+    it("la tarjeta no se toca y queda accesible: sigue en farming_direcciones, colgada de una zona que TODAVÍA existe", async () => {
+      await borrar("z-mia")
+      expect(base.tablas.farming_direcciones.find((d) => d.id === "d-1")).toBeDefined()
+      // Si la zona se hubiera borrado (el bug de hoy), la tarjeta quedaría huérfana: no
+      // "accesible" como pide el spec. Por eso esta prueba también exige que z-mia siga.
+      expect(base.tablas.farming_zonas.find((z) => z.id === "z-mia")).toBeDefined()
+    })
+
+    it("archivar libera las cuadras igual: la zona archivada no cuenta como 'activa'", async () => {
+      await borrar("z-mia")
+      const fila = base.tablas.farming_zonas.find((z) => z.id === "z-mia")!
+      // El choque (candidatasParaChoque, vía cargarContexto) solo mira farming_zonas con
+      // estado 'activa': no hace falta ningún código nuevo para "liberar", alcanza con que
+      // la zona deje de ser 'activa'.
+      expect(fila.estado).not.toBe("activa")
+    })
+
+    // El archivado es de la MISMA familia que el «liberar» del director, que ya escribía
+    // liberada_en / liberada_por / motivo_liberacion. En una zona COMPARTIDA, el colega se
+    // encuentra el tablero fuera de su lista de trabajo sin haber tocado nada: sin firma no hay
+    // forma de saber quién lo hizo ni cuándo, en una función cuyo sentido es el historial
+    // firmado. Este test muere si se sacan las tres columnas del update.
+    it("el archivado queda FIRMADO: cuándo, quién y por qué", async () => {
+      const antes = Date.now()
+      await borrar("z-mia")
+      const fila = base.tablas.farming_zonas.find((z) => z.id === "z-mia")!
+      expect(fila.liberada_por).toBe(YO)
+      expect(fila.motivo_liberacion).toBe("Archivada por su dueño al borrar la zona")
+      expect(new Date(fila.liberada_en).getTime()).toBeGreaterThanOrEqual(antes)
+    })
+
+    it("la zona de un colega sigue dando 403 y no se archiva ni se borra", async () => {
+      base.tablas.farming_direcciones.push({ id: "d-2", zona_id: "z-juan", agency_id: AGENCIA, calle: "Lavalle", altura: "200" })
+      const r = await borrar("z-juan")
+      expect(r.status).toBe(403)
+      const fila = base.tablas.farming_zonas.find((z) => z.id === "z-juan")!
+      expect(fila.estado).toBe("activa")
+    })
   })
 })
