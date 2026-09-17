@@ -293,6 +293,46 @@ guardada muestra "recalcular" si `publicado` de `gcba_parcelas_cur` es posterior
 6. Pruebas en navegador, OK de Leonardo, commit, docs (bitácora + guía funcional sin
    tecnicismos), merge a main por el flujo clásico.
 
+## Adenda 17-sep-2026: la envolvente oficial pasa a ser la fuente
+
+Al preparar el plan se encontró que Ciudad 3D publica sus capas como **teselas vectoriales
+públicas** (sin clave, gzip, zooms 12 a 19) en `vectortiles.usig.buenosaires.gob.ar/cur3d/`:
+
+| Capa | URL (`{z}/{x}/{y}.pbf`) | Qué trae por feature |
+|---|---|---|
+| Superficie edificable | `cur3d/volumen_edif/` | Por parcela: `smp`, `tipo` (cuerpo principal / retiro 1 / retiro 2 / basamento), `edificabil` (CA, CM, USAA, USAM, USAB2, USAB1, USAB0), `altura_inicial`, `altura_final`; polígono |
+| Línea de frente interno | `cur3d/lfi/` | Por manzana (`sm`): polígono del espacio libre |
+| Línea interna de basamento | `cur3d/lib/` | Por manzana: línea |
+| Banda mínima edificable | `cur3d/banda_minima/` | Por manzana: polígono |
+| Manzanas | `cur3d/manzana/` | `sm`, `tipo` (TIPICA / ATIPICA) |
+| Línea oficial | `cur3d/linea_oficial/` | Por parcela: línea de frente sobre la calle |
+
+Verificado el 17-sep con Roosevelt 4554 (053-050-006): la envolvente oficial da **261 m² de
+cuerpo principal** (TodoProps: 263), retiro 1 244 m², retiro 2 192 m², alturas 17,2 / 20,2 /
+24,2 (las de la reforma 2024). La regla del cuarto sobre la manzana daba 242 m²: la línea de
+frente interno oficial es un polígono de 20 vértices con las extensiones del espacio libre del
+art. 6.4.2.3, no un rectángulo. También hay envolvente oficial para la manzana **atípica** de
+Zuviría 3939 y para Cabildo 2040 (dos unidades, CM y CA, cada una con su polígono y sus
+alturas).
+
+**Decisión:** el cálculo lee la **envolvente oficial** de las teselas y mide sus polígonos
+recortados al lote. La regla del cuarto (Paso 2 original) queda como **control de
+consistencia y respaldo** si una parcela no tiene envolvente en la capa. Consecuencias:
+
+- El **modo exacto** cubre también esquinas y manzanas atípicas cuando hay envolvente oficial.
+  Los avisos (esquina, atípica, área especial, catalogado, dos alturas) se muestran igual, como
+  advertencias, con la leyenda de estudio profesional. El **modo rango** queda solo para
+  parcelas sin envolvente oficial.
+- El servidor pide 1 a 4 teselas de zoom 17 que cubren el lote, une los pedazos de un mismo
+  polígono partido entre teselas y los recorta al contorno del lote. Se guardan en la caché
+  de la parcela junto con el contorno.
+- La validación de 20 parcelas compara **nuestra medición de la envolvente oficial** contra
+  TodoProps (m² por planta, ±5 %), y la regla del cuarto contra la capa oficial en manzanas
+  típicas (informativo).
+- Dependencias nuevas: `@mapbox/vector-tile` 3.0.0 y `pbf` 5.1.2 (ESM; `import { PbfReader }
+  from "pbf"`). Las teselas vienen gzip aunque el servidor no lo declare: hay que
+  descomprimir si empiezan con `1f 8b`.
+
 ## Riesgos
 
 - **Dato del GCBA al 31-dic-2024.** Una modificación nueva del Código no se refleja hasta
