@@ -9,6 +9,7 @@
  * Configuración IA) y las de "Marketing IA" pasaron a ser páginas propias, en los
  * grupos «Difusión» y «Marketing IA». Cada rol ve como páginas exactamente las
  * solapas que veía antes. «Contratos IA» quedó solo en «Documentación».
+ * El 18/9/2026 se sumó «Prefactibilidad» (spec 2026-09-12) en Propiedades para los dos roles.
  *
  * Reglas:
  * - Un renglón sin definición para un rol no existe para ese rol.
@@ -49,6 +50,7 @@ import {
   Lightbulb,
   Settings,
   Sprout,
+  Ruler,
 } from "lucide-react"
 import { contratosIaDeshabilitado } from "@/lib/access/contratos-ia"
 import { rutaMarketing } from "@/lib/marketing-ia/rutas"
@@ -147,6 +149,9 @@ const RENGLONES: Renglon[] = [
   { id: "acm", icon: Scale, grupo: "propiedades",
     director: { name: "ACM", href: "/director/acm" },
     asesor:   { name: "ACM", href: "/asesor/acm" } },
+  { id: "prefactibilidad", icon: Ruler, grupo: "propiedades",
+    director: { name: "Prefactibilidad", href: "/director/prefactibilidad" },
+    asesor:   { name: "Prefactibilidad", href: "/asesor/prefactibilidad" } },
   { id: "mercado", icon: BarChart2, grupo: "propiedades",
     director: { name: "Pulso de Mercado", href: "/director/mercado" },
     asesor:   { name: "Pulso de Mercado", href: "/asesor/mercado" } },

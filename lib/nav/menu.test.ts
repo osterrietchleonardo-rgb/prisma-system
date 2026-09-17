@@ -28,6 +28,7 @@ const DIRECTOR = [
   { name: "Farming",                href: "/director/farming" },
   { name: "Buscador IA",            href: "/director/consultor" },
   { name: "ACM",                    href: "/director/acm" },
+  { name: "Prefactibilidad",        href: "/director/prefactibilidad" },
   { name: "Pulso de Mercado",       href: "/director/mercado" },
   { name: "Crear Anuncio",          href: "/director/marketing-ia/crear-anuncio" },
   { name: "HomeStaging",            href: "/director/marketing-ia/homestaging" },
@@ -61,6 +62,7 @@ const ASESOR = [
   { name: "Farming",                href: "/asesor/farming" },
   { name: "Buscador IA",            href: "/asesor/consultor-ia" },
   { name: "ACM",                    href: "/asesor/acm" },
+  { name: "Prefactibilidad",        href: "/asesor/prefactibilidad" },
   { name: "Pulso de Mercado",       href: "/asesor/mercado" },
   { name: "Crear Anuncio",          href: "/asesor/marketing-ia/crear-anuncio" },
   { name: "HomeStaging",            href: "/asesor/marketing-ia/homestaging" },
@@ -90,9 +92,9 @@ describe("las páginas del menú, por nombre y dirección", () => {
     expect(ahora).toEqual(esperados.map(clave).sort())
   })
 
-  it("director: 30 renglones; asesor: 24", () => {
-    expect(planos("director")).toHaveLength(30)
-    expect(planos("asesor")).toHaveLength(24)
+  it("director: 31 renglones; asesor: 25", () => {
+    expect(planos("director")).toHaveLength(31)
+    expect(planos("asesor")).toHaveLength(25)
   })
 
   it("las direcciones viejas de las páginas con solapas ya no son renglones (redirigen)", () => {
@@ -140,7 +142,7 @@ describe("grupos", () => {
     const porGrupo = Object.fromEntries(menuPara("director").map((g) => [g.id, g.items.map((it) => it.name)]))
     expect(porGrupo["contactos"]).toEqual(["Pipeline", "Leads Tokko", "Leads WhatsApp"])
     expect(porGrupo["difusion"]).toEqual(["Contactos", "Plantillas", "Campañas", "Configuración IA"])
-    expect(porGrupo["propiedades"]).toEqual(["Propiedades", "Farming", "Buscador IA", "ACM", "Pulso de Mercado"])
+    expect(porGrupo["propiedades"]).toEqual(["Propiedades", "Farming", "Buscador IA", "ACM", "Prefactibilidad", "Pulso de Mercado"])
     expect(porGrupo["marketing-ia"]).toEqual([
       "Crear Anuncio", "HomeStaging", "Clientes Ideales (IPC)", "Mi ADN", "Historial / Galería", "Guía Mágica", "Configuración IA",
     ])
