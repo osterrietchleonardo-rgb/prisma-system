@@ -54,6 +54,34 @@ export interface PaginaEncontrada {
   parecido: number
 }
 
+/**
+ * Por qué la herramienta volvió con las manos vacías. Son situaciones MUY distintas y el agente
+ * tiene que poder decir cosas distintas en cada una (Leonardo, 17/9): devolver siempre "nada" las
+ * aplana y lo deja sin con qué razonar.
+ */
+export type ResultadoBusqueda =
+  | { estado: "encontrado"; paginas: PaginaEncontrada[]; mejorParecido: number }
+  /** Se buscó bien, pero lo mejor del sitio no tiene que ver: "eso no figura en la web". */
+  | { estado: "nada_parecido"; paginas: []; mejorParecido: number }
+  /** El sitio todavía no se leyó (widget nuevo, rastreo fallido): ni prometer que mira la web. */
+  | { estado: "sin_sitio"; paginas: [] }
+  /** La búsqueda se rompió: no es que no esté, es que no se pudo mirar. */
+  | { estado: "error"; paginas: []; motivo: string }
+
+/** Lo que el agente lee como resultado de la herramienta, en una línea. */
+export function resumenParaElAgente(r: ResultadoBusqueda): string {
+  switch (r.estado) {
+    case "encontrado":
+      return `Encontré ${r.paginas.length} ${r.paginas.length === 1 ? "sección" : "secciones"} del sitio que responden esto.`
+    case "nada_parecido":
+      return "Busqué en todo el sitio y NO hay ninguna sección que hable de esto. No inventes una: decilo y ofrecé pasarlo con alguien del equipo."
+    case "sin_sitio":
+      return "El sitio de esta agencia todavía no está cargado, así que no puedo mirarlo. No digas que lo consultaste."
+    case "error":
+      return "La búsqueda falló (problema nuestro, no del sitio). No afirmes que la información no existe."
+  }
+}
+
 /** Cuánto se parecen dos vectores: 1 es lo mismo, 0 es nada que ver. */
 export function coseno(a: number[], b: number[]): number {
   if (!a.length || a.length !== b.length) return 0

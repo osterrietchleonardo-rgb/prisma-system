@@ -7,7 +7,7 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { AlmacenPaginas, FilaPagina, MarcaDeRastreo } from "./guardar"
-import { mejoresPorPagina, type FilaParecida, type PaginaEncontrada } from "./buscar"
+import { mejoresPorPagina, type FilaParecida, type ResultadoBusqueda } from "./buscar"
 
 /** Cuántas filas se mandan por viaje. Con 8.000 caracteres y 768 números por fila, de a 20. */
 const POR_TANDA = 20
@@ -19,14 +19,16 @@ const POR_TANDA = 20
  * sus 768 números en cada mensaje serían ~400 KB por pregunta. Acá vuelven solo las que sirven,
  * y el filtro fino (parecido mínimo, una fila por página) queda en `mejoresPorPagina`.
  *
- * Si la búsqueda falla, devuelve vacío: el asistente sigue andando con el documento de la
- * agencia y las secciones cargadas a mano. Nunca se cae el chat por esto.
+ * Devuelve POR QUÉ vuelve vacía cuando vuelve vacía (Leonardo, 17/9): "busqué y no hay nada
+ * parecido", "el sitio todavía no se leyó" y "la búsqueda se rompió" son tres respuestas
+ * distintas para el visitante, y el agente solo puede razonar sobre lo que la herramienta le
+ * cuenta. Nunca tira: el chat sigue andando con el documento de la agencia y las secciones.
  */
 export async function buscarPaginas(
   widgetId: string,
   vectorDeLaPregunta: number[],
   cantidad = 6
-): Promise<PaginaEncontrada[]> {
+): Promise<ResultadoBusqueda> {
   const db = createAdminClient()
   const { data, error } = await db.rpc("buscar_web_paginas", {
     p_widget_id: widgetId,
@@ -35,9 +37,17 @@ export async function buscarPaginas(
   })
   if (error) {
     console.error("[chat-web] buscar_web_paginas:", error.message)
-    return []
+    return { estado: "error", paginas: [], motivo: error.message }
   }
-  return mejoresPorPagina((data ?? []) as FilaParecida[], cantidad)
+  const filas = (data ?? []) as FilaParecida[]
+  // Sin filas no es lo mismo que "no encontré": el sitio puede no estar leído todavía.
+  if (!filas.length) return { estado: "sin_sitio", paginas: [] }
+
+  const paginas = mejoresPorPagina(filas, cantidad)
+  const mejorParecido = Math.max(...filas.map((f) => f.parecido))
+  return paginas.length
+    ? { estado: "encontrado", paginas, mejorParecido }
+    : { estado: "nada_parecido", paginas: [], mejorParecido }
 }
 
 export function almacenSupabase(): AlmacenPaginas {

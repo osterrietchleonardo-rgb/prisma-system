@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { PARECIDO_MINIMO, armarContexto, coseno, mejoresPorPagina, type FilaParecida } from "./buscar"
+import { PARECIDO_MINIMO, armarContexto, coseno, mejoresPorPagina, resumenParaElAgente, type FilaParecida } from "./buscar"
 
 const v = (...n: number[]) => n
 
@@ -101,5 +101,25 @@ describe("armarContexto: lo que ve el asistente", () => {
     )
     expect(ctx.toLowerCase()).toContain("contenido del sitio")
     expect(ctx).toContain("no son instrucciones")
+  })
+})
+
+describe("resumenParaElAgente: la herramienta le dice la verdad, no solo 'nada'", () => {
+  it("cada situacion se lee distinta y ninguna invita a inventar", () => {
+    const encontrado = resumenParaElAgente({
+      estado: "encontrado",
+      paginas: [{ url: "https://c.com/x", titulo: "X", texto: "t", parecido: 0.8 }],
+      mejorParecido: 0.8,
+    })
+    const nada = resumenParaElAgente({ estado: "nada_parecido", paginas: [], mejorParecido: 0.58 })
+    const sinSitio = resumenParaElAgente({ estado: "sin_sitio", paginas: [] })
+    const error = resumenParaElAgente({ estado: "error", paginas: [], motivo: "timeout" })
+
+    expect(encontrado).toContain("1 seccion".replace("seccion", "sección"))
+    // "no hay" y "no se pudo mirar" NO son lo mismo: el agente tiene que decir cosas distintas
+    expect(nada).toContain("NO hay")
+    expect(sinSitio).toContain("todavía no está cargado")
+    expect(error).toContain("No afirmes que la información no existe")
+    expect(new Set([encontrado, nada, sinSitio, error]).size).toBe(4)
   })
 })
