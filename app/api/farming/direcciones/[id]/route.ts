@@ -181,23 +181,35 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         .maybeSingle()
       if (eZona) throw eZona
 
-      const nuevaFueraDeZona =
-        typeof nuevoLat === "number" && typeof nuevoLng === "number" && zonaFila?.geojson
-          ? calculaFueraDeZona(nuevoLat, nuevoLng, zonaFila.geojson)
-          : false
+      // NO ES LO MISMO «no hay punto» que «no pudimos evaluar». Si la zona no se puede leer
+      // (geojson faltante o roto), la cuenta no se puede hacer: se deja lo último que se sabía
+      // en vez de estampar un "adentro" que nadie calculó, que además borraría la fecha de
+      // cuándo se cayó. Un dato viejo y verdadero es mejor que uno nuevo e inventado.
+      if (!zonaFila?.geojson) {
+        console.error("Farming (PATCH ubicación): no se pudo leer el geojson de la zona", c.direccion.zona_id)
+      } else {
+        // Sin punto, no hay adentro ni afuera: la pantalla borra `lat`/`lng` a propósito cuando
+        // el asesor reescribe la calle después de haber elegido una sugerencia
+        // (components/farming/direccion-dialog.tsx). Una tarjeta sin punto no lleva cartel, y
+        // tampoco tiene una historia de "se cayó afuera": las dos cosas se limpian juntas.
+        const nuevaFueraDeZona =
+          typeof nuevoLat === "number" && typeof nuevoLng === "number"
+            ? calculaFueraDeZona(nuevoLat, nuevoLng, zonaFila.geojson)
+            : false
 
-      payload.fuera_de_zona = nuevaFueraDeZona
-      // El comentario del alta lo dice y acá se sostiene: `fuera_de_zona_desde` CON FECHA =
-      // la tarjeta estaba adentro y se cayó afuera al corregir la ubicación (o al redibujar el
-      // trazo, en la 3-B). En NULL = nació afuera. Por eso:
-      //  - entra a la zona → se limpia a `null` (dejó de estar "caída"; nunca "nació afuera");
-      //  - sigue afuera (ya tenía fecha) → NO se toca: pisarla con la de HOY borraría el
-      //    historial real de cuándo se cayó;
-      //  - estaba adentro y recién ahora se cae → se estampa la fecha de HOY, la primera vez.
-      if (!nuevaFueraDeZona) {
-        payload.fuera_de_zona_desde = null
-      } else if (!c.direccion.fuera_de_zona_desde) {
-        payload.fuera_de_zona_desde = new Date().toISOString()
+        payload.fuera_de_zona = nuevaFueraDeZona
+        // El comentario del alta lo dice y acá se sostiene: `fuera_de_zona_desde` CON FECHA =
+        // la tarjeta estaba adentro y se cayó afuera al corregir la ubicación (o al redibujar
+        // el trazo, en la 3-B). En NULL = nació afuera. Por eso:
+        //  - entra a la zona (o se queda sin punto) → se limpia a `null`;
+        //  - sigue afuera (ya tenía fecha) → NO se toca: pisarla con la de HOY borraría el
+        //    historial real de cuándo se cayó;
+        //  - estaba adentro y recién ahora se cae → se estampa la fecha de HOY, la primera vez.
+        if (!nuevaFueraDeZona) {
+          payload.fuera_de_zona_desde = null
+        } else if (!c.direccion.fuera_de_zona_desde) {
+          payload.fuera_de_zona_desde = new Date().toISOString()
+        }
       }
     }
 

@@ -455,7 +455,34 @@ describe("PATCH: recalcular fuera_de_zona al corregir la ubicación", () => {
     expect(d.direccion.fuera_de_zona_desde).toBe("2020-01-01T00:00:00.000Z")
   })
 
+  // El fixture es INCONSISTENTE a propósito: las coordenadas guardadas caen AFUERA, pero la
+  // fila dice `fuera_de_zona: false`. Así, si alguien borrara el `if (tocaUbicacion)` y el
+  // bloque corriera siempre, el recálculo daría `true` y esta prueba moriría. Con un fixture
+  // coherente, la prueba pasaría igual recalculando o no, y no probaría nada.
   it("un PATCH que no toca lat ni lng no recalcula fuera_de_zona ni fuera_de_zona_desde", async () => {
+    nuevaBase({
+      farming_direcciones: [
+        direccionFixture(D_MIA, Z_MIA, AGENCIA, {
+          lat: -34.4,
+          lng: -58.3, // afuera del cuadrado...
+          fuera_de_zona: false, // ...pero la fila dice que no. Nadie tiene que "corregirlo" acá.
+          fuera_de_zona_desde: null,
+        }),
+      ],
+    })
+    const r = await patch(D_MIA, { encargado_nombre: "Doña Rosa" })
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.direccion.fuera_de_zona).toBe(false)
+    expect(d.direccion.fuera_de_zona_desde).toBeNull()
+  })
+
+  // LA PANTALLA MANDA ESTO DE VERDAD: `direccion-dialog.tsx` borra `lat`/`lng` cuando el asesor
+  // reescribe la calle después de haber elegido una sugerencia. No es un cliente roto ni un
+  // ataque: es el camino normal. Sin punto no hay adentro ni afuera, así que no va cartel — y
+  // la historia de "se cayó afuera" se limpia con él, porque ya no hay ninguna posición que
+  // contar.
+  it("un PATCH con lat y lng en null (la pantalla borró el punto): sin cartel y sin fecha colgada", async () => {
     nuevaBase({
       farming_direcciones: [
         direccionFixture(D_MIA, Z_MIA, AGENCIA, {
@@ -466,7 +493,32 @@ describe("PATCH: recalcular fuera_de_zona al corregir la ubicación", () => {
         }),
       ],
     })
-    const r = await patch(D_MIA, { encargado_nombre: "Doña Rosa" })
+    const r = await patch(D_MIA, { lat: null, lng: null })
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.direccion.fuera_de_zona).toBe(false)
+    expect(d.direccion.fuera_de_zona_desde).toBeNull()
+  })
+
+  // EL CASO QUE BORRABA HISTORIAL EN SILENCIO: si la zona no se puede leer, la cuenta no se
+  // puede hacer. Antes se guardaba `fuera_de_zona: false` igual —un "adentro" que nadie
+  // calculó— y de paso se borraba la fecha de cuándo se había caído. Ahora no se toca nada:
+  // un dato viejo y verdadero es mejor que uno nuevo e inventado.
+  it("si no se puede leer el geojson de la zona: no se toca ni el cartel ni la fecha", async () => {
+    nuevaBase({
+      farming_direcciones: [
+        direccionFixture(D_MIA, Z_MIA, AGENCIA, {
+          lat: -34.4,
+          lng: -58.3, // afuera del cuadrado
+          fuera_de_zona: true,
+          fuera_de_zona_desde: "2020-01-01T00:00:00.000Z",
+        }),
+      ],
+      // La misma zona de siempre, pero SIN geojson: no hay contra qué comparar el punto.
+      farming_zonas: zonasFixture().map((z: any) => (z.id === Z_MIA ? { ...z, geojson: null } : z)),
+    })
+    // Un punto que cae ADENTRO del cuadrado: si el código igual "calculara", diría false.
+    const r = await patch(D_MIA, { lat: -34.555, lng: -58.455 })
     const d = await r.json()
     expect(r.status).toBe(200)
     expect(d.direccion.fuera_de_zona).toBe(true)
