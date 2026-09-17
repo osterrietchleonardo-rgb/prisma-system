@@ -356,6 +356,124 @@ describe("PATCH: la forma de los campos", () => {
   })
 })
 
+// Trampa 2 de la 3-A: `calle` y `tipo` son `not null` en la base. Mandarlas explícitamente en
+// `null` (no simplemente omitirlas, que es un PATCH parcial legítimo) hoy revienta como un 500
+// crudo de Postgres. `valoresImposibles` no las mira (un PATCH sin calle es válido: se está
+// corrigiendo otro campo), así que el candado tiene que estar ACÁ, antes de tocar la base, y
+// reusar el mismo mensaje que ya usa el alta (`validarDireccion`) — no inventar uno nuevo.
+describe("PATCH: calle o tipo null explícitos", () => {
+  it("calle: null explícito: 400 con «Falta la calle.», no un 500 crudo, y no escribe", async () => {
+    const r = await patch(D_MIA, { calle: null })
+    const d = await r.json()
+    expect(r.status).toBe(400)
+    expect(d.error).toContain("Falta la calle.")
+    expect(base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!.calle).toBe("Peron")
+  })
+
+  it("tipo: null explícito: 400 con «Elegí qué tipo de propiedad es.», y no escribe", async () => {
+    const r = await patch(D_MIA, { tipo: null })
+    const d = await r.json()
+    expect(r.status).toBe(400)
+    expect(d.error).toContain("Elegí qué tipo de propiedad es.")
+    expect(base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!.tipo).toBe("casa")
+  })
+
+  // Omitir el campo (no mandarlo) sigue siendo un PATCH parcial legítimo: el candado es para el
+  // `null` EXPLÍCITO, no para "no vino". Sin esta prueba, alguien podría "arreglar" el punto de
+  // arriba prohibiendo cualquier ausencia de calle/tipo, lo que rompería la edición parcial que
+  // ya prueba "un PATCH parcial sin calle ni tipo se guarda igual" más arriba.
+  it("calle: '' (string vacío explícito) no dispara este candado — es otro caso, no lo tapa", async () => {
+    const r = await patch(D_MIA, { calle: "" })
+    expect(r.status).toBe(200)
+  })
+})
+
+// Trampa 1 y 3 de la 3-A: cuando el PATCH corrige `lat` o `lng`, el cartel "fuera de zona" tiene
+// que recalcularse con el MISMO criterio que el alta (`calculaFueraDeZona`, en servidor.ts).
+// `fuera_de_zona_desde` CON FECHA = la tarjeta estaba adentro y el asesor la corrigió (o
+// redibujó el trazo) hasta dejarla afuera. En NULL = nació afuera. Esa diferencia es la que
+// separa «se te cayó afuera» de «la cargaste afuera», y estos tests mueren si se la invierte.
+describe("PATCH: recalcular fuera_de_zona al corregir la ubicación", () => {
+  it("una tarjeta que estaba ADENTRO y se corrige hacia AFUERA: fuera_de_zona=true y se estampa fuera_de_zona_desde", async () => {
+    nuevaBase({
+      farming_direcciones: [
+        direccionFixture(D_MIA, Z_MIA, AGENCIA, {
+          lat: -34.555,
+          lng: -58.455, // adentro del cuadrado
+          fuera_de_zona: false,
+          fuera_de_zona_desde: null,
+        }),
+      ],
+    })
+    const r = await patch(D_MIA, { lat: -34.4, lng: -58.3 }) // afuera del cuadrado
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.direccion.fuera_de_zona).toBe(true)
+    expect(d.direccion.fuera_de_zona_desde).not.toBeNull()
+    const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!
+    expect(fila.fuera_de_zona).toBe(true)
+    expect(fila.fuera_de_zona_desde).not.toBeNull()
+  })
+
+  it("una tarjeta que estaba AFUERA y se corrige hacia ADENTRO: fuera_de_zona=false y fuera_de_zona_desde se limpia a null", async () => {
+    nuevaBase({
+      farming_direcciones: [
+        direccionFixture(D_MIA, Z_MIA, AGENCIA, {
+          lat: -34.4,
+          lng: -58.3, // afuera del cuadrado
+          fuera_de_zona: true,
+          fuera_de_zona_desde: "2020-01-01T00:00:00.000Z",
+        }),
+      ],
+    })
+    const r = await patch(D_MIA, { lat: -34.555, lng: -58.455 }) // adentro del cuadrado
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.direccion.fuera_de_zona).toBe(false)
+    expect(d.direccion.fuera_de_zona_desde).toBeNull()
+    const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!
+    expect(fila.fuera_de_zona).toBe(false)
+    expect(fila.fuera_de_zona_desde).toBeNull()
+  })
+
+  it("una tarjeta que YA estaba afuera y sigue afuera: no pisa la fecha vieja de fuera_de_zona_desde con la de hoy", async () => {
+    nuevaBase({
+      farming_direcciones: [
+        direccionFixture(D_MIA, Z_MIA, AGENCIA, {
+          lat: -34.4,
+          lng: -58.3, // afuera del cuadrado
+          fuera_de_zona: true,
+          fuera_de_zona_desde: "2020-01-01T00:00:00.000Z",
+        }),
+      ],
+    })
+    // Otro punto, TAMBIÉN afuera del cuadrado: sigue afuera, no "vuelve a caerse".
+    const r = await patch(D_MIA, { lat: -34.41, lng: -58.31 })
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.direccion.fuera_de_zona).toBe(true)
+    expect(d.direccion.fuera_de_zona_desde).toBe("2020-01-01T00:00:00.000Z")
+  })
+
+  it("un PATCH que no toca lat ni lng no recalcula fuera_de_zona ni fuera_de_zona_desde", async () => {
+    nuevaBase({
+      farming_direcciones: [
+        direccionFixture(D_MIA, Z_MIA, AGENCIA, {
+          lat: -34.4,
+          lng: -58.3, // afuera del cuadrado
+          fuera_de_zona: true,
+          fuera_de_zona_desde: "2020-01-01T00:00:00.000Z",
+        }),
+      ],
+    })
+    const r = await patch(D_MIA, { encargado_nombre: "Doña Rosa" })
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.direccion.fuera_de_zona).toBe(true)
+    expect(d.direccion.fuera_de_zona_desde).toBe("2020-01-01T00:00:00.000Z")
+  })
+})
+
 // La otra mitad de «se mira, no se trabaja»: la tarjeta de una zona archivada se lista (ver el
 // GET de /api/farming/direcciones) pero no se cambia ni se borra desde ningún lado.
 describe("una tarjeta de zona archivada no se escribe", () => {

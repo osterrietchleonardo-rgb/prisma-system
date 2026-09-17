@@ -6,7 +6,12 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { direccionAccesible, rechazoDeDireccion, responderError } from "@/lib/farming/servidor"
+import {
+  calculaFueraDeZona,
+  direccionAccesible,
+  rechazoDeDireccion,
+  responderError,
+} from "@/lib/farming/servidor"
 import { ETAPAS, normalizarDireccion, tieneAlturaComparable, valoresImposibles } from "@/lib/farming/direcciones"
 
 export const dynamic = "force-dynamic"
@@ -16,10 +21,14 @@ const CLAVES_ETAPA = ETAPAS.map((e) => e.clave) as string[]
 /**
  * Lista blanca EXPLÍCITA de lo que un PATCH puede tocar: cualquier subconjunto de
  * `EntradaDireccion` más `etapa` y `orden`. Se arma campo por campo (nunca `...body` ni un
- * `delete` de las prohibidas), así que ninguna clave fuera de esta lista llega al UPDATE —
- * ni `zona_id`, `agency_id`, `creada_por`, `created_at`, `id`, `aviso_id`,
- * `aviso_es_dueno_directo`, `origen`, `fuera_de_zona`, `fuera_de_zona_desde`, y sobre todo
- * nunca `unidades_totales`: es GENERADA, y mandarla hace fallar el UPDATE con 428C9.
+ * `delete` de las prohibidas), así que ninguna clave fuera de esta lista llega al UPDATE por
+ * esta vía — ni `zona_id`, `agency_id`, `creada_por`, `created_at`, `id`, `aviso_id`,
+ * `aviso_es_dueno_directo`, `origen`, y sobre todo nunca `unidades_totales`: es GENERADA, y
+ * mandarla hace fallar el UPDATE con 428C9.
+ *
+ * `fuera_de_zona` y `fuera_de_zona_desde` tampoco están acá — el body nunca las decide — pero
+ * SÍ pueden terminar en el payload: el bloque de más abajo las recalcula a mano, con el mismo
+ * criterio que el alta, cuando el PATCH trae `lat` o `lng`.
  */
 const COLUMNAS_EDITABLES = [
   "tramo",
@@ -95,6 +104,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     ) {
       errores.push("El orden tiene que ser un número entero.")
     }
+    // `calle` y `tipo` son `not null` en la base. Omitirlas es un PATCH parcial legítimo (por
+    // eso `valoresImposibles`, y no `validarDireccion`, es lo que corre acá) — pero mandarlas
+    // EXPLÍCITAMENTE en `null` no lo es: sin este candado, ese `null` llega crudo al UPDATE y
+    // Postgres lo revienta con un 23502 en inglés. Mismo mensaje que ya usa el alta
+    // (`validarDireccion`), no uno nuevo. Ojo: es el `null` explícito, no cualquier valor
+    // falsy — una `calle: ""` es otro caso, y no lo tapa este chequeo.
+    if (Object.prototype.hasOwnProperty.call(body, "calle") && body.calle === null) {
+      errores.push("Falta la calle.")
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "tipo") && body.tipo === null) {
+      errores.push("Elegí qué tipo de propiedad es.")
+    }
     errores.push(...valoresImposibles(body))
     if (errores.length > 0) {
       return NextResponse.json({ error: errores.join(" ") }, { status: 400 })
@@ -139,6 +160,45 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const payload: Record<string, unknown> = { updated_at: new Date().toISOString() }
     for (const col of COLUMNAS_EDITABLES) {
       if (Object.prototype.hasOwnProperty.call(body, col)) payload[col] = (body as any)[col]
+    }
+
+    // TRAMPA 1 de la 3-A: si el PATCH corrige `lat` o `lng`, el cartel "fuera de zona" puede
+    // quedar mintiendo para cualquiera de los dos lados si no se recalcula. `calculaFueraDeZona`
+    // (lib/farming/servidor.ts) es el ÚNICO criterio de adentro/afuera de todo Farming: el
+    // mismo que usa el alta. Nunca una segunda cuenta inventada acá.
+    const tocaUbicacion =
+      Object.prototype.hasOwnProperty.call(body, "lat") || Object.prototype.hasOwnProperty.call(body, "lng")
+    if (tocaUbicacion) {
+      const nuevoLat = Object.prototype.hasOwnProperty.call(body, "lat") ? (payload.lat as unknown) : c.direccion.lat
+      const nuevoLng = Object.prototype.hasOwnProperty.call(body, "lng") ? (payload.lng as unknown) : c.direccion.lng
+
+      // La zona ya se validó en `candado` (arriba): esto es una simple lectura de su geojson,
+      // no un segundo candado de acceso.
+      const { data: zonaFila, error: eZona } = await admin
+        .from("farming_zonas")
+        .select("geojson")
+        .eq("id", c.direccion.zona_id)
+        .maybeSingle()
+      if (eZona) throw eZona
+
+      const nuevaFueraDeZona =
+        typeof nuevoLat === "number" && typeof nuevoLng === "number" && zonaFila?.geojson
+          ? calculaFueraDeZona(nuevoLat, nuevoLng, zonaFila.geojson)
+          : false
+
+      payload.fuera_de_zona = nuevaFueraDeZona
+      // El comentario del alta lo dice y acá se sostiene: `fuera_de_zona_desde` CON FECHA =
+      // la tarjeta estaba adentro y se cayó afuera al corregir la ubicación (o al redibujar el
+      // trazo, en la 3-B). En NULL = nació afuera. Por eso:
+      //  - entra a la zona → se limpia a `null` (dejó de estar "caída"; nunca "nació afuera");
+      //  - sigue afuera (ya tenía fecha) → NO se toca: pisarla con la de HOY borraría el
+      //    historial real de cuándo se cayó;
+      //  - estaba adentro y recién ahora se cae → se estampa la fecha de HOY, la primera vez.
+      if (!nuevaFueraDeZona) {
+        payload.fuera_de_zona_desde = null
+      } else if (!c.direccion.fuera_de_zona_desde) {
+        payload.fuera_de_zona_desde = new Date().toISOString()
+      }
     }
 
     const { data, error } = await admin

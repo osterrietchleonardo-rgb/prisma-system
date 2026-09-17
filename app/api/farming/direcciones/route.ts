@@ -5,10 +5,9 @@
 // createAdminClient se saltea la RLS: el acceso a la zona se valida a mano, SIEMPRE, antes de
 // tocar farming_direcciones (en las dos operaciones).
 import { NextResponse } from "next/server"
-import { booleanPointInPolygon, point } from "@turf/turf"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { rechazoDeZona, responderError, zonaAccesible } from "@/lib/farming/servidor"
+import { calculaFueraDeZona, rechazoDeZona, responderError, zonaAccesible } from "@/lib/farming/servidor"
 import { normalizarDireccion, tieneAlturaComparable, validarDireccion } from "@/lib/farming/direcciones"
 import { calcularIndicadores, type FilaIndicadores } from "@/lib/farming/tablero"
 
@@ -20,16 +19,6 @@ function avisoIdDe(v: unknown): number | null {
   if (v === null || v === undefined || String(v).trim() === "") return null
   const n = Number(v)
   return Number.isInteger(n) ? n : null
-}
-
-/** true si el punto cae afuera del polígono de la zona. Un geojson roto no bloquea el alta —el
- *  candado real ya pasó en zonaAccesible— así que se guarda como si no hubiera coordenadas. */
-function calculaFueraDeZona(lat: number, lng: number, geojson: unknown): boolean {
-  try {
-    return !booleanPointInPolygon(point([lng, lat]), geojson as any)
-  } catch {
-    return false
-  }
 }
 
 export async function GET(req: Request) {

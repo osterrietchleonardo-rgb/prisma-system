@@ -5,6 +5,7 @@
 //
 // createAdminClient se saltea la RLS: por eso cargarContexto filtra SIEMPRE por agency_id.
 import { NextResponse } from "next/server"
+import { booleanPointInPolygon, point } from "@turf/turf"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { FilaCompartida, FilaPerfil, FilaZona } from "./armar"
 
@@ -40,6 +41,21 @@ export type Acceso = "leer" | "escribir"
  *  frase: "no existe", "es de un colega" y "está archivada" son tres cosas distintas para
  *  quien mira la pantalla, y contestarlas todas igual esconde la razón real. */
 export type MotivoRechazo = "no_existe" | "ajena" | "archivada"
+
+/**
+ * true si el punto cae AFUERA del polígono de la zona. Es el ÚNICO criterio de adentro/afuera
+ * de todo Farming: el alta (POST /api/farming/direcciones) y la corrección de ubicación (PATCH
+ * /api/farming/direcciones/[id]) llaman a esta misma función — nunca una segunda cuenta
+ * inventada en el otro endpoint. Un geojson roto no bloquea la escritura —el candado real ya
+ * pasó en zonaAccesible/direccionAccesible— así que se guarda como si no hubiera coordenadas.
+ */
+export function calculaFueraDeZona(lat: number, lng: number, geojson: unknown): boolean {
+  try {
+    return !booleanPointInPolygon(point([lng, lat]), geojson as any)
+  } catch {
+    return false
+  }
+}
 
 /** El rechazo ya armado para una ZONA. Devuelve `null` cuando se puede seguir. */
 export function rechazoDeZona(r: { motivo: MotivoRechazo | null }) {
