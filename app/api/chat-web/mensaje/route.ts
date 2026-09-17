@@ -17,7 +17,7 @@ import { generateEmbedding } from "@/lib/gemini"
 import { conversar, type Herramientas, type Mensaje } from "@/lib/chat-web/agente"
 import { armarContexto, resumenParaElAgente } from "@/lib/chat-web/buscar"
 import { buscarPaginas } from "@/lib/chat-web/almacen-supabase"
-import { armarAvisoDerivacion, telefonoUsable, type ObjetivoDerivacion } from "@/lib/chat-web/derivar"
+import { armarAvisoDerivacion, enviarDerivacionPorEmail, telefonoUsable, type ObjetivoDerivacion } from "@/lib/chat-web/derivar"
 import { decidirAtencion, revisarOrigen, type WidgetPublico } from "@/lib/chat-web/puerta"
 
 export const maxDuration = 60
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
 
   const { data: fila } = await db
     .from("web_widgets")
-    .select("id, agency_id, activo, dominios, whatsapp_destino, destinos_por_objetivo, secciones")
+    .select("id, agency_id, activo, dominios, whatsapp_destino, email_destino, perfil_equipo_id, destinos_por_objetivo, secciones")
     .eq("id", widgetId)
     .maybeSingle()
 
@@ -279,14 +279,43 @@ export async function POST(req: Request) {
     const destino =
       ((fila.destinos_por_objetivo as Record<string, string>) ?? {})[resultado.respuesta.objetivo] ??
       widget.whatsapp_destino
+
+    // A quién le llega. El email principal siempre; y si es "quiero sumarme al equipo" y el
+    // director eligió a alguien de PRISMA, también a esa persona (que se busca acá, para no
+    // guardar su correo copiado en el widget y que quede viejo).
+    const para: Array<string | null | undefined> = [fila.email_destino as string | null]
+    if (resultado.respuesta.objetivo === "sumarse_equipo" && fila.perfil_equipo_id) {
+      const { data: elegido } = await db
+        .from("profiles")
+        .select("email, estado, deleted_at")
+        .eq("id", fila.perfil_equipo_id as string)
+        .maybeSingle()
+      // Si esa persona ya no está activa, el aviso NO se pierde: va igual al email principal.
+      if (elegido?.email && elegido.estado === "activo" && !elegido.deleted_at) para.push(elegido.email as string)
+    }
+
+    const envio = await enviarDerivacionPorEmail({
+      aviso,
+      para,
+      nombreAgencia: (agencia?.name as string) ?? "la inmobiliaria",
+    })
+
     await guardarMensaje("sistema", `Derivado al equipo: ${aviso.asunto}`, {
-      pasos: [{ herramienta: "derivar_a_whatsapp", destino, telefono: telefonoUsable(datosAcumulados.telefono) }],
+      pasos: [
+        {
+          herramienta: "derivar_a_whatsapp",
+          destino,
+          telefono: telefonoUsable(datosAcumulados.telefono),
+          email: envio.resultado,
+          email_id: envio.id,
+        },
+      ],
     })
     actualizacion.estado = "derivada"
     actualizacion.derivada_en = new Date().toISOString()
     actualizacion.derivada_a = destino ?? null
-    // El aviso por email y por WhatsApp sale en el paso siguiente (plantilla aprobada en Meta).
-    // Queda registrado igual: ninguna derivación se pierde por no haber mandado el aviso.
+    // El aviso por WhatsApp (plantilla aprobada en Meta) sale en el paso siguiente. El email ya
+    // sale ahora, y su resultado queda guardado: un lead que no llegó tiene que poder rastrearse.
   }
 
   return contestar(resultado.respuesta.texto, {

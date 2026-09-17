@@ -19,10 +19,20 @@ interface Seccion {
   resumen: string
 }
 
+interface PersonaDelEquipo {
+  id: string
+  nombre: string
+  rol: string
+  tieneEmail: boolean
+  tieneCelular: boolean
+}
+
 interface Widget {
   id: string
   sitio: string
   whatsapp_destino: string | null
+  email_destino: string | null
+  perfil_equipo_id: string | null
   destinos_por_objetivo: Record<string, string> | null
   secciones: Seccion[] | null
   acento: string | null
@@ -61,21 +71,31 @@ export function ConfiguracionChatWeb() {
   const [paginas, setPaginas] = useState<PaginaLeida[]>([])
   const [sitio, setSitio] = useState("")
   const [whatsapp, setWhatsapp] = useState("")
-  const [whatsappEquipo, setWhatsappEquipo] = useState("")
+  const [whatsapp2, setWhatsapp2] = useState("")
+  const [email, setEmail] = useState("")
+  const [email2, setEmail2] = useState("")
+  const [perfilEquipo, setPerfilEquipo] = useState("ninguno")
+  const [equipo, setEquipo] = useState<PersonaDelEquipo[]>([])
   const [acento, setAcento] = useState("")
   const [secciones, setSecciones] = useState<Seccion[]>([])
 
   const cargar = useCallback(async () => {
     setCargando(true)
     try {
-      const r = await fetch("/api/chat-web/widget")
+      const [r, rEquipo] = await Promise.all([fetch("/api/chat-web/widget"), fetch("/api/chat-web/equipo")])
       const d = await r.json()
+      const dEquipo = await rEquipo.json().catch(() => ({ equipo: [] }))
+      setEquipo(dEquipo.equipo ?? [])
       setWidget(d.widget ?? null)
       setPaginas(d.paginas ?? [])
       if (d.widget) {
         setSitio(d.widget.sitio ?? "")
+        // Lo ya guardado se da por verificado: no se le pide al director que lo reescriba.
         setWhatsapp(d.widget.whatsapp_destino ?? "")
-        setWhatsappEquipo(d.widget.destinos_por_objetivo?.sumarse_equipo ?? "")
+        setWhatsapp2(d.widget.whatsapp_destino ?? "")
+        setEmail(d.widget.email_destino ?? "")
+        setEmail2(d.widget.email_destino ?? "")
+        setPerfilEquipo(d.widget.perfil_equipo_id ?? "ninguno")
         setAcento(d.widget.acento ?? "")
         setSecciones(d.widget.secciones ?? [])
       }
@@ -101,7 +121,8 @@ export function ConfiguracionChatWeb() {
         body: JSON.stringify({
           sitio,
           whatsapp_destino: whatsapp,
-          destinos_por_objetivo: { sumarse_equipo: whatsappEquipo },
+          email_destino: email,
+          perfil_equipo_id: perfilEquipo,
           secciones,
           acento,
           activo: widget?.activo ?? false,
@@ -149,6 +170,10 @@ export function ConfiguracionChatWeb() {
   const cambiarSeccion = (i: number, campo: keyof Seccion, valor: string) =>
     setSecciones((prev) => prev.map((s, j) => (j === i ? { ...s, [campo]: valor } : s)))
 
+  // La doble verificación no sirve de nada si igual se puede guardar: el botón se apaga.
+  const contactosVerificados =
+    whatsapp.trim() === whatsapp2.trim() && email.trim() === email2.trim()
+
   if (cargando) return <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
 
   return (
@@ -174,34 +199,62 @@ export function ConfiguracionChatWeb() {
         </div>
       )}
 
-      <Card className="space-y-4 p-4 sm:p-5">
-        <h2 className="font-medium">A dónde van los contactos</h2>
-        <div className="space-y-2">
-          <Label htmlFor="whatsapp">WhatsApp que recibe los contactos</Label>
-          <Input
-            id="whatsapp"
-            value={whatsapp}
-            onChange={(e) => setWhatsapp(e.target.value)}
-            placeholder="+54 9 11 5060-4928"
-            className="h-11"
-            inputMode="tel"
-          />
-          {errores.whatsapp_destino && <p className="text-sm text-red-600">{errores.whatsapp_destino}</p>}
-          <p className="text-xs text-muted-foreground">
-            Cuando alguien deja sus datos, te llega un mensaje con el resumen y el link para seguir
-            la conversación por WhatsApp.
+      <Card className="space-y-5 p-4 sm:p-5">
+        <div>
+          <h2 className="font-medium">A dónde van los contactos</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Cuando alguien deja sus datos, te llega el resumen con un botón para escribirle por
+            WhatsApp en un toque. Los dos campos se escriben dos veces a propósito: un dígito mal
+            y el contacto se pierde sin que nadie se entere.
           </p>
         </div>
+
+        <CampoVerificado
+          id="whatsapp"
+          etiqueta="WhatsApp que recibe los contactos"
+          valor={whatsapp}
+          repetido={whatsapp2}
+          onValor={setWhatsapp}
+          onRepetido={setWhatsapp2}
+          placeholder="+54 9 11 5060-4928"
+          tipo="tel"
+          error={errores.whatsapp_destino}
+        />
+
+        <CampoVerificado
+          id="email"
+          etiqueta="Email que recibe los contactos"
+          valor={email}
+          repetido={email2}
+          onValor={setEmail}
+          onRepetido={setEmail2}
+          placeholder="leads@tuinmobiliaria.com.ar"
+          tipo="email"
+          error={errores.email_destino}
+          ayuda="Este es el que funciona desde el primer día: no depende de que WhatsApp apruebe nada."
+        />
+
         <div className="space-y-2">
-          <Label htmlFor="whatsapp-equipo">Para quien quiere sumarse al equipo (opcional)</Label>
-          <Input
-            id="whatsapp-equipo"
-            value={whatsappEquipo}
-            onChange={(e) => setWhatsappEquipo(e.target.value)}
-            placeholder="Si lo dejás vacío, va al número de arriba"
-            className="h-11"
-            inputMode="tel"
-          />
+          <Label htmlFor="perfil-equipo">Quién recibe los «quiero sumarme al equipo»</Label>
+          <select
+            id="perfil-equipo"
+            value={perfilEquipo}
+            onChange={(e) => setPerfilEquipo(e.target.value)}
+            className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="ninguno">Que vayan al contacto de arriba</option>
+            {equipo.map((p) => (
+              <option key={p.id} value={p.id} disabled={!p.tieneEmail}>
+                {p.nombre} · {p.rol}
+                {p.tieneEmail ? "" : " (sin email cargado)"}
+              </option>
+            ))}
+          </select>
+          {errores.perfil_equipo_id && <p className="text-sm text-red-600">{errores.perfil_equipo_id}</p>}
+          <p className="text-xs text-muted-foreground">
+            Se elige de tu equipo: el sistema ya sabe su celular y su email, así que no hay nada
+            que escribir ni nada que se pueda tipear mal.
+          </p>
         </div>
       </Card>
 
@@ -372,10 +425,75 @@ export function ConfiguracionChatWeb() {
       </Card>
 
       <div className="sticky bottom-0 flex justify-end bg-background/80 py-3 backdrop-blur">
-        <Button onClick={guardar} disabled={guardando} className="h-11 min-w-[140px]">
-          {guardando ? "Guardando…" : "Guardar"}
-        </Button>
+        <div className="flex items-center gap-3">
+          {!contactosVerificados && (
+            <span className="text-sm text-red-600">Los datos de contacto no coinciden.</span>
+          )}
+          <Button
+            onClick={guardar}
+            disabled={guardando || !contactosVerificados}
+            className="h-11 min-w-[140px]"
+          >
+            {guardando ? "Guardando…" : "Guardar"}
+          </Button>
+        </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Un dato de contacto se escribe DOS veces, y la segunda no se puede pegar. Es el mismo criterio
+ * del alta manual de contactos: un dígito mal en el WhatsApp o una letra de menos en el email y
+ * los leads se pierden en silencio, que es la peor forma de perderlos.
+ */
+function CampoVerificado(props: {
+  id: string
+  etiqueta: string
+  valor: string
+  repetido: string
+  onValor: (v: string) => void
+  onRepetido: (v: string) => void
+  placeholder: string
+  tipo: "tel" | "email"
+  error?: string
+  ayuda?: string
+}) {
+  const bloquearPegar = (e: React.ClipboardEvent | React.DragEvent) => e.preventDefault()
+  const escrito = props.valor.trim().length > 0
+  const coincide = props.valor.trim() === props.repetido.trim()
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={props.id}>{props.etiqueta}</Label>
+      <Input
+        id={props.id}
+        value={props.valor}
+        onChange={(e) => props.onValor(e.target.value)}
+        placeholder={props.placeholder}
+        className="h-11"
+        inputMode={props.tipo === "tel" ? "tel" : "email"}
+        autoComplete="off"
+      />
+      <Input
+        id={`${props.id}-repetir`}
+        value={props.repetido}
+        onChange={(e) => props.onRepetido(e.target.value)}
+        onPaste={bloquearPegar}
+        onDrop={bloquearPegar}
+        placeholder="Escribilo de nuevo para confirmar"
+        className="h-11"
+        inputMode={props.tipo === "tel" ? "tel" : "email"}
+        autoComplete="off"
+        aria-label={`Confirmar ${props.etiqueta.toLowerCase()}`}
+      />
+      {escrito && (
+        <p className={`text-sm ${coincide ? "text-emerald-600" : "text-red-600"}`}>
+          {coincide ? "✓ Coinciden" : "✗ No coinciden"}
+        </p>
+      )}
+      {props.error && <p className="text-sm text-red-600">{props.error}</p>}
+      {props.ayuda && <p className="text-xs text-muted-foreground">{props.ayuda}</p>}
     </div>
   )
 }

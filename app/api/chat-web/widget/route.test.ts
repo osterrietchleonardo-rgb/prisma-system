@@ -42,6 +42,7 @@ const guardar = (cuerpo: unknown) =>
 const valido = {
   sitio: "centralrealestate.com.ar",
   whatsapp_destino: "+54 9 11 5060-4928",
+  email_destino: "leads@centralrealestate.com.ar",
   secciones: [{ nombre: "Tasaciones", url: "https://centralrealestate.com.ar/tasaciones", resumen: "" }],
 }
 
@@ -71,6 +72,7 @@ describe("guardar la configuración", () => {
       agency_id: AGENCIA,
       sitio: "https://centralrealestate.com.ar/",
       whatsapp_destino: "5491150604928",
+      email_destino: "leads@centralrealestate.com.ar",
       activo: false,
     })
   })
@@ -81,10 +83,10 @@ describe("guardar la configuración", () => {
   })
 
   it("con datos mal cargados devuelve 400 con los motivos y no escribe", async () => {
-    const r = await guardar({ sitio: "nada", whatsapp_destino: "x" })
+    const r = await guardar({ sitio: "nada", whatsapp_destino: "x", email_destino: "tampoco" })
     expect(r.status).toBe(400)
     const cuerpo = await r.json()
-    expect(Object.keys(cuerpo.errores).sort()).toEqual(["sitio", "whatsapp_destino"])
+    expect(Object.keys(cuerpo.errores).sort()).toEqual(["email_destino", "sitio", "whatsapp_destino"])
     expect(base.guardado).toHaveLength(0)
   })
 

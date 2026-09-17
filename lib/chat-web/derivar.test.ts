@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { armarAvisoDerivacion, linkWhatsApp, telefonoUsable } from "./derivar"
+import { armarAvisoDerivacion, enviarDerivacionPorEmail, linkWhatsApp, telefonoUsable } from "./derivar"
 
 const base = {
   nombreAgencia: "Central",
@@ -79,5 +79,56 @@ describe("armarAvisoDerivacion", () => {
     expect(a.textoWhatsApp).toContain("Alicia")
     expect(a.textoWhatsApp).not.toContain("<")
     expect(a.textoWhatsApp.length).toBeLessThanOrEqual(600)
+  })
+})
+
+describe("enviarDerivacionPorEmail: el lead tiene que llegarle a alguien", () => {
+  const aviso = armarAvisoDerivacion(base)
+  const env = { RESEND_API_KEY: "clave", RESEND_FROM: "PRISMA <avisos@vakdor.com>" }
+
+  it("manda a todos los destinatarios en un solo correo y dice a quienes", async () => {
+    const pedidos: Array<Record<string, unknown>> = []
+    const fetchFalso = (async (_u: string, o: { body: string }) => {
+      pedidos.push(JSON.parse(o.body))
+      return { ok: true, json: async () => ({ id: "re-1" }) }
+    }) as unknown as typeof fetch
+
+    const r = await enviarDerivacionPorEmail({
+      aviso, para: ["leads@central.com", "juan@central.com"], nombreAgencia: "Central", env, fetchFn: fetchFalso,
+    })
+    expect(r.resultado).toBe("enviado")
+    expect(pedidos[0].to).toEqual(["leads@central.com", "juan@central.com"])
+    expect(String(pedidos[0].subject)).toContain("Alicia")
+    expect(String(pedidos[0].from)).toContain("Central")
+  })
+
+  it("sin destinatarios no inventa un envio", async () => {
+    const r = await enviarDerivacionPorEmail({ aviso, para: [], nombreAgencia: "Central", env })
+    expect(r.resultado).toBe("sin_destinatario")
+  })
+
+  it("sin la clave de correo configurada, lo dice en vez de fallar en silencio", async () => {
+    const r = await enviarDerivacionPorEmail({ aviso, para: ["x@y.com"], nombreAgencia: "Central", env: {} })
+    expect(r.resultado).toBe("sin_resend")
+  })
+
+  it("si el correo rebota, vuelve el motivo (no se pierde el lead en silencio)", async () => {
+    const fetchRoto = (async () => ({ ok: false, status: 422, json: async () => ({}) })) as unknown as typeof fetch
+    const r = await enviarDerivacionPorEmail({
+      aviso, para: ["x@y.com"], nombreAgencia: "Central", env, fetchFn: fetchRoto,
+    })
+    expect(r.resultado).toBe("error_422")
+  })
+
+  it("no repite un destinatario ni manda a un email roto", async () => {
+    const pedidos: Array<Record<string, unknown>> = []
+    const fetchFalso = (async (_u: string, o: { body: string }) => {
+      pedidos.push(JSON.parse(o.body))
+      return { ok: true, json: async () => ({ id: "re-1" }) }
+    }) as unknown as typeof fetch
+    await enviarDerivacionPorEmail({
+      aviso, para: ["a@b.com", "a@b.com", "", "no-es-email", " A@B.com "], nombreAgencia: "Central", env, fetchFn: fetchFalso,
+    })
+    expect(pedidos[0].to).toEqual(["a@b.com"])
   })
 })

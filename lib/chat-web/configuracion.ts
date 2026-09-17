@@ -24,6 +24,10 @@ export interface ConfiguracionWidget {
   sitio: string
   dominios: string[]
   whatsapp_destino: string
+  /** El canal que no depende de que Meta apruebe una plantilla: es el que funciona primero. */
+  email_destino: string
+  /** La persona de PRISMA que recibe los "quiero sumarme al equipo". Null = va al principal. */
+  perfil_equipo_id: string | null
   destinos_por_objetivo: Record<string, string>
   secciones: Seccion[]
   acento: string | null
@@ -33,6 +37,9 @@ export interface ConfiguracionWidget {
 export type Validacion =
   | { ok: true; valor: ConfiguracionWidget }
   | { ok: false; errores: Record<string, string> }
+
+const ES_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const ES_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Los formatos reales vienen de todas las formas: se guarda solo con números. */
 function soloNumeros(entrada: unknown): string {
@@ -56,6 +63,17 @@ export function validarConfiguracion(entrada: unknown): Validacion {
     errores.whatsapp_destino =
       "Poné el WhatsApp que va a recibir los contactos, con código de país. Ejemplo: +54 9 11 5060-4928"
   }
+
+  const email = String(e.email_destino ?? "").trim().toLowerCase()
+  if (!ES_EMAIL.test(email))
+    errores.email_destino =
+      "Poné el email que va a recibir los contactos. Ejemplo: leads@tuinmobiliaria.com.ar"
+
+  // La persona del equipo se elige de una lista, así que acá solo puede venir un id o nada.
+  const perfilCrudo = String(e.perfil_equipo_id ?? "").trim()
+  const perfilEquipo = !perfilCrudo || perfilCrudo === "ninguno" ? null : perfilCrudo
+  if (perfilEquipo && !ES_ID.test(perfilEquipo))
+    errores.perfil_equipo_id = "Elegí a alguien de la lista del equipo."
 
   // Vacío significa "usá el principal", así que no es un error: simplemente no se guarda.
   const destinos: Record<string, string> = {}
@@ -97,6 +115,8 @@ export function validarConfiguracion(entrada: unknown): Validacion {
       sitio: sitio!.origen,
       dominios: sitio!.dominios,
       whatsapp_destino: whatsapp,
+      email_destino: email,
+      perfil_equipo_id: perfilEquipo,
       destinos_por_objetivo: destinos,
       secciones,
       acento,

@@ -72,6 +72,60 @@ function sinHtml(s: unknown): string {
   return String(s ?? "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
 }
 
+const ES_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export type ResultadoEnvio = "enviado" | "sin_destinatario" | "sin_resend" | `error_${number}` | "error_red"
+
+/**
+ * El aviso por email. Es el canal que NO depende de que Meta apruebe una plantilla, así que es el
+ * primero que funciona: mientras no esté la plantilla, esto es lo único que hace que el lead
+ * llegue a una persona.
+ *
+ * Devuelve siempre un motivo: un lead que no llegó tiene que poder rastrearse, no desaparecer.
+ */
+export async function enviarDerivacionPorEmail(opts: {
+  aviso: AvisoDerivacion
+  para: Array<string | null | undefined>
+  nombreAgencia: string
+  env?: Record<string, string | undefined>
+  fetchFn?: typeof fetch
+}): Promise<{ resultado: ResultadoEnvio; id: string | null }> {
+  const env = opts.env ?? process.env
+  const fetchFn = opts.fetchFn ?? fetch
+
+  const destinatarios = [
+    ...new Set(
+      opts.para
+        .map((e) => String(e ?? "").trim().toLowerCase())
+        .filter((e) => ES_EMAIL.test(e))
+    ),
+  ]
+  if (!destinatarios.length) return { resultado: "sin_destinatario", id: null }
+
+  const apiKey = env.RESEND_API_KEY
+  const from = env.RESEND_FROM
+  if (!apiKey || !from) return { resultado: "sin_resend", id: null }
+  const direccion = from.match(/<([^>]+)>/)?.[1] ?? from
+
+  try {
+    const res = await fetchFn("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: `${opts.nombreAgencia} vía PRISMA <${direccion}>`,
+        to: destinatarios,
+        subject: opts.aviso.asunto,
+        html: opts.aviso.html,
+      }),
+    })
+    if (!res.ok) return { resultado: `error_${res.status}` as ResultadoEnvio, id: null }
+    const data = (await res.json().catch(() => ({}))) as { id?: string }
+    return { resultado: "enviado", id: data?.id ?? null }
+  } catch {
+    return { resultado: "error_red", id: null }
+  }
+}
+
 export function armarAvisoDerivacion(o: OpcionesAviso): AvisoDerivacion {
   const nombre = sinHtml(o.datos.nombre).trim() || "Alguien"
   const telefono = telefonoUsable(o.datos.telefono)
