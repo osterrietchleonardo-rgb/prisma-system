@@ -832,7 +832,8 @@ import path from "node:path";
 import { analizarManzana, huellaPorRegla, edificabilidadPorRegla } from "./lfi-regla";
 import type { Poligono } from "./tipos";
 
-// Manzana sintética de 100 × 100 m con esquina en (-58.48, -34.57). 1 m ≈ 1/91700° en lng y 1/110540° en lat.
+// Manzana sintética de 100 × 100 m con esquina en (-58.48, -34.57). El lote va al MEDIO del lado (x=40):
+// a 20 m de la esquina entra también en la banda del lado oeste y la huella crece (es la regla, no un bug). 1 m ≈ 1/91700° en lng y 1/110540° en lat.
 const DX = 1 / 91700, DY = 1 / 110540;
 const O: [number, number] = [-58.48, -34.57];
 const rect = (x0: number, y0: number, w: number, h: number): Poligono => ({
@@ -857,17 +858,17 @@ describe("manzana típica según art. 6.4.2.1", () => {
 
 describe("la línea de frente interno a ¼ (art. 6.4.2)", () => {
   it("lote de 8,66 × 30 sobre el lado sur: la huella es 8,66 × 25 = 216,5 m²", () => {
-    const h = huellaPorRegla(rect(20, 0, 8.66, 30), MANZANA, "USAM");
+    const h = huellaPorRegla(rect(40, 0, 8.66, 30), MANZANA, "USAM");
     expect(h.alcanzadoPorLfi).toBe(true);
     expect(h.m2).toBeGreaterThan(214); expect(h.m2).toBeLessThan(219);
   });
   it("lote de 20 m de fondo en USAM: la L.F.I. no lo alcanza → retiro de fondo de 6 m (art. 6.4.2.4) → 8,66 × 14", () => {
-    const h = huellaPorRegla(rect(20, 0, 8.66, 20), MANZANA, "USAM");
+    const h = huellaPorRegla(rect(40, 0, 8.66, 20), MANZANA, "USAM");
     expect(h.alcanzadoPorLfi).toBe(false);
     expect(h.m2).toBeCloseTo(8.66 * 14, 0);
   });
   it("edificabilidad por regla: modo regla, 6 niveles, rango con piso de 16 m", () => {
-    const e = edificabilidadPorRegla(rect(20, 0, 8.66, 30), MANZANA, "USAM");
+    const e = edificabilidadPorRegla(rect(40, 0, 8.66, 30), MANZANA, "USAM");
     expect(e.modo).toBe("regla");
     expect(e.plantas[0].niveles).toBe(6);
     expect(e.rango!.piso).toBeCloseTo(8.66 * 16 * 6, -1);
