@@ -43,7 +43,7 @@ const ITEMS: { clave: keyof Totales; nombre: string; deDondeSale: string }[] = [
   {
     clave: "encargados",
     nombre: "Encargados contactados",
-    deDondeSale: "Direcciones con encargado anotado Y una visita registrada.",
+    deDondeSale: "Direcciones con el encargado anotado y una «Visita al encargado» registrada.",
   },
   {
     clave: "respuestas",
