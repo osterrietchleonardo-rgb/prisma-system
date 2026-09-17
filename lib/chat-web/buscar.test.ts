@@ -19,7 +19,7 @@ describe("mejoresPorPagina: una página aparece UNA vez, con su mejor pedazo", (
   const filas: FilaParecida[] = [
     { url: "https://c.com/tasaciones", titulo: "Tasaciones", texto: "pedazo flojo", orden: 1, excluida: false, parecido: 0.61 },
     { url: "https://c.com/tasaciones", titulo: "Tasaciones", texto: "pedazo bueno", orden: 0, excluida: false, parecido: 0.88 },
-    { url: "https://c.com/nosotros", titulo: "Nosotros", texto: "somos un equipo", orden: 0, excluida: false, parecido: 0.72 },
+    { url: "https://c.com/nosotros", titulo: "Nosotros", texto: "somos un equipo", orden: 0, excluida: false, parecido: 0.83 },
   ]
 
   it("junta los pedazos de la misma página y se queda con el que más se parece", () => {
@@ -45,6 +45,24 @@ describe("mejoresPorPagina: una página aparece UNA vez, con su mejor pedazo", (
       { url: "https://c.com/x", titulo: "X", texto: "nada que ver", orden: 0, excluida: false, parecido: PARECIDO_MINIMO - 0.01 },
     ]
     expect(mejoresPorPagina(flojas, 5)).toEqual([])
+  })
+
+  // Medido el 17/9 contra vakdor.com: preguntar por "un alquiler de 2 ambientes en Caballito"
+  // en un sitio que no vende propiedades igual devolvía tres páginas, con 0,581 la mejor.
+  it("una pregunta ajena al sitio no devuelve NADA, aunque algo dé 0,58", () => {
+    const ajena: FilaParecida[] = [
+      { url: "https://c.com/blog", titulo: "Blog", texto: "notas", orden: 0, excluida: false, parecido: 0.581 },
+      { url: "https://c.com/", titulo: "Inicio", texto: "portada", orden: 0, excluida: false, parecido: 0.574 },
+    ]
+    expect(mejoresPorPagina(ajena, 5)).toEqual([])
+  })
+
+  it("con una página que acierta de lleno, el relleno no entra ni gasta contexto", () => {
+    const conRelleno: FilaParecida[] = [
+      { url: "https://c.com/demo", titulo: "Demostración", texto: "la demo", orden: 0, excluida: false, parecido: 0.75 },
+      { url: "https://c.com/blog", titulo: "Blog", texto: "cualquier cosa", orden: 0, excluida: false, parecido: 0.62 },
+    ]
+    expect(mejoresPorPagina(conRelleno, 5).map((p) => p.url)).toEqual(["https://c.com/demo"])
   })
 })
 
