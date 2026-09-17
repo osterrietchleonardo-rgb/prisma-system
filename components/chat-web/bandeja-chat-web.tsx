@@ -34,8 +34,6 @@ interface Resumen {
   tasaContacto: number
   porObjetivo: Record<string, number>
   sinDefinir: number
-  costoTotalUSD: number
-  costoPromedioUSD: number
 }
 
 interface MensajeGuardado {
@@ -129,7 +127,7 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
             <Numero valor={resumen.conversaron} de={resumen.total} titulo="Conversaron" ayuda="Intercambiaron al menos un ida y vuelta. Los que abrieron el chat y se fueron no cuentan." />
             <Numero valor={resumen.dejaronContacto} titulo="Dejaron contacto" ayuda={`${resumen.tasaContacto}% de los que conversaron`} />
             <Numero valor={resumen.soloPreguntas} titulo="Solo preguntas" ayuda="Hablaron pero no dejaron teléfono ni email." />
-            <Numero valor={resumen.derivadas} titulo="Derivadas al equipo" ayuda={`Costó US$${resumen.costoTotalUSD.toFixed(2)} en total`} />
+            <Numero valor={resumen.derivadas} titulo="Derivadas al equipo" ayuda="Ya tienen los datos y el chat abierto." />
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">

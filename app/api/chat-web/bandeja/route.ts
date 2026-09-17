@@ -62,7 +62,10 @@ export async function GET(req: Request) {
 
     // El resumen sale de las MISMAS filas que se devuelven: lo que ve en la lista es lo que
     // cuentan los números, siempre. Un tablero que cuenta otra cosa se vuelve indiscutible y falso.
-    const resumen = resumirConversaciones((data ?? []) as unknown as FilaParaMetricas[])
+    const completo = resumirConversaciones((data ?? []) as unknown as FilaParaMetricas[])
+    // El costo NO sale a la pantalla de PRISMA (Leonardo, 17/9): es un dato nuestro, no de la
+    // agencia. Se saca acá y no solo en el dibujo: si viaja al navegador, se ve igual.
+    const { costoTotalUSD: _t, costoPromedioUSD: _p, ...resumen } = completo
     return NextResponse.json({ conversaciones: data ?? [], resumen, soloMias: !filtro.todas })
   } catch (error) {
     const mensaje = error instanceof Error ? error.message : "Error"

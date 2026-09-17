@@ -102,6 +102,13 @@ describe("quién entra", () => {
     expect(cuerpo.resumen.porObjetivo.sumarse_equipo).toBe(1)
   })
 
+  it("el costo NO viaja al navegador: es un dato nuestro, no de la agencia", async () => {
+    const cuerpo = await (await pedir()).json()
+    expect(cuerpo.resumen.costoTotalUSD).toBeUndefined()
+    expect(cuerpo.resumen.costoPromedioUSD).toBeUndefined()
+    expect(JSON.stringify(cuerpo.resumen).toLowerCase()).not.toContain("costo")
+  })
+
   it("siempre se filtra por la agencia de la sesión", async () => {
     await pedir()
     expect(base.filtros).toContainEqual(["agency_id", AGENCIA])

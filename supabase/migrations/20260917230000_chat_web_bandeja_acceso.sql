@@ -72,4 +72,10 @@ create policy web_mensajes_ver_bandeja on public.web_mensajes
     )
   );
 
+-- Y el COSTO no se ve desde la agencia (Leonardo, 17/9): es un dato nuestro. Sacarlo de la
+-- pantalla no alcanza, porque la fila se puede leer por PostgREST; se cierra la columna.
+-- `service_role` (la app) conserva todo: los topes de gasto se siguen midiendo igual.
+revoke select (costo_usd) on public.web_conversaciones from authenticated, anon;
+revoke select (costo_usd) on public.web_mensajes from authenticated, anon;
+
 commit;
