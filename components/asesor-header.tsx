@@ -17,6 +17,7 @@ import { BotonAbrirBarra } from "@/components/barra-lateral"
 import { usePathname } from "next/navigation"
 import { GlobalSearch } from "@/components/shared/global-search"
 import { NotificationPopover } from "@/components/shared/notification-popover"
+import { tituloDelSegmento } from "@/lib/nav/titulos"
 
 interface AsesorHeaderProps {
   userName?: string
@@ -56,9 +57,7 @@ export function AsesorHeader({ userName, userEmail, agencyName, agencyId, userRo
 
   const segments = pathname.split("/").filter(Boolean)
   const lastSegment = segments[segments.length - 1] || "Dashboard"
-  const pageTitle =
-    customTitle ||
-    lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, " ")
+  const pageTitle = customTitle || tituloDelSegmento(lastSegment)
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

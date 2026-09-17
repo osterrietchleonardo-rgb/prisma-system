@@ -43,7 +43,7 @@ async function getDirectorContext() {
  * dato que se manda al navegador cuando el asesor cambia el año, así que si no se filtra en el
  * origen la tabla se vería filtrada pero los números ajenos igual viajarían en la respuesta.
  */
-export async function getObjectivesDashboardForYear(year: number): Promise<AdvisorObjectives[]> {
+export async function getObjectivesDashboardForYear(year: number, agentId?: string): Promise<AdvisorObjectives[]> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
@@ -62,7 +62,8 @@ export async function getObjectivesDashboardForYear(year: number): Promise<Advis
   if (profile.role !== "director") {
     return todos.filter((o) => o.agentId === user.id);
   }
-  return todos;
+  // El director con un asesor elegido en el filtro del dashboard: sólo ese asesor.
+  return agentId ? todos.filter((o) => o.agentId === agentId) : todos;
 }
 
 /** Asesores de la agencia del director (para armar las filas del editor). */

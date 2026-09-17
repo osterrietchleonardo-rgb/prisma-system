@@ -16,6 +16,10 @@ export interface Amenidades {
   seguridad_24hs: boolean;
   jardin_privado: boolean;
   terraza_privada: boolean;
+  // Laundry del EDIFICIO (servicio compartido). No es el "lavadero" de la unidad: en la red
+  // son dos datos distintos (solo 3.623 de 30.173 avisos traen los dos). Opcional porque
+  // las búsquedas guardadas antes de sep-2026 no lo tienen; ausente = no lo pidió.
+  laundry?: boolean;
 }
 
 export interface Sujeto {
@@ -105,7 +109,10 @@ export interface Comparable extends Omit<Sujeto, 'ocupacion'> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type Operacion = 'venta' | 'alquiler';
-export type AcmSource = 'cartera' | 'roomix';
+// 'link' = un aviso que el asesor sumó pegando su link y que no está en la red (otro portal,
+// alquiler, o una publicación que la red no tiene). Los que SÍ están en la red entran como
+// 'roomix', igual que cualquier otro comparable de la red.
+export type AcmSource = 'cartera' | 'roomix' | 'link';
 
 /**
  * Tope de comparables que devuelve cada fuente (cartera y red) en una búsqueda.
@@ -155,6 +162,18 @@ export interface AcmComparable {
   imagen: string | null;
   url: string | null;
 
+  // Años de antigüedad con el estado de obra adentro: 0 = a estrenar, negativo = en pozo.
+  // null = la publicación no lo dice. Ausente en búsquedas guardadas antes de sep-2026 (ahí
+  // se recupera del checklist, ver lib/acm/antiguedad.ts).
+  antiguedad?: number | null;
+
+  // Sumado a mano por el asesor pegando el link del aviso (no salió de la búsqueda).
+  agregado_por_link?: boolean;
+  // Solo en source 'link': lo que en los otros orígenes la ficha vuelve a leer de la base.
+  // Las fotos se revalidan contra la lista de hosts permitidos al armar la ficha: esto viaja
+  // por el navegador y no se le cree a ciegas.
+  link_datos?: { fotos: string[]; amenities: string[]; descripcion: string };
+
   // Responsable de la publicación + fecha (para la red de colaboración / portales).
   responsable: string;
   fecha_publicacion: string | null; // ISO o null
@@ -186,6 +205,10 @@ export interface ExtractResult {
   metodo: 'json-ld' | 'next-data' | 'opengraph' | 'ia' | 'extractor-service';
   requiere_completar_manual: boolean;
   aviso?: string;
+  // Fotos del propio aviso (no las de otros avisos de la misma página). Ver lib/acm/fotos-aviso.ts.
+  fotos?: string[];
+  // Texto de la publicación, para la ficha del cliente cuando el aviso se suma como comparable.
+  descripcion?: string | null;
 }
 
 export interface FactorAjusteValor {

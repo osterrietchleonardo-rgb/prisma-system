@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { inicioDelDiaAR, finDelDiaAR } from "@/lib/dashboard/periodo"
 
 /**
  * Handoffs sin atender.
@@ -22,6 +23,9 @@ const HANDOFF_MARKER = "Handoff activado"
 
 /** Techo de mensajes de handoff a traer. Hoy hay ~60 en total; da mucho margen. */
 const MAX_HANDOFFS = 500
+
+/** Filas por consulta: el techo que impone la base (max_rows de Supabase). */
+const PAGINA = 1000
 
 export type HandoffSeverity = "reciente" | "demorado" | "critico"
 
@@ -48,6 +52,11 @@ export interface HandoffsDashboardData {
   esperandoConMensajes: number
   /** Mediana de horas que tardó el asesor en responder, sobre los atendidos. */
   medianResponseHours: number | null
+  /** Promedio de horas, sobre los mismos atendidos. Lo suben las demoras muy largas. */
+  averageResponseHours: number | null
+  /** El período del filtro, 'yyyy-MM-dd'. */
+  desde?: string
+  hasta?: string
 }
 
 const EMPTY: HandoffsDashboardData = {
@@ -57,6 +66,7 @@ const EMPTY: HandoffsDashboardData = {
   criticos: 0,
   esperandoConMensajes: 0,
   medianResponseHours: null,
+  averageResponseHours: null,
 }
 
 function severityFor(hours: number): HandoffSeverity {
@@ -91,10 +101,11 @@ export async function getHandoffsDashboardData(
     .order("created_at", { ascending: false })
     .limit(MAX_HANDOFFS)
 
-  if (startDate) handoffQuery = handoffQuery.gte("created_at", startDate)
+  // Días argentinos: sin zona, el período corría 3 horas (15/9/2026).
+  if (startDate) handoffQuery = handoffQuery.gte("created_at", inicioDelDiaAR(startDate))
   // El filtro de fecha manda 'yyyy-MM-dd'. Sin extenderlo a fin de día se perderían
   // los handoffs de hoy, que son justamente los que hay que atender.
-  if (endDate) handoffQuery = handoffQuery.lte("created_at", `${endDate}T23:59:59.999Z`)
+  if (endDate) handoffQuery = handoffQuery.lte("created_at", finDelDiaAR(endDate))
 
   const { data: handoffMsgs, error: handoffError } = await handoffQuery
   if (handoffError || !handoffMsgs?.length) return EMPTY
@@ -124,14 +135,24 @@ export async function getHandoffsDashboardData(
     .map(id => handoffAtByConv.get(id)!)
     .reduce((min, at) => (at < min ? at : min))
 
-  // 3. Todo lo que pasó después del handoff más viejo, en un solo viaje.
-  const { data: laterMsgs } = await supabase
-    .from("wa_messages")
-    .select("conversation_id, role, content, created_at")
-    .eq("agency_id", agencyId)
-    .in("conversation_id", visibleIds)
-    .gte("created_at", earliestHandoff)
-    .order("created_at", { ascending: true })
+  // 3. Todo lo que pasó después del handoff más viejo, de a tandas: la base entrega como
+  //    máximo 1.000 filas por consulta y Central ya pasa las 1.900 (15/9/2026). Sin
+  //    paginar, conversaciones que el asesor sí contestó aparecían como "sin atender".
+  const laterMsgs: { conversation_id: string; role: string; content: string | null; created_at: string }[] = []
+  for (let desde = 0; ; desde += PAGINA) {
+    const { data, error } = await supabase
+      .from("wa_messages")
+      .select("conversation_id, role, content, created_at")
+      .eq("agency_id", agencyId)
+      .in("conversation_id", visibleIds)
+      .gte("created_at", earliestHandoff)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(desde, desde + PAGINA - 1)
+    if (error || !data?.length) break
+    laterMsgs.push(...data)
+    if (data.length < PAGINA) break
+  }
 
   const now = Date.now()
   const unattended: UnattendedHandoff[] = []
@@ -185,5 +206,10 @@ export async function getHandoffsDashboardData(
     criticos: unattended.filter(h => h.severity === "critico").length,
     esperandoConMensajes: unattended.filter(h => h.clientMessagesAfter > 0).length,
     medianResponseHours: median(responseHours),
+    averageResponseHours: responseHours.length
+      ? responseHours.reduce((a, b) => a + b, 0) / responseHours.length
+      : null,
+    desde: startDate,
+    hasta: endDate,
   }
 }

@@ -3,15 +3,19 @@
 # Por zona: relee el inventario completo con --tanda 30 (precios, republicaciones,
 # altas que el descubrimiento se perdió) y después verifica los avisos que el
 # refresco no vio — el ÚNICO camino que marca 'caido'. Al final, embeddings de lo
-# nuevo. Cubre los 48 barrios de CABA (41 + 7 linderos) más las zonas del bloque
-# `include` (fuera de CABA / otro tipo de propiedad, con slug propio). Costo ≈ US$ 60-70/mes
-# con Apify. NO pasa --ckpt: siempre relee todo desde la página 1, sin saltear.
+# nuevo. NO pasa --ckpt: siempre relee todo desde la página 1, sin saltear.
+#
+# QUÉ ZONAS CORREN ESTE MES lo decide `mercado-sync/plan.mjs` (con sus tests), no
+# una lista escrita acá. Releer las 48 zonas todos los meses costaba ~US$ 67 y,
+# sumado al descubrimiento diario (~US$ 42), no entraba en el plan de US$ 100.
+# Ahora la ciudad va en DOS TURNOS parejos: cada mes se relee la mitad (~US$ 33),
+# así que todo CABA queda al día cada 2 meses y ningún barrio queda afuera.
 #
 # max-parallel 3: el plan de Apify permite 5 corridas simultáneas y el
 # descubrimiento diario también necesita lugar. Cada zona es un job propio con su
 # timeout de 350 min; con tanda 30 hasta la más grande entra con margen.
-# OJO PRESUPUESTO: --tope-usd 95 corta si el uso mensual llega a US$95; conviene
-# tener el límite de la cuenta Apify en US$120 para que un mes pesado no choque.
+# PRESUPUESTO: --tope-usd 70 frena el refresco si el mes ya lleva US$ 70, para
+# dejarle lugar al descubrimiento diario (que tiene su propio freno en 90).
 
 name: mercado-refresco
 
@@ -21,69 +25,32 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  # Le pregunta al plan qué zonas le tocan a este mes y arma la matriz con eso.
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matriz: ${{ steps.calcular.outputs.matriz }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Qué zonas corren este mes
+        id: calcular
+        run: |
+          node mercado-sync/matriz.mjs --humano
+          node mercado-sync/matriz.mjs >> "$GITHUB_OUTPUT"
+
   refrescar:
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 350
     strategy:
       max-parallel: 3
       fail-fast: false
       matrix:
-        # Los 48 barrios de CABA (41 + 7 linderos). hasta 220 = pasa el techo de
-        # paginación de ZonaProp (~210); el barrido corta solo al agotar el inventario.
-        zona:
-          - recoleta
-          - caballito
-          - almagro
-          - balvanera
-          - villa-crespo
-          - barracas
-          - flores
-          - retiro
-          - villa-devoto
-          - villa-del-parque
-          - monserrat
-          - san-nicolas
-          - constitucion
-          - san-telmo
-          - chacarita
-          - villa-ortuzar
-          - villa-pueyrredon
-          - boedo
-          - parque-patricios
-          - villa-luro
-          - floresta
-          - san-cristobal
-          - parque-chacabuco
-          - monte-castro
-          - puerto-madero
-          - agronomia
-          - la-paternal
-          - villa-general-mitre
-          - villa-santa-rita
-          - villa-real
-          - versalles
-          - velez-sarsfield
-          - mataderos
-          - liniers
-          - parque-avellaneda
-          - villa-lugano
-          - nueva-pompeya
-          - villa-soldati
-          - villa-riachuelo
-          - parque-chas
-          - la-boca
-          - belgrano
-          - palermo
-          - nunez
-          - villa-urquiza
-          - colegiales
-          - saavedra
-          - coghlan
-        # Zonas fuera de CABA o con otro tipo de propiedad: llevan su propio slug de
-        # búsqueda (`base`) porque el default `departamentos-venta-<zona>` no aplica.
-        # `hasta` chico para no pagar corridas vacías en localidades con pocas páginas.
-        include:
-          - { zona: don-torcuato, base: terrenos-venta-don-torcuato, hasta: 60 }
+        include: ${{ fromJSON(needs.plan.outputs.matriz) }}
     env:
       APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -93,10 +60,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # `refrescar: false` es el caso de `otros-sin-zona`: los barrios que ZonaProp
+      # escribe fuera de las 48 zonas (Barrio Norte, Once, Congreso, Centro…) y
+      # los avisos que vinieron sin barrio. No hay búsqueda que los traiga, pero
+      # sus avisos existen y hay que verificar si siguen vivos.
       - name: Refresco ${{ matrix.zona }}
-        # `matrix.base` / `matrix.hasta` solo existen en las entradas de `include`;
-        # para las 48 zonas de la lista quedan vacíos y cae al default.
-        run: node mercado-sync/barrido.mjs --base ${{ matrix.base || format('departamentos-venta-{0}', matrix.zona) }} --desde 1 --hasta ${{ matrix.hasta || 220 }} --tanda 30 --zona ${{ matrix.zona }} --tope-usd 95
+        if: ${{ matrix.refrescar }}
+        run: node mercado-sync/barrido.mjs --base ${{ matrix.base }} --desde 1 --hasta ${{ matrix.hasta }} --tanda 30 --zona ${{ matrix.zona }} --tope-usd 70
       - name: Verificación de bajas ${{ matrix.zona }}
         run: node mercado-sync/verificacion.mjs --zona ${{ matrix.zona }} --dias 25 --max 500
 

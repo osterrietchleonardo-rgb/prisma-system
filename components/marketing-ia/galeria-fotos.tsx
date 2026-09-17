@@ -220,11 +220,14 @@ export function GaleriaFotos() {
               onClick={() => setAbierto(g.clave)}
               className="overflow-hidden flex flex-col cursor-pointer transition hover:border-accent group"
             >
+              {/* La foto va en absoluto: con h-full a secas, una foto vertical no respeta la
+                  caja 16:10, la agranda, y como la grilla iguala las alturas de la fila, se
+                  estiran las tres tarjetas de esa fila (visto el 12/9/2026). */}
               <div className="relative aspect-[16/10] bg-muted">
                 <img
                   src={g.ultimo.public_url}
                   alt={g.propiedad}
-                  className="w-full h-full object-cover"
+                  className="absolute inset-0 w-full h-full object-cover"
                   loading="lazy"
                 />
                 <Badge className="absolute top-3 left-3 gap-1.5 shadow-sm">
@@ -392,12 +395,13 @@ function Carrusel({
               key={j}
               onClick={() => setI(j)}
               className={cn(
-                "shrink-0 rounded-lg overflow-hidden border-2 transition w-20 aspect-[16/10]",
+                "relative shrink-0 rounded-lg overflow-hidden border-2 transition w-20 aspect-[16/10]",
                 j === indice ? "border-accent" : "border-transparent opacity-60 hover:opacity-100"
               )}
               title={s.titulo}
             >
-              <img src={s.url} alt={s.titulo} className="w-full h-full object-cover" />
+              {/* Mismo motivo que en las tarjetas: en absoluto para que la vertical no agrande la miniatura. */}
+              <img src={s.url} alt={s.titulo} className="absolute inset-0 w-full h-full object-cover" />
             </button>
           ))}
         </div>

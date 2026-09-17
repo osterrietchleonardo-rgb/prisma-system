@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subDays } from "date-fns";
+import { format, parseISO, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, ChevronDown } from "lucide-react";
 import { DateRange } from "react-day-picker";
@@ -24,9 +24,11 @@ export function DatePeriodFilter({ className }: React.HTMLAttributes<HTMLDivElem
 
   const [date, setDate] = React.useState<DateRange | undefined>(() => {
     if (fromParam && toParam) {
+      // parseISO lee 'yyyy-MM-dd' como día LOCAL. `new Date('2026-01-01')` lo toma como
+      // medianoche de Londres y en Argentina el botón mostraba "dic 31" (un día antes).
       return {
-        from: new Date(fromParam),
-        to: new Date(toParam),
+        from: parseISO(fromParam),
+        to: parseISO(toParam),
       };
     }
     // Default to last 30 days if no params

@@ -37,7 +37,29 @@ export function CopyGeneratorFlow() {
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [progressText, setProgressText] = useState("")
-  
+
+  // ── La foto real de la propiedad para la placa ─────────────────────
+  // Solo tiene sentido si el perfil IPC está atado a una propiedad de cartera. Si no, la placa
+  // sale como salía antes (la imagen la inventa Gemini) y este paso ni aparece.
+  const [fotos, setFotos] = useState<{ thumb: string; image: string }[]>([])
+  const [fotoElegida, setFotoElegida] = useState<string | null>(null)
+  const [cargandoFotos, setCargandoFotos] = useState(false)
+  // Sin fotos vs. no pudimos preguntar son dos cosas MUY distintas para el asesor: la primera
+  // dice que la propiedad no tiene fotos (verdad); la segunda diría eso mismo siendo falso si no
+  // se distingue. Ya pasó acá con el Buscador IA: un timeout de base salió como "la propiedad no
+  // existe" y el equipo persiguió un bug de permisos que no existía.
+  const [errorFotos, setErrorFotos] = useState(false)
+  // Cuáles son demasiado chicas para la placa. El ancho NO viene del endpoint: se lo pregunta al
+  // navegador cuando ya cargó la miniatura (`naturalWidth`). Así no hay que tocar ni la base ni
+  // el sincronizador para avisar algo que es puramente visual. 7 de cada 40 portadas de Central
+  // miden menos de 1080 px, así que el aviso se va a ver seguido.
+  const [fotosChicas, setFotosChicas] = useState<Record<string, boolean>>({})
+
+  // `propiedad_tokko_id` es un campo propio de IpcProfile (no vive en flow_data), así que no
+  // hace falta ningún `as any` ni fallback: si el perfil no está atado a una propiedad, es
+  // undefined y acá queda null.
+  const propiedadDelIpc = selectedIpc?.propiedad_tokko_id ?? null
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -70,6 +92,55 @@ export function CopyGeneratorFlow() {
     }
   }, [selectedIpcId, ipcs])
 
+  // Trae las fotos de la propiedad cuando el perfil elegido tiene una atada. Se resetea todo
+  // (incluido el mapa de "poco nítida") cada vez que cambia el perfil, para no arrastrar el
+  // estado de una propiedad a la siguiente.
+  //
+  // `cancelado` es la guarda de carrera: si el asesor elige el perfil A y enseguida el B, la
+  // respuesta de A puede llegar DESPUÉS que la de B. Sin la guarda, esa respuesta tardía
+  // pisaría `fotos`/`fotoElegida` de B con los de A, y al generar se mandaría el id de la
+  // propiedad B con la URL de foto de A — el servidor lo rechaza con 400 porque esa foto no es
+  // de esa propiedad, pero como más abajo ese 400 se toleraba en silencio, el asesor terminaba
+  // con variantes sin imagen y ningún aviso de por qué.
+  useEffect(() => {
+    let cancelado = false
+    setFotos([])
+    setFotoElegida(null)
+    setFotosChicas({})
+    setErrorFotos(false)
+    if (!propiedadDelIpc || copyType !== 'post') return
+
+    setCargandoFotos(true)
+    fetch(`/api/marketing-ia/fotos-propiedad?tokko_id=${propiedadDelIpc}`)
+      .then(res => {
+        // Un 401/500 no es "sin fotos": es que no pudimos preguntar. Si los tratamos igual,
+        // le decimos algo falso sobre su propia ficha.
+        if (!res.ok) throw new Error('No se pudieron traer las fotos')
+        return res.json()
+      })
+      .then(data => {
+        if (cancelado) return
+        const lista = data?.fotos ?? []
+        setFotos(lista)
+        // La portada viene elegida: es la que la inmobiliaria ya eligió como la mejor.
+        if (lista[0]) setFotoElegida(lista[0].image)
+      })
+      .catch(() => {
+        if (cancelado) return
+        setErrorFotos(true)
+      })
+      .finally(() => {
+        if (cancelado) return
+        setCargandoFotos(false)
+      })
+
+    // Marca esta corrida como vieja si el perfil o el tipo de copy cambian antes de que
+    // responda el fetch. Así una respuesta tardía nunca llega a escribir estado.
+    return () => {
+      cancelado = true
+    }
+  }, [propiedadDelIpc, copyType])
+
   const handleGenerateBatch = async () => {
     if (!selectedIpcId || !selectedIpc) return toast.error("Seleccione un IPC")
     const esGuion = copyType === 'video'
@@ -100,8 +171,6 @@ export function CopyGeneratorFlow() {
 
       if (!esGuion) setProgressText("Se está generando la imagen...")
 
-      const tokkoProperty = selectedIpc.tipo_ipc === 'vender' ? (selectedIpc.flow_data as any).tokko_property_details : null;
-      
       // Save 3 drafts
       const draftsToInsert = batchContent.map((item: any) => ({
         user_id: user?.id,
@@ -125,26 +194,61 @@ export function CopyGeneratorFlow() {
 
       // Los guiones de video son para hablar a cámara: no llevan imagen.
       if (!esGuion) {
+        // Si el servidor rechaza la foto (por ejemplo un 400 porque la propiedad ya no
+        // coincide con la foto elegida), antes quedaba en silencio: la variante se guardaba
+        // sin imagen y nadie se enteraba. Se sigue tolerando el fallo — una imagen caída no
+        // frena a las demás — pero ahora se cuenta y se avisa al final.
+        let fallosImagen = 0
+        // Cuenta las placas que salieron pero con el panel montado encima del aviso legal (ver
+        // `desborda` en la respuesta de generate-image). Antes esto quedaba solo en el log del
+        // servidor: la placa se subia igual y el asesor la veia recien publicada.
+        let placasDesbordadas = 0
         for (const draft of insertedDrafts) {
           setProgressText("Se está generando la imagen...")
           try {
-            await fetch('/api/marketing-ia/generate-image', {
+            const resImagen = await fetch('/api/marketing-ia/generate-image', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 draft_id: draft.id,
                 copy_content: draft.content,
-                tokko_property: tokkoProperty,
+                propiedad_tokko_id: propiedadDelIpc,
+                foto_url: fotoElegida ?? undefined,
                 format,
                 style,
                 extra_prompt: "",
                 logo_variant: logoVariant ?? 'estandar'
               })
             })
+            if (!resImagen.ok) {
+              fallosImagen++
+              console.error("generate-image devolvió un error para el draft", draft.id, resImagen.status)
+            } else {
+              const dataImagen = await resImagen.json().catch(() => null)
+              if (dataImagen?.desborda) {
+                placasDesbordadas++
+                console.error("generate-image devolvió una placa con el panel desbordado para el draft", draft.id)
+              }
+            }
           } catch (imgError) {
+            fallosImagen++
             console.error("Failed to generate image for draft", draft.id, imgError)
             // Tolerancia a fallos: continuamos con las demás
           }
+        }
+        if (fallosImagen > 0) {
+          toast.error(
+            fallosImagen === insertedDrafts.length
+              ? "No se pudo generar ninguna de las placas. Revisá tus generaciones e intentá de nuevo."
+              : `${fallosImagen} de ${insertedDrafts.length} placas no se pudieron generar. Esas variantes van a quedar sin imagen.`
+          )
+        }
+        if (placasDesbordadas > 0) {
+          toast.warning(
+            placasDesbordadas === 1
+              ? "Una placa salió con el aviso legal muy largo para el formato: el texto puede superponerse. Revisala antes de publicar."
+              : `${placasDesbordadas} placas salieron con el aviso legal muy largo para el formato: el texto puede superponerse. Revisalas antes de publicar.`
+          )
         }
       }
 
@@ -156,7 +260,7 @@ export function CopyGeneratorFlow() {
       // Auto-refresh credit badge
       window.dispatchEvent(new CustomEvent('prisma-refresh-credits'));
       
-      setProgressText("¡Todo listo! Ve a la pestaña 'Mis Generaciones'.")
+      setProgressText("¡Todo listo! Te llevamos a tus generaciones.")
 
     } catch (error: any) {
       console.error('handleGenerateBatch error:', error)
@@ -381,6 +485,69 @@ export function CopyGeneratorFlow() {
                     ? "Elegí con cuál de los dos logos de la agencia sale esta placa."
                     : "Tu director configuró un solo logo, así que las placas salen con ese."}
                 </p>
+              </div>
+            )}
+
+            {/* La foto real de la propiedad. Solo aparece si el perfil está atado a una
+                propiedad de cartera: si no, no hay nada que elegir. */}
+            {propiedadDelIpc && (
+              <div className="space-y-4">
+                <Label className="text-sm font-bold">6. Foto de la placa</Label>
+                {cargandoFotos ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="aspect-[4/3] rounded-xl bg-muted animate-pulse" />
+                    ))}
+                  </div>
+                ) : errorFotos ? (
+                  // Distinto del caso "sin fotos": acá no sabemos si tiene o no, solo que la
+                  // búsqueda falló. Decirle "no tiene fotos" sería una afirmación falsa sobre
+                  // su propia ficha.
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    No pudimos traer las fotos de esta propiedad. Probá elegir el perfil de nuevo.
+                  </p>
+                ) : fotos.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Esta propiedad todavía no tiene fotos en Tokko. La placa va a salir con una imagen creada por IA.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[260px] overflow-y-auto pr-1">
+                      {fotos.map((f, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setFotoElegida(f.image)}
+                          className={cn(
+                            "relative aspect-[4/3] rounded-xl overflow-hidden border-2 transition",
+                            fotoElegida === f.image ? "border-accent ring-1 ring-accent" : "border-transparent hover:border-accent/50"
+                          )}
+                        >
+                          <img
+                            src={f.thumb || f.image}
+                            alt={`Foto ${i + 1}`}
+                            className="w-full h-full object-cover"
+                            // El ancho real lo sabe el navegador recién cuando la bajó.
+                            onLoad={(e) => {
+                              const ancho = (e.currentTarget as HTMLImageElement).naturalWidth
+                              if (ancho && ancho < 1080) {
+                                setFotosChicas((prev) => (prev[f.image] ? prev : { ...prev, [f.image]: true }))
+                              }
+                            }}
+                          />
+                          {fotosChicas[f.image] && (
+                            <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] text-white py-0.5">
+                              poco nítida
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      Las 3 placas salen con esta foto, tal cual está en Tokko. Sin retocar.
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </div>

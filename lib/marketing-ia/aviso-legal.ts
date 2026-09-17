@@ -9,7 +9,7 @@
 //
 // Como se dibujan las letras (y por que no son texto) esta en lib/tipografia/contornos.ts.
 import sharp from "sharp";
-import { anchoDelTexto, comoPaths, contornosDeTexto } from "@/lib/tipografia/contornos";
+import { comoPaths, contornosDeTexto, repartirEnRenglones } from "@/lib/tipografia/contornos";
 
 // Todo se mide contra un ancho de referencia de 1080 px (el lado de una placa de Instagram) y
 // despues se escala, asi la franja se ve igual en un post cuadrado que en una historia.
@@ -32,46 +32,6 @@ const TOPE_POR_ALTO = 0.22;
 const OPACIDAD_FRANJA = 0.62;
 const COLOR_TEXTO = "#ffffff";
 const OPACIDAD_TEXTO = 0.93;
-
-// Respeta los saltos de linea que haya escrito el director (suelen separar el aviso de la firma
-// de la agencia) y acomoda cada parrafo dentro del ancho disponible.
-function repartirEnRenglones(texto: string, cuerpo: number, anchoUtil: number): string[] {
-  const renglones: string[] = [];
-
-  for (const parrafo of texto.replace(/\r\n?/g, "\n").split("\n")) {
-    const limpio = parrafo.trim().replace(/\s+/g, " ");
-    if (!limpio) continue;
-
-    let actual = "";
-    for (const palabra of limpio.split(" ")) {
-      const tentativa = actual ? `${actual} ${palabra}` : palabra;
-      if (anchoDelTexto(tentativa, cuerpo) <= anchoUtil) {
-        actual = tentativa;
-        continue;
-      }
-      if (actual) renglones.push(actual);
-
-      // Una sola palabra mas larga que el renglon (una URL, por ejemplo): se parte a lo bruto.
-      if (anchoDelTexto(palabra, cuerpo) > anchoUtil) {
-        let trozo = "";
-        for (const ch of palabra) {
-          if (anchoDelTexto(trozo + ch, cuerpo) > anchoUtil && trozo) {
-            renglones.push(trozo);
-            trozo = ch;
-          } else {
-            trozo += ch;
-          }
-        }
-        actual = trozo;
-      } else {
-        actual = palabra;
-      }
-    }
-    if (actual) renglones.push(actual);
-  }
-
-  return renglones;
-}
 
 export type FranjaLegal = {
   /** La franja ya dibujada, lista para pegar. */

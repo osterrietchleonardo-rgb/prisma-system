@@ -1,0 +1,192 @@
+"use client"
+
+// La página Farming del asesor, en tres solapas: «Mis zonas» (el territorio), «A la venta en mi
+// zona» (lo que se publica adentro) y «Relevamiento» (lo que carga caminando, la pantalla para
+// la que existe toda la etapa 3).
+import { useCallback, useEffect, useState } from "react"
+import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import type { Dibujo } from "@/lib/farming/geometria"
+import { contornosParaDibujar } from "@/lib/farming/armar"
+import { pedir } from "@/lib/farming/cliente"
+import type { RespuestaZonas, ZonaFarming } from "@/lib/farming/tipos"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ListaZonas } from "./lista-zonas"
+import { CompartirDialog } from "./compartir-dialog"
+import { MapaFarming, type ModoMapa } from "./mapa-farming"
+import { AvisosEnZona } from "./avisos-en-zona"
+import { Relevamiento } from "./relevamiento"
+
+export function FarmingPage() {
+  const [datos, setDatos] = useState<RespuestaZonas | null>(null)
+  const [cargando, setCargando] = useState(true)
+  const [modo, setModo] = useState<ModoMapa | null>(null)
+  const [compartiendo, setCompartiendo] = useState<ZonaFarming | null>(null)
+  // El título del mapa en modo "ver": distinto según si la zona es mía o de un colega.
+  const [tituloVer, setTituloVer] = useState("")
+
+  const recargar = useCallback(async () => {
+    try {
+      setDatos(await pedir("/api/farming/zonas"))
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setCargando(false)
+    }
+  }, [])
+
+  useEffect(() => { recargar() }, [recargar])
+
+  // El diálogo de compartir muestra la zona con su lista de compartidos al día.
+  useEffect(() => {
+    if (!compartiendo || !datos) return
+    const fresca = datos.mias.find((z) => z.id === compartiendo.id)
+    if (fresca && fresca !== compartiendo) setCompartiendo(fresca)
+  }, [datos, compartiendo])
+
+  const guardar = async ({ nombre, geojson }: { nombre?: string; geojson: Dibujo }) => {
+    if (!modo || modo.tipo === "ver") return
+    let zona: ZonaFarming
+    if (modo.tipo === "nueva") {
+      zona = (await pedir("/api/farming/zonas", { method: "POST", body: JSON.stringify({ nombre, geojson }) })).zona
+      toast.success("Zona guardada")
+    } else {
+      zona = (await pedir(`/api/farming/zonas/${modo.zonaId}`, { method: "PATCH", body: JSON.stringify({ accion: modo.tipo, geojson }) })).zona
+      toast.success(modo.tipo === "sumar" ? "Pedazo sumado" : "Zona redibujada")
+    }
+    // La respuesta del servidor se aplica de una: así la tarjeta nunca muestra números viejos
+    // (km²/pedazos) mientras la lista completa todavía se está recargando.
+    setDatos((d) => d && { ...d, mias: modo.tipo === "nueva" ? [zona, ...d.mias] : d.mias.map((z) => (z.id === zona.id ? zona : z)) })
+    setModo(null)
+    await recargar()
+  }
+
+  const borrar = async (z: ZonaFarming) => {
+    // El servidor decide entre borrar y archivar según si la zona tiene tarjetas cargadas
+    // (esta pantalla no lo sabe de antemano: pedirlo costaría una consulta por zona en cada
+    // carga de Farming). Por eso el texto tiene que ser honesto con los DOS desenlaces.
+    if (
+      !window.confirm(
+        `¿Borrar «${z.nombre}»?\n\nSi tenés tarjetas cargadas en esta zona, no se pierde nada: la zona se archiva y tus tarjetas, tus propietarios y su historial quedan guardados. Los vas a poder leer en «Relevamiento», eligiendo la zona archivada, aunque ya no los puedas cambiar.\n\nSi no tenés ninguna, se borra del todo y no queda registro.\n\nEn los dos casos, esas cuadras vuelven a estar libres para que otro asesor las dibuje.`,
+      )
+    )
+      return
+    try {
+      const r = await pedir(`/api/farming/zonas/${z.id}`, { method: "DELETE" })
+      // Si la zona tenía tarjetas cargadas, el servidor no la borró: la archivó (spec, "nunca
+      // se pierde trabajo por apretar un botón"). El mensaje depende de lo que respondió.
+      toast.success(
+        r.accion === "archivada"
+          ? "Zona archivada. Tus tarjetas y su historial quedan guardados: los leés en «Relevamiento», eligiendo la zona archivada. Esas cuadras vuelven a estar libres."
+          : "Zona borrada",
+      )
+      await recargar()
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+  }
+
+  const sumarColega = async (zonaId: string, userId: string) => {
+    try {
+      await pedir(`/api/farming/zonas/${zonaId}/compartir`, { method: "POST", body: JSON.stringify({ user_id: userId }) })
+      toast.success("Zona compartida")
+      await recargar()
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+  }
+
+  const sacarColega = async (zonaId: string, userId: string) => {
+    try {
+      await pedir(`/api/farming/zonas/${zonaId}/compartir?user_id=${encodeURIComponent(userId)}`, { method: "DELETE" })
+      await recargar()
+    } catch (e: any) {
+      toast.error(e.message)
+    }
+  }
+
+  if (cargando || !datos) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-full flex-col gap-6 p-4 pt-6 md:p-8">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Farming</h1>
+        <p className="text-sm text-muted-foreground">Tu territorio: las cuadras que trabajás para captar propiedades.</p>
+      </div>
+
+      {modo ? (
+        // Key con el modo: MapaFarming arranca lapizActivo a partir de modo.tipo solo al
+        // montarse, así que cambiar de "ver" a "redibujar" (u otro modo) sin desmontar dejaría
+        // el lápiz en el estado del modo anterior.
+        <MapaFarming
+          key={`${modo.tipo}-${"zonaId" in modo ? modo.zonaId : ""}`}
+          modo={modo}
+          ajenas={contornosParaDibujar(datos, "zonaId" in modo ? modo.zonaId : undefined)}
+          titulo={modo.tipo === "ver" ? tituloVer : undefined}
+          onGuardar={guardar}
+          onCerrar={() => setModo(null)}
+        />
+      ) : (
+        <Tabs defaultValue="zonas" className="flex flex-col">
+          <TabsList className="mb-4 self-start rounded-xl border border-accent/10 bg-muted/50 p-1">
+            <TabsTrigger value="zonas" className="h-9 rounded-lg px-4 text-sm data-[state=active]:bg-card data-[state=active]:text-accent">
+              Mis zonas
+            </TabsTrigger>
+            <TabsTrigger value="avisos" className="h-9 rounded-lg px-4 text-sm data-[state=active]:bg-card data-[state=active]:text-accent">
+              A la venta en mi zona
+            </TabsTrigger>
+            <TabsTrigger value="relevamiento" className="h-9 rounded-lg px-4 text-sm data-[state=active]:bg-card data-[state=active]:text-accent">
+              Relevamiento
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="zonas" className="mt-0 data-[state=inactive]:hidden">
+            <ListaZonas
+              mias={datos.mias}
+              compartidasConmigo={datos.compartidas_conmigo}
+              topes={datos.topes}
+              miId={datos.mi_id}
+              onNueva={() => setModo({ tipo: "nueva" })}
+              onVer={(z) => {
+                const esMia = datos.mias.some((m) => m.id === z.id)
+                setTituloVer(esMia ? `«${z.nombre}»` : `«${z.nombre}» · zona de ${z.owner_nombre}`)
+                setModo({ tipo: "ver", actual: z.geojson })
+              }}
+              onRedibujar={(z) => setModo({ tipo: "redibujar", zonaId: z.id, actual: z.geojson })}
+              onSumar={(z) => setModo({ tipo: "sumar", zonaId: z.id, actual: z.geojson })}
+              onCompartir={(z) => setCompartiendo(z)}
+              onBorrar={borrar}
+            />
+          </TabsContent>
+
+          <TabsContent value="avisos" className="mt-0 data-[state=inactive]:hidden">
+            {/* Las compartidas conmigo también cuentan: la zona se trabaja entre los dos. */}
+            <AvisosEnZona zonas={[...datos.mias, ...datos.compartidas_conmigo]} />
+          </TabsContent>
+
+          <TabsContent value="relevamiento" className="mt-0 data-[state=inactive]:hidden">
+            {/* Las compartidas conmigo también cuentan: el tablero de la zona se trabaja entre
+                los dos. Y las ARCHIVADAS van al final, de solo lectura: al archivar le
+                prometimos al asesor que sus tarjetas, su gente y su historial quedaban
+                guardados — esta es la única pantalla donde puede verlos. */}
+            <Relevamiento zonas={[...datos.mias, ...datos.compartidas_conmigo, ...datos.archivadas]} />
+          </TabsContent>
+        </Tabs>
+      )}
+
+      <CompartirDialog
+        zona={compartiendo}
+        colegas={datos.colegas}
+        onSumar={sumarColega}
+        onSacar={sacarColega}
+        onCerrar={() => setCompartiendo(null)}
+      />
+    </div>
+  )
+}

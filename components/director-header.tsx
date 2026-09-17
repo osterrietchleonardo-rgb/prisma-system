@@ -27,6 +27,7 @@ import { BotonAbrirBarra } from "@/components/barra-lateral"
 import { usePathname } from "next/navigation"
 import { GlobalSearch } from "@/components/shared/global-search"
 import { NotificationPopover } from "@/components/shared/notification-popover"
+import { tituloDelSegmento } from "@/lib/nav/titulos"
 
 interface DirectorHeaderProps {
   userName?: string
@@ -66,9 +67,7 @@ export function DirectorHeader({ userName, userEmail, agencyName, agencyId, user
 
   const segments = pathname.split('/').filter(Boolean)
   const lastSegment = segments[segments.length - 1] || 'Dashboard'
-  // Rutas cuyo nombre visible no coincide con el segmento de la URL
-  const ALIAS: Record<string, string> = { aprobaciones: 'Equipo' }
-  const pageTitle = customTitle || ALIAS[lastSegment] || (lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' '))
+  const pageTitle = customTitle || tituloDelSegmento(lastSegment)
 
   // AI Credits calculations
   const remainingCredits = aiCredits ? aiCredits.allocated - aiCredits.consumed : 0;

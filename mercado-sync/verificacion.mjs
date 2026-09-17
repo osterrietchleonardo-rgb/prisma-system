@@ -23,6 +23,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { barriosDeZona, ZONA_SIN_BARRIO } from './plan.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i > -1 ? (process.argv[i + 1] ?? true) : d; };
@@ -68,23 +69,41 @@ async function correrDetalles(urls) {
   throw new Error('run no terminó en 10 min');
 }
 
-// El slug de zona no siempre coincide con el barrio de la tabla (acentos).
-const BARRIO_POR_ZONA = {
-  'belgrano': 'Belgrano', 'nunez': 'Núñez', 'colegiales': 'Colegiales',
-  'coghlan': 'Coghlan', 'villa-urquiza': 'Villa Urquiza', 'saavedra': 'Saavedra',
-  'palermo': 'Palermo',
-};
+/**
+ * Los nombres de barrio, como los escribe la base (con acentos). Salen de la
+ * vista `acm_barrios_disponibles`, no de una lista escrita a mano: la lista a
+ * mano tenía SIETE barrios y para las otras 41 zonas este script cortaba con
+ * error, así que las bajas no se marcaban en casi toda CABA (al 15-sep-2026:
+ * 70.129 avisos "activos" y 0 caídos en la última semana).
+ */
+async function nombresDeBarrio() {
+  const filas = await sb('acm_barrios_disponibles?select=nombre&limit=500', { prefer: 'return=representation' });
+  const nombres = (filas || []).map((f) => f.nombre).filter(Boolean);
+  // Si la vista viniera vacía o cortada, el script "no encontraría candidatos" y
+  // parecería que está todo bien. Medir cero no es un resultado: es un aborto.
+  if (nombres.length < 40) throw new Error(`la vista de barrios devolvió ${nombres.length} nombres (esperaba 40+): no se puede saber qué verificar`);
+  return nombres;
+}
 
 async function main() {
-  const barrio = BARRIO_POR_ZONA[ZONA];
-  if (!barrio) { console.error(`Zona ${ZONA} sin barrio mapeado (agregar a BARRIO_POR_ZONA)`); process.exit(1); }
+  const barrios = barriosDeZona(ZONA, await nombresDeBarrio());   // tira si la zona no está en ningún grupo
+  if (!barrios.length) {
+    console.log(`[verificacion] ${ZONA}: la base todavía no tiene avisos de esta zona. Nada que verificar.`);
+    return;
+  }
   const corte = new Date(Date.now() - DIAS * 86400000).toISOString();
+  const lista = barrios.map((b) => `"${b.replace(/"/g, '')}"`).join(',');
+  // `otros-sin-zona` es el cajón de los barrios sin zona propia (Barrio Norte, Once,
+  // Congreso, Centro…) y también de los avisos que vinieron sin barrio.
+  const filtroBarrio = ZONA === ZONA_SIN_BARRIO
+    ? `or=${encodeURIComponent(`(barrio.in.(${lista}),barrio.is.null)`)}`
+    : `barrio=in.${encodeURIComponent(`(${lista})`)}`;
   const candidatos = await sb(
     `mercado_avisos?estado=neq.caido&visto_ultima_vez=lt.${corte}` +
-    `&barrio=eq.${encodeURIComponent(barrio)}&select=id,url_publica,barridos_sin_ver,estado&order=visto_ultima_vez&limit=${MAX}`,
+    `&${filtroBarrio}&select=id,url_publica,barridos_sin_ver,estado&order=visto_ultima_vez&limit=${MAX}`,
     { prefer: 'return=representation' }
   );
-  console.log(`[verificacion] ${ZONA}: ${candidatos.length} avisos sin ver hace ${DIAS}+ días${DRY ? ' · DRY' : ''}`);
+  console.log(`[verificacion] ${ZONA} (${barrios.length} barrio/s: ${barrios.join(', ')}): ${candidatos.length} avisos sin ver hace ${DIAS}+ días${DRY ? ' · DRY' : ''}`);
   if (!candidatos.length || DRY) return;
 
   const dataDir = join(__dirname, 'data');

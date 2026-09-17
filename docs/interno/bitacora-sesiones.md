@@ -16,6 +16,862 @@
 
 ---
 
+## 2026-09-16 — ACM: el link ya no puede abrir direcciones internas, y el barrio de los links
+
+**Link seguro (pedido de Leonardo, con el requisito "si el ataque no falla, no está hecho").**
+`extractFromUrl` abría cualquier `http(s)` con `redirect:"follow"` desde el 25-jun: con sesión se
+podía hacer que el servidor abriera `169.254.169.254`, `127.0.0.1:3000` o un link que redirigía
+adentro. Decisión: cualquier host público, nada interno. `lib/acm/url-segura.ts` (detalle en
+TECNICO §10.6): forma del link, DNS (todas públicas) y control AL CONECTAR, en cada salto.
+
+- **Por qué no alcanzaba con validar y después `fetch`:** el `fetch` global de Node no deja
+  controlar la IP al conectar, y un DNS que responde público y después interno se lo saltea. Por
+  eso `node:http(s)` con `lookup` propio. La prueba del DNS cambiante lo demuestra (2 consultas,
+  0 pedidos al servidor interno).
+- **Verificación:** ataques en pruebas + servidor real en 127.0.0.1 que cuenta pedidos (0, con
+  control que prueba que responde); 10 mutantes muertos, incluido reponer el `fetch` original;
+  internet real (redirectores de httpbin hacia 169.254.169.254 y 127.0.0.1, `localtest.me`)
+  rechazados; navegador: el link de metadatos muestra "Ese link no se puede abrir…", Argenprop
+  carga igual. 2.340 pruebas.
+- **Abierto:** el navegador del extractor de EasyPanel sigue redirecciones que haga la página,
+  dentro de la red de n8n. Ya no recibe links internos; cerrarlo del todo es otro cambio + redeploy.
+
+**Barrio de los links.** Argenprop y Zonaprop ponen la ciudad en `addressLocality` y el barrio
+en `addressRegion`; Tier 1 se quedaba con "CABA, Argentina". `elegirBarrio` (puerto de la regla
+del extractor con navegador). Navegador: "Desde un link" da "Palermo Chico" + "Barrio reconocido".
+4 mutantes muertos.
+
+**Hecho también hoy (con OK):** redeploy del extractor en EasyPanel (`98ae1df`, Argenprop con 5
+fotos) y las 2 sugerencias de Carolina Etcheverry resueltas en admin-vakdor (las otras 3 ya las
+había marcado Leonardo). Datos de prueba en PRISMAIA - VAKDOR: ACM `1bd60870`, `c1fe5f5d`, ficha
+`lTb19sULahAu` (sin borrar).
+
+**Trampa:** `git stash list` en un worktree muestra los stash de TODOS (hay uno "bitacora en
+progreso, no es mia"). No tocarlos.
+
+---
+
+## 2026-09-16 — Sofía: cuando derivaba, el cliente no recibía ningún mensaje
+
+**Qué pasaba:** `/api/n8n/reply` descarta toda respuesta si el bot está apagado (existe desde abril
+para no pisar a un asesor que toma la charla a mano). Pero `Gestion_Handoff` apaga el bot EN EL MEDIO
+del turno de Sofía, antes de que salga su mensaje ("te conecto con el equipo / te derivo con
+[asesor]"), y ese mensaje se descartaba: *"Bot pausado: respuesta descartada — el agente humano tomó
+control"*. Visto con el primer cliente real atendido por luna (Elian, colega, 16-sep 15:40).
+Confirmado en 4 ejecuciones del 16-sep (Elian 15539, Mariana 15496, Ines 15504, Julia 15525). En 30
+días, ~76 de 109 derivaciones sin mensaje al cliente (medición por palabras, aproximada). Casos que
+lo muestran: Paula (15-sep) "¿Se comunica un asesor conmigo?" sin respuesta; juan_ogo (9-sep) "No
+recibí respuesta".
+
+**Arreglo (rama `fix/derivacion-mensaje-al-cliente`):** `lib/whatsapp/derivacion-propia.ts`. Con el bot
+apagado, el mensaje pasa SOLO si hay una marca "⚠️ Handoff activado" (la escribe únicamente el
+subflujo de n8n; el botón del asesor apaga sin marca) de los últimos 5 minutos, y después de ella no
+escribió ni un asesor (`human`) ni el cliente (`lead`). Ante cualquier duda, o si la consulta falla,
+se sigue descartando. El bot queda apagado: la ruta no lo toca.
+
+**Decisión:** Leonardo propuso mover el apagado al final del flujo de n8n (mensaje primero, apagado
+después). Se descartó con datos: el mensaje sale 16-20 s después de derivar, así que abre una ventana
+en la que Sofía contestaría de nuevo, y si el envío falla el bot queda prendido (lo que le pasó a
+Sonia). Se eligió el arreglo en la app; Leonardo delegó la decisión.
+
+**Verificación:**
+- Prueba de la ruta con la derivación: FALLÓ con el código anterior y pasa con el arreglo. Las del
+  botón del asesor, el cliente que vuelve a escribir y el envío normal pasan en los dos.
+- 9 pruebas de la regla (bordes de 5 minutos, fecha rota, marca de otro texto).
+- Casos reales en el segundo exacto del envío: Elian, Mariana, Ines y Julia pasan de "descartado" a
+  "se envía"; Sonia a las 09:31 (turno posterior a su derivación) se descarta.
+- Bytes de la marca idénticos en los 242 mensajes guardados desde abril.
+- Suite completa: 125 archivos, 2.275 pruebas, 0 fallas. Tipos sin errores; los 2 avisos de lint de
+  la ruta ya estaban en `main` (`prefer-const` en `evoPayload`/`metaPayload`).
+
+**Pendiente:** ver la primera derivación real después del deploy. Sigue abierto aparte: Sonia (16-sep
+08:59) tuvo la marca de derivación y el bot quedó prendido 30 min.
+
+---
+
+## 2026-09-15/16 — Sofía: dejar de preguntar lo que la ficha del link ya contesta (aplicado en n8n)
+
+**De dónde salió:** sugerencia del asesor Eric Zambrana (Central), `system_feedback`
+`143c4b25-90eb-4459-a5ea-67e1c1960605`, 15-sep 12:30. No traía link a la charla; el caso se
+encontró buscando: **Emilio, 14-sep, `997786fa`**, depto de 1.470.000 USD en Puerto Madero.
+
+**El diagnóstico, que cambió el arreglo:** el bot NO desobedeció el prompt, lo cumplió.
+`metricas` se llena con lo que el cliente **teclea**, nunca con la propiedad por la que entró.
+Emilio nunca escribió "Puerto Madero" → `zona` y `barrio_consultado` en `null` → "Zona" era el
+**punto 1** de FALTA DEL MÍNIMO → el prompt dice "tu próxima pregunta es la PRIMERA de esa
+lista". Por eso el arreglo va en tres nodos, no solo en el prompt.
+
+**Medido contra producción (30 días, 465 conversaciones que arrancan con un link)**
+
+- "¿en qué zona?" tras entrar por link: **26**; ambientes 4; compra/alquiler 3.
+- Cerró con "¿en qué presupuesto te manejás?": **272 (61%)**. Ofreció reemplazar la propiedad
+  del link: **29**. Propiedades de ≥500k USD: 7, y las 4 que se leyeron fallaron igual.
+- `barrio_consultado` con dato y `zona` vacía: **80 de 516** (`Armar_Memoria` solo miraba
+  `zona`, aunque `calificacion_completitud` ya los contaba juntos).
+- Repreguntó el **nombre** ya dado: 8 conversaciones, siempre entre 0,3 y 2,4 min después
+  (una, dos veces en 18 s). Repreguntó el **presupuesto** tras una respuesta numérica: 18.
+  La regla ya existía (ANTI-REPETICIÓN nº 7) y se incumplió igual: patrón 1.
+
+**Qué se aplicó** (16-sep 00:38, `scratch/aplicar-prompt-ficha-obvia.mjs --apply`, 17 parches)
+
+- `Agente IA CEO` (15): sección nueva LO QUE LA PROPIEDAD YA CONTESTA (operación, tipo, zona y
+  ambientes resueltos por la propiedad, con su bloque ESTO NO QUEDA CONGELADO) · la memoria va
+  un turno atrasada y el historial le gana · la respuesta a lo que preguntó va ANTES de la
+  ficha · el cierre deja de ser el presupuesto · se omite la línea `Ficha completa:` cuando es
+  la propiedad que él trajo · el presupuesto nunca se usa contra esa propiedad · handoff por
+  conducta (pregunta si sos persona → ofrecerle el asesor en ese mismo mensaje; permuta,
+  financiación, uso para un evento, consulta de empresa → derivar sin calificar) · prohibido
+  hablarle de "ficha interna", "el registro", "el campo estructurado".
+- `Armar_Memoria`: Zona resuelta con `barrio_consultado || zona`.
+- `Analizar_Conversacion1`: regla 27 — la propiedad consultada llena barrio, operación, tipo y
+  ambientes; gana siempre lo que dijo el lead, y lo más nuevo.
+
+**Decisiones de Leonardo:** el presupuesto deja de ser la pregunta de cierre · el "ticket alto"
+se dispara por **conducta del cliente, sin umbral de precio** (7 casos en 30 días no justifican
+una rama por número que el bot solo conoce después de buscar) · alcance: prompt + los dos
+nodos de sistema.
+
+**Verificación**
+
+- `Armar_Memoria` corrido contra **517 filas reales**: 0 datos perdidos; conversaciones con
+  "Zona" pendiente 142 → 62. La primera corrida dio "80 perdidos" y **era un error del test**:
+  al salir Zona la lista se renumera y se comparaba con el número adelante.
+- 17 anclas únicas; delta de expresiones declarado; 89 nodos y conexiones intactos; relectura
+  posterior independiente, no la del script que escribió.
+- **Tres contradicciones propias cazadas al releer** (patrón 4): "no se los preguntes NUNCA"
+  con su excepción quince renglones abajo · "LA ÚNICA EXCEPCIÓN" cuando pasaron a ser dos ·
+  el presupuesto repreguntable a los 55 s.
+
+**Costo:** el bloque dinámico sube 2.553 → 2.807 chars (~77 tokens por turno; ~3.700 mensajes
+de clientes en 30 días). Lo demás es estático y cachea.
+
+**Línea de base:** Christopher (`207a11df`) terminó 00:32:49, seis minutos ANTES de aplicar,
+y muestra los dos síntomas (mandó `Ficha completa:` de la propiedad del link y cerró pidiendo
+el presupuesto).
+
+**Primera lectura en tráfico real (16-sep, 11 h después, 4 conversaciones nuevas, todas por
+link; Ines derivó sola por ser colega).** Poca muestra: tendencia, no prueba.
+
+- Funcionó, visto en las ejecuciones: el extractor llenó barrio/operación/tipo/ambientes
+  desde el link en **4 de 4** (Tania solo escribió "me gustaría ver este departamento" y quedó
+  San Telmo/compra/depto/1). Zona preguntada 0, reemplazo ofrecido 0, desajuste marcado 0.
+  **Mariana** (`599ff9db`, 550.000 USD): respuesta primero ("sí, figura como apta crédito"),
+  cierre en NIVEL 2 (crédito), **salteó "Ambientes" aunque la lista lo pedía** (exec 15480),
+  y derivó a los 57 s cuando preguntó si el precio se negociaba.
+- A medias: omitir `Ficha completa:` se cumplió 1 de 2 (Viki exec 15514 sí; Mariana 15480
+  no, la escribió el agente mismo).
+- **Hallazgo grande, PREEXISTENTE:** el extractor anota como presupuesto el precio de la ficha.
+  Presupuesto = precio en 105 de 252 leads por link (30 días); en **74** el cliente no
+  escribió ni un número. Mariana es uno (550.000 = el chalet). El asesor recibe un dato falso
+  y el bot nunca pregunta el presupuesto. La regla 27 ya lo prohibía y el nano lo hizo igual:
+  no se arregla con texto, va un guard. **Propuesto, no aplicado.**
+- Preexistentes vistos en Viki (`d04559b5`): mostró un depto "Apto mascotas: No" a una clienta
+  con gato; `Formato_Mensajes` duplica fichas y **mete un `Video:` vacío que el agente no
+  escribió** (verificado comparando salida del agente vs Formato); la 3.ª pregunta de
+  presupuesto salió porque el mensaje con el número llegó con la ejecución ya en curso
+  (exec 15518 solo vio "Te cuento") — la ventana sin lock — y además pasó el máximo de 2.
+- Script para leer ejecuciones por conversación: `scratch/_ejecuciones-viki.mjs <conv> <desde> <hasta>`.
+
+**Presupuesto con cita — APLICADO 16-sep 12:48 (AR)** (`scratch/aplicar-presupuesto-con-cita.mjs`)
+
+- Extractor: el presupuesto solo existe si el lead lo dio; campo nuevo `presupuesto_cita` (textual).
+  Nodo `Execute a SQL query`: guarda el presupuesto solo si la cita está en lo que el lead escribió
+  o dijo por audio (`n8n_chat_histories` + `wa_messages`), no es pregunta, y trae el número
+  (entero/miles/millones) o lo acepta con palabras. Si la nueva no vale, conserva la guardada que
+  sí; los viejos sin cita se limpian solos en el próximo mensaje.
+- Sofía: el **rango de presupuesto se pregunta temprano** (la pregunta siguiente a la ficha), sin
+  anclarlo en el precio del link (pedido de Leonardo; el parche del 15 decía "anotalo como
+  referencia" y "va al final"). Repetidas se controlan por enlace Y dirección.
+- Diseños descartados con datos: lista de palabras v1 borraba 5 de 14 presupuestos reales; v2
+  dejaba pasar a Mariana ("¿el valor es final?").
+- Verificación: modelo real sobre 18 conversaciones × 2 corridas → inventados 4/10 → 0/10, reales
+  7/7 (incl. audio). SQL exacto sobre tabla temporal: 14/14 con chequeo exacto de claves. 6,6 ms
+  por consulta (`n8n_chat_histories` sin índice por `session_id`, 18k filas: índice opcional).
+- **Custodia:** el primer `--apply` abortó: a las 12:43 se cambió el respaldo del agente de Sonnet a
+  DeepSeek (el prompt quedó idéntico). A las 12:47:39 se revirtió. Mi escritura (12:48:14) tomó ese
+  estado; no se borró nada ajeno (tres backups en `scratch/n8n-backups/PRISMA-2026-09-16-*`).
+- **Trampas propias:** pasé "corrida1" por argv a un script que importa `sql-produccion.mjs` (lo
+  ejecuta como SQL; error de sintaxis, nada escrito). Python metió retrocesos `\x08` por `\b`.
+- **SIN TRÁFICO TODAVÍA:** 0 ejecuciones después de aplicar. Primer control: que el nodo SQL no
+  devuelva error (si falla, falla en silencio y la ficha deja de actualizarse). A las 13:21 se
+  comprobó que tampoco entraron mensajes de clientes a `wa_messages`: no hubo nada sin procesar.
+
+**DeepSeek y luna (16-sep, tarde).** DeepSeek descartado para Sofía por datos (política: datos en
+China; términos de API: ley china y consentimiento de cada usuario final); ahorro vs luna ~US$5/mes.
+Gasto real OpenAI 30 días US$77,79 (mini US$61,63). Comparación luna vs mini con turnos reales:
+luna 0 fallas de reglas vs mini 6 y 9; luna peor en avisar antes de tiempo y en no buscar la
+propiedad sin nombre. Detalle en la memoria `modelos-precios-y-datos-2026-09` y en
+`scratch/comparar-modelos/`. Hallazgo: propiedad del link no encontrada (57%) presentada como si
+fuera la del link (Claudia).
+
+**APLICADO 16-sep 14:10 (AR), con OK de Leonardo:**
+1. Prompt "el nombre no frena la propiedad" (`scratch/aplicar-prompt-nombre-no-frena.mjs`): si al
+   saludo contestan sin nombre, se busca la propiedad en ese turno. Banco: Tania no buscada luna 3/3
+   → 0/3, mini 2/3 → 0/3; saludo inicial 12/12 sin búsqueda.
+2. **Sofía pasa a `gpt-5.6-luna`** (`scratch/aplicar-modelo-luna.mjs`; volver:
+   `--volver --apply`). Segunda ronda con el prompt nuevo, leída a mano: luna 1 falla real en 60
+   turnos, mini 15. Opciones (8000, medium) y respaldo Claude Sonnet sin cambios. Luna no tiene
+   versión con fecha.
+- Verificación independiente del flujo vivo: 10/10 OK. **Sin tráfico real todavía** (ningún mensaje
+  de cliente desde 12:29). Vigilante armado para la primera ejecución.
+- Pendientes que NO se tocaron: Claudia (propiedad del link no encontrada presentada igual); Sonia
+  colega no detectada; Sofía siguió contestando 30 min después de "Handoff activado" (16-sep 08:59).
+- **Primer tráfico real con luna (15:34-15:40):** Elian RRE, colega. Saludo correcto, extractor sin
+  presupuesto inventado, SQL con cita ok (150 y 144 ms). Segundo turno: buscó Vedia al 4800 (92%),
+  detectó colega y derivó a Micaela sin calificar. 0 errores. El silencio de 12:29 a 15:34 fue real
+  (Meta conectado, suscripción ok, código de entrada sin cambios).
+- **BUG PREEXISTENTE ENCONTRADO:** el mensaje de derivación de Sofía se descarta en
+  `/api/n8n/reply` porque `Gestion_Handoff` ya apagó el bot ("Bot pausado: respuesta descartada").
+  Elian no recibió respuesta. Confirmado en 4 ejecuciones; en 30 días ~76 de 109 derivaciones sin
+  mensaje. Detalle y arreglo propuesto en la memoria `derivacion-sin-mensaje-al-cliente`. SIN tocar.
+
+---
+
+## 2026-09-16 — ACM: cuatro pedidos de los asesores (link, Laundry, antigüedad, sumar por link)
+
+**De dónde salió:** `system_feedback` de Central. Carolina Etcheverry (16-sep, `a251b9b4` link de
+los comparables y `adc8c2d4` Laundry), Carolina Grossi (28-ago, `0f151722` antigüedad) y Eric
+Zambrana (31-ago, `aa44c66e`, segunda mitad: sumar comparables por link). La primera mitad de
+Eric y la de Maximiliano (`353bbb7e`, zona dibujada) ya estaban hechas desde el 8-sep.
+
+**Lo que había de verdad detrás de cada uno**
+
+- Link: existía, al fondo del checklist desplegado. No era un error, era diseño.
+- Antigüedad: el campo del formulario existe desde marzo. Grossi armó una ficha
+  (`DQMs3ltJsXya`) 9 minutos antes de escribir: lo que faltaba era verla EN LA FICHA.
+- Laundry: "Laundry" (edificio) y "Lavadero" (unidad) son datos distintos en la red: solo
+  3.623 de 30.173 traen los dos. Token `laundry(?! ?room)`; exacto 10.387 contra `'Laundry'`.
+
+**Qué se hizo** (commit `47baa76`; detalle en TECNICO §10.6)
+
+- "Ver publicación" a la vista (44 px), antigüedad en tarjeta, hoja y portada.
+- `POST /api/acm/comparable-link`: Zonaprop se busca en `mercado_avisos` por id (el número del
+  aviso es el id); otro portal va por el extractor pidiendo `con_html`. `% = puntaje-link.ts`.
+- Fotos del propio aviso (`fotos-aviso.ts`), probadas contra páginas reales de los tres portales.
+
+**Verificación**
+
+- Paridad del % contra `acm_match_roomix` real: 305 avisos de 8 ACM, 305 iguales. La primera
+  corrida dio 303: el 66,5 en coma flotante redondeaba a 66 (Postgres dice 67).
+- 12 errores metidos a propósito, los 12 hicieron fallar su prueba. 2.262 pruebas en verde.
+- Navegador con PRISMAIA - VAKDOR: escritorio, celular emulado (390×844, touch) y tema claro;
+  ficha medida en modo impresión (cada hoja 1123 px, pie adentro).
+
+**Errores propios cazados probando:** (1) el servidor guardaba un aviso que la búsqueda ya
+había traído aunque la pantalla avisara "ya está" → duplicado al reabrir; ahora decide el
+servidor. (2) "CABA, Argentina" contaba como otro barrio (zona 0); no saber no es ser otro.
+(3) Las etiquetas pisaban "COMPARABLE" en 390 px (preexistente con "apto crédito").
+**Trampa:** `git checkout --` no restaura un archivo sin trackear; un mutante quedó puesto hasta
+que el grep lo mostró. Restaurar mutantes desde una copia, nunca con git.
+
+**Pendiente**
+
+- **Redeploy del extractor en EasyPanel** (con OK): sin eso, fuera de la red no hay fotos
+  cuando Tier 1 está bloqueado (en Vercel, casi siempre).
+- Argenprop por Tier 1 devuelve barrio "CABA, Argentina" (el JSON-LD no trae el barrio).
+- Marcar las 4 sugerencias como resueltas en admin-vakdor (con OK).
+- Datos de prueba en PRISMAIA - VAKDOR: `acm_searches` `1bd60870` y ficha `lTb19sULahAu`.
+
+## 2026-09-16 — El gasto de Apify entra en US$100, las bajas vuelven a marcarse, y apareció el sitemap de ZonaProp
+
+**De dónde salió:** Leonardo pidió analizar un informe de fuentes de datos para el CMA que le
+generó Z.ai (`Downloads/informe_fuentes_datos_cma_argentina (1).pdf`, 43 págs). De ahí salió todo
+lo demás. Detalle completo y verificaciones en la memoria `remax-api-publica-y-informe-zai.md`.
+
+**Lo del informe, verificado en vivo (15-sep)**
+
+- **RE/MAX tiene API pública que funciona** (`api-ar.redremax.com`, sin token ni proxy): 66.693
+  avisos en venta hoy. Filtro por ciudad que el informe no trae: `like=geoLabel:La Plata` → 2.963.
+- **FALSO lo central del informe:** el "cruce exacto" entre el código de anunciante de ZonaProp y
+  el `internalId` de RE/MAX no existe: **0 de 40** (con control positivo y negativo). Pares
+  idénticos confirmados tienen códigos que no se corresponden (`421141094-1438` ⇄ `AR.42.136.94.841.V24`).
+- CABA: de 16.896 avisos de RE/MAX, 55% ya están en la base y 29% no tienen candidato; lo "nuevo"
+  es casi todo casas/PH/terrenos/locales, **los tipos que no cargamos de ZonaProp** (el portal tiene
+  24.800 en CABA y nosotros ~2.450). Mercado Libre: de 31 cruzables, 29 ya los teníamos; su API da
+  403 para buscar avisos ajenos con dos apps distintas. Benchmark oficial de CABA: la serie termina
+  en 2019. Argenprop bloquea (202 vacío) a los pocos pedidos.
+
+**Lo que se arregló** (rama `mercado-presupuesto`, worktree propio, commit `3ad77cc`)
+
+Leonardo puso el límite: **US$100/mes de Apify**, sin saltar al plan de US$200. El régimen daba ~120.
+
+- **Dos turnos parejos** (33.458 y 33.454 avisos): cada mes se relee media ciudad, todo CABA al día
+  cada 2 meses. Eligió esto sobre "7 barrios del cliente mensual + resto cada 3": no quería barrios
+  sin actualizar. Sale ~US$79/mes.
+- El workflow de refresco ya no lleva las 48 zonas escritas: se las pide a `mercado-sync/plan.mjs`
+  (con 29 tests) vía `matriz.mjs` y `fromJSON`.
+- **El descubrimiento pasa a las 00:30 AR** (era 7:00): la ventana incluye "lo que va de hoy" y eso
+  se repaga al día siguiente — medido el 8-sep, 315 avisos (~US$10/mes). La ventana ahora se calcula
+  (piso 2, techo 3 si faltó una corrida).
+- **Guardia de presupuesto** en el descubrimiento (tope 90) y refresco bajado a 70.
+- **La verificación de bajas estaba rota en 41 de 48 zonas** (mapa de 7 barrios escrito a mano): por
+  eso 70.129 avisos "activos" y 0 caídos. Ahora sale de la base, más un cajón `otros-sin-zona` con
+  los 608 avisos de barrios que ZonaProp escribe fuera de las 48 zonas (Barrio Norte, Once, Congreso).
+
+**Hallazgo grande, a medio probar: el sitemap de ZonaProp**
+
+`https://www.zonaprop.com.ar/sitemaps_https.xml` lista avisos **uno por uno con `lastmod`**, gratis
+y sin actor. Bajado: 48.785 avisos con fechas de los últimos 8 días; de 300 cruzados con la base, 26
+estaban publicados hace más de un mes y figuran modificados esta semana. **Si la fecha es confiable,
+el refresco pasa de US$67 a ~US$1,40** (releer solo lo que cambió) y se puede refrescar todo CABA
+todas las semanas. Dos avisos: **no es el censo completo** (~100.000 de ~700.000 → la ausencia NO
+prueba una baja) y el portal tira 403 si se le piden muchas páginas seguidas.
+
+**Pendiente, con fecha: 30-sep**, cuando se libere el ciclo de Apify (hoy la cuenta está en
+US$102,43 de 100 y el descubrimiento está frenado desde el 14):
+1. Releer 200 avisos con `lastmod` nuevo y 200 con `lastmod` viejo (US$0,40) → ¿la fecha marca
+   cambios de verdad?
+2. Releer 500 avisos de un barrio (US$0,50) → ¿cuántos cambian de precio por mes sin republicarse?
+   De eso depende si el refresco cada 2 meses alcanza o sobra.
+3. Bajar el segundo archivo del sitemap (`sitemap_prop_https_2`), que hoy dio 403.
+4. **Argenprop, muestra de 500 avisos (US$0,50)** con `igolaizola/argenprop-scraper`, 2-3 barrios,
+   cruzada contra la base por dirección + precio → **cuántos avisos son únicos**. CABA entero son
+   102.843 (≈US$103 de una vez). El actor filtra por ubicación, radio en km, `advertiserTypes`
+   (dueño directo) y `sortBy: newest`, así que permitiría un descubrimiento diario barato.
+5. **Mercado Libre, muestra de 500 avisos (US$2)** con `gio21/mercadolibre-inmuebles-scraper`
+   (US$4/1.000, cuatro veces ZonaProp) → confirmar con muestra grande el 94% de repetición que
+   dio la muestra chica (29 de 31 ya estaban en la base).
+
+Las cinco juntas cuestan menos de US$3,50 y cada una decide un camino. **Sumar un portal recién se
+encara si la 4 da volumen único**: exige clave nueva en `mercado_avisos` (hoy es el postingId de
+ZonaProp), capa "estos avisos son el mismo inmueble" por geo+precio+m² (los códigos NO cruzan entre
+portales, medido 0/40) y geocodificar direcciones, porque ni Argenprop ni Mercado Libre dan
+coordenadas.
+
+**API de Mercado Libre: CERRADA, no insistir.** Tres apps propias distintas (la última con unidad
+VIS y permisos mínimos) dan lo mismo: el token sirve (`/users/me`, `/categories`, `/sites/MLA` y
+`/items/{id}/description` responden 200) pero `/sites/MLA/search` da 403, `/items/{id}` da 403 y
+`/users/{id}/items/search` responde textual **"Searching another user items is restricted."** La
+doc oficial (10/09/2026) ya no documenta la búsqueda por sitio, y hay decenas de desarrolladores
+reportando lo mismo en 2026. El cambio es de abril-2025: solo se accede a lo del usuario que
+autoriza la app. Único uso que queda: que un cliente nuestro autorice la app para bajar SUS avisos.
+
+**Sin resolver, de Leonardo:** regenerar los Client Secret de las dos apps de Mercado Libre
+(`2055069549619410` y `5235611298360779`), que quedaron expuestos en el chat, y dejar sus permisos
+en "Sin acceso" (la primera tenía escritura sobre publicaciones, facturas y órdenes).
+
+**Falta probar de verdad:** la matriz por `fromJSON` solo se prueba corriendo el workflow en GitHub.
+Al subir la rama, dispararlo a mano una vez y mirar el job `plan`, que imprime en castellano qué
+zonas le tocan al mes. Si falla, falla antes de gastar.
+
+---
+
+## 2026-09-16 — Farming etapa 3-A: la caminata (direcciones y propietarios)
+
+**Qué se construyó** (rama `feat/farming-relevamiento`, worktree `PRISMA-SYSTEM-farming2`): lo que
+el asesor carga **a pie**, que es la mayoría de lo que releva y no está publicado en ningún
+portal. Tres tablas (`farming_direcciones`, `farming_propietarios`, `farming_contactos`), los
+endpoints de alta/edición/borrado de tarjetas y personas, el botón que pasa un aviso publicado a
+Relevamiento, y la solapa nueva con su formulario. **La etapa 3 se partió en dos**: el tablero de
+6 columnas, el historial que se llena solo, los 9 indicadores y el botón a Tracking son la 3-B.
+
+**Lo que más vale de esta rama no es la pantalla, son dos protecciones:**
+- **Borrar una zona con trabajo cargado ahora es imposible.** El botón «borrar» existe desde la
+  etapa 1 y lo único que iba a frenar la cascada era un comentario que decía «esto se hace en la
+  etapa 3». La FK quedó en `on delete restrict` y la app archiva en vez de borrar. Probado contra
+  producción con una transacción que se revierte: la base **se niega**.
+- **El ataque de RLS pasó de 10 a 40 casos.** Ahora prueba lo que un test flojo deja pasar: que
+  un colega con zona compartida **lea pero no escriba**, y que el director **mire pero no edite**.
+  El bloque del director no corre si el service_role no confirma antes que esa cuenta es director
+  de esa agencia — si no, se saltea en vez de dar un OK falso. 40/40, salida 0.
+
+**Decisiones tomadas** (las discutibles, con su motivo):
+- `validarDireccion` devuelve `{ errores, avisos }`: solo la calle y el tipo bloquean. Un asesor
+  que escribe «pisos: 8» parado en la vereda tiene que poder guardar y completar después.
+- El `tipo` arranca en «Edificio». Lo había decidido al revés y **cambié de opinión** con el
+  argumento del revisor: una casa mal tipeada aporta CERO a «unidades potenciales» (las unidades
+  salen de los números, no del tipo), el error se ve en la tarjeta y se arregla con un toque;
+  sacar el default haría empezar cada puerta con el botón deshabilitado.
+- `fuera_de_zona` se guarda al crear, pero `fuera_de_zona_desde` queda NULL: esa fecha dice
+  «cuándo se cayó», y una tarjeta que nació afuera nunca se cayó. Con fecha = se cayó al mover el
+  trazo; sin fecha = nació afuera. Es lo que la 3-B va a usar para separar las dos poblaciones.
+- Al borrar una tarjeta que vino de un aviso se borra también su marca, así el aviso **vuelve** a
+  «A la venta en mi zona» en vez de quedar escondido para siempre.
+
+**Verificado en el navegador, contra datos reales** (usuario de prueba, zona de 1.097 avisos):
+se guarda con solo la calle; 8×4 muestra «Total: 32 unidades · se calcula solo»; «av   ejemplo
+1200» se detecta como la misma puerta que «Av. Ejemplo 1200» y el cuadro queda abierto para
+corregir; el teléfono se guarda en E.164 y disca desde un link de 44 px; pasar un aviso a tarjeta
+y deshacerlo revierte **las dos mitades**; a 390 px nada baja de 44 px ni se corta; consola limpia.
+
+**Dos cosas que solo aparecen probando, no leyendo código:**
+- Un **500 al guardar una persona** que NO era de la app: el servidor de desarrollo se quedaba sin
+  memoria compilando esa ruta (había **51 procesos de node** abiertos). Servidor limpio, mismo
+  pedido, 201. Conviene matar los node colgados antes de probar.
+- El buscador de direcciones medía **42 px** y, peor, **no llevaba `type`**, así que tampoco lo
+  alcanzaba la regla anti-zoom de iOS: al tocarlo en un iPhone la pantalla se agrandaba sola.
+  Arreglado en `components/mapa/mapa-buscador.tsx` (46 px y letra de 16), que **también arregla el
+  mapa del Buscador IA**.
+
+**Para la etapa 3-B, anotado para que no se pierda:**
+- Recalcular `fuera_de_zona` **cada vez que un PATCH traiga `lat` o `lng`**, no solo al redibujar:
+  hoy el cartel puede quedar mal en las dos direcciones, y una tarjeta puede terminar con una
+  calle que no coincide con su punto.
+- Convertir un aviso ya descartado necesita `update`, no `ON CONFLICT DO NOTHING`.
+- Los dos números de la tarjeta de zona («direcciones relevadas» y «avisos a la venta hoy») van
+  con la 3-B, que rehace esa tarjeta igual.
+
+## 2026-09-16 — El creador de anuncios: texto que se puede pegar en Meta, y la placa con la foto REAL
+
+**Qué se construyó** (rama `feat/anuncios-texto-y-placa`, worktree `PRISMA-SYSTEM-anuncios`)
+
+Las dos sugerencias de Maximiliano Filoreto que estaban `en_proceso` desde principios de mes:
+
+- **El texto salía en un bloque.** El copy real que él generó el 10-sep (`copy_drafts 30b0f771`)
+  tenía 89 palabras sin un salto de línea ni un emoji. La causa: el prompt de `generate-batch`
+  solo pedía *"cuerpo usando el ángulo pas"* y nunca decía que eso se pega en Instagram. Ahora se
+  le pide `parrafos`, una **lista** que el servidor puede contar, y el servidor la sella. Probado
+  en producción: los 3 borradores salen en **6 párrafos** con un emoji al cierre.
+- **La placa ignoraba la propiedad.** `flow_data.tokko_property_details` está VACÍO en los perfiles
+  reales, así que la imagen no recibía ni la foto ni los datos y caía en *"imagen representativa
+  del mercado inmobiliario argentino premium"*. Ahora la placa se arma con la **foto real de
+  Tokko, sin IA**: foto arriba, panel de marca abajo dibujado por el código.
+
+**Dos prompts decían cosas distintas y solo uno corría.** `generate-copy` pedía "3-5 párrafos
+cortos"; `generate-batch`, que es el que usa la pantalla, no pedía nada. Ahora comparten
+`REGLAS_POST` y no se pueden volver a separar.
+
+**Tres decisiones, todas medidas**
+
+- **Foto + panel, no foto a pantalla completa.** Medí 40 portadas reales: 28 son 4:3, mediana
+  1500 px de ancho, y 7 de 40 son más angostas que la placa. Con la foto típica, a pantalla
+  completa el Reel usa el 42% del ancho y la agranda 1,71×; con panel usa el 76% y la **achica**
+  0,94×. En 4:5 y cuadrado entra entera.
+- **El contenido nunca pisa el aviso legal.** Con el aviso REAL de Central (165 px de franja,
+  319 reservados) el cuadrado metía el precio **abajo** de la franja. El `Math.min` que protegía
+  la foto terminaba pisando lo legal. Palancas nuevas, en orden: soltar casillas → soltar bajada →
+  achicar título → achicar la foto (el 45% pasa a ser preferencia, piso duro 30%). Si ni así entra,
+  sale igual pero **lo avisa** (`desborda`).
+- **La ruta no confía en la `foto_url` que manda el navegador.** Comprueba contra `properties` que
+  la foto sea de esa propiedad **y de esa agencia**. Cierra dos agujeros de una: que el servidor
+  baje cualquier URL, y que un inquilino publique la foto de otra agencia con su logo.
+
+**Errores propios**
+
+- **Afirmé que un emoji en la placa "sale como nada".** Es falso: en esta Inter el `.notdef` es un
+  **cuadrito visible** de 638 caracteres de contorno, y el del contorno vacío es el ESPACIO. O sea
+  al revés. Antes del arreglo el emoji se **dibujaba** y no se contaba, porque el path del cuadrito
+  no tiene ningún `NaN`. Corregido en el spec con la tabla medida.
+- **El regex de emojis que dicté estaba roto y su propia prueba lo delataba.** `⚠️` son dos
+  caracteres; los contaba por separado y "conservaba el último", que es el invisible. Hubo que
+  arreglarlo tres veces: secuencias completas, después keycaps (`3️⃣`) y banderas (`🇦🇷`) que
+  escapaban enteras, y respetar `©®™` que Inter sí sabe dibujar.
+- **La prueba que sostiene todo el diseño no podía fallar.** "LA FOTO NO SE TOCA" muestreaba una
+  foto de color plano: un revisor la desenfocó con `.blur(30)` y **la prueba siguió pasando**.
+  Ahora usa una foto texturada y compara contra el recorte esperado; se probó al revés (con
+  desenfoque el desvío salta de 3,14 a 11,61 y falla).
+- **Casi reporto que la foto había sido alterada.** Mi medición sobre una placa de producción daba
+  18,27. Era MI detección del alto corrida **un píxel** (609 en vez de 608): en una foto llena de
+  follaje eso triplica el número. Con el alto real da 5,56, y la doble compresión JPEG sola explica
+  5,67. La foto está intacta.
+
+**Un hallazgo que salió de mirar, no de medir:** la ruta recomprimía la placa con `.toBuffer()` sin
+formato, y sharp usa calidad 80 por defecto. Duplicaba la pérdida justo en la foto que prometemos
+no tocar. Una línea en cada camino.
+
+**Quedó pendiente**
+
+- **El título de la placa puede ser muy largo.** El hook del post tiene ~150 caracteres, que para un
+  título es mucho. El diseño lo acomoda achicando la letra, pero lo correcto sería pedirle al modelo
+  un título corto aparte. Decidido dejarlo afuera.
+- **El aviso legal de Central son 841 caracteres** y en cuadrado deja la foto en el 33%. No es un
+  bug: la palanca es acortar el aviso, y esa decisión es de él. Kevin ya se había quejado el 31-ago
+  de que no le entraba.
+- **La config de Marketing de PRISMAIA - VAKDOR tiene cargado el aviso legal DE CENTRAL**, con sus
+  matrículas y su dirección. Config vieja de la agencia de prueba; conviene corregirla.
+- **El camino sin propiedad no se generó de punta a punta.** Verifiqué que el paso nuevo no aparece,
+  pero no generé una placa por el camino de Gemini.
+- **Las dos sugerencias siguen `en_proceso`.** Leonardo manda él la respuesta a Maximiliano.
+- **Lo mismo de siempre que sigue abierto:** el `generate-batch` y el `generate-image` tienen dos
+  copias casi idénticas de `traerPropiedad`; y la placa lee la foto de la tabla sincronizada pero
+  el precio de una llamada viva a Tokko, así que pueden no coincidir.
+
+## 2026-09-16 — Farming etapa 2: «A la venta en mi zona»
+
+**Qué se construyó** (rama `feat/farming-avisos-en-mi-zona`, worktree `PRISMA-SYSTEM-farming2`):
+la segunda solapa de Farming, que lista lo que está publicado adentro de la zona del asesor sin
+que él cargue nada. Tabla `farming_avisos_marca` (lo que ya miró), dos funciones PostGIS que
+recortan `mercado_avisos` por el polígono, `GET /api/farming/avisos`, `POST/DELETE
+/api/farming/avisos/marca`, y la solapa con los cuatro atajos de captación.
+
+**Decisiones de Leonardo:**
+- **Un atajo se dibuja solo si tiene datos.** Hoy «se cayó» y «bajó el precio» dan cero en todo
+  el sistema, y un botón que siempre da cero se siente roto. Cuando el pipeline vuelva, aparecen
+  solos.
+- **Trazabilidad de zonas: no se guarda historial.** Preguntó si las zonas quedaban con fecha y
+  filtros para ver la evolución. Verificado ese día: **borrar borra la fila de verdad** y
+  **redibujar pisa el trazo anterior**. Su decisión textual: *«si se borran o se redibujan, no
+  pasa nada, queda lo último y lo visible»*, con un aviso en pantalla y la sugerencia de crear
+  una zona nueva en vez de reemplazar. Se hizo así: dos textos, cero cambios de comportamiento.
+
+**Migración aplicada a producción con su OK.** El clasificador del entorno bloquea «Production
+Deploy» desde el agente (los dos intérpretes): la corrió él con `! node scratch/aplicar-sql.mjs`.
+Verificado después: `authenticated` y `anon` quedan con SELECT y **nada** de escritura, RLS
+encendida, y el **ataque de RLS da 10/10 fallando** (se le sumaron 3 casos + 1 control positivo
+sobre la tabla nueva). El script ahora **no puede terminar en verde si los ataques no corrieron**
+(sale con código 2): antes, correrlo sin la migración aplicada decía «todo bien».
+
+**Dos números corregidos, los dos míos:**
+- Yo había escrito «24,5 ms» en el comentario de la migración. Medido de verdad ya aplicado
+  contra la zona real de Central: **131-136 ms** la función, 91 ms la consulta cruda equivalente
+  (que sí muestra el plan: Index Scan en los dos índices geom de las particiones). Corregido en
+  el archivo.
+- Un brief mío salió corrupto por un `sed` (metió un `&` literal donde iba una aserción). El
+  implementador no lo transcribió; se arregló el plan.
+
+**Encontrado probando en el navegador, no razonando:** las fotos de `mercado_avisos` **no cargan
+ninguna**. La base guarda la URL con el texto `wxh` sin reemplazar —es una plantilla, no una
+dirección—: el CDN da 404 con `wxh` y 200 con `360x266`. Son **70.202 de 70.322** avisos con
+foto. Esta rama es el único lugar de la app que lee `foto_portada`, así que no rompe nada más.
+
+**Verificado en el navegador** (usuario de prueba, zona de 1.097 avisos en Palermo): los atajos
+salen solo los dos que tienen datos; descartar baja el total y el conteo del atajo al instante y
+ofrece deshacer; **lo descartado no vuelve después de recargar**; 120 avisos tras «ver más` sin
+un solo repetido; los 244 elementos tocables miden ≥44 px en 390×844 y ninguna línea se corta.
+
+**Cabos sueltos (en el plan, no perdidos):**
+- El contraste del chip de señal da **2,78** en tema claro (mínimo legible 4,5); en oscuro, 5,84.
+- Descartar y después tocar «ver más» **saltea tantos avisos como los descartados** (confirmado
+  contra la app: 2 descartes → 2 avisos que no aparecen nunca). El offset tiene que ser la
+  cantidad de tarjetas en pantalla, no página × 60.
+- Si el asesor descarta el último aviso del atajo que está mirando, el chip desaparece con el
+  filtro puesto y, con una sola zona, no queda botón para volver a «Todas».
+- El endpoint de marca no valida que el aviso esté dentro de la zona (solo puede ensuciar la
+  lista propia). Para la etapa 3: «convertir» sobre un aviso ya descartado necesita `update`, no
+  el `ON CONFLICT DO NOTHING` de hoy, o no hace nada en silencio.
+- La tarjeta de zona de la solapa 1 todavía no muestra «avisos a la venta hoy», que el spec pide
+  y esta etapa recién ahora hace calculable.
+- **Pendiente de Leonardo:** el tope de Apify (US$100 agotado, gastado US$102,45). El
+  descubrimiento diario está caído desde el 9-sep y por eso dos atajos dan cero.
+
+## 2026-09-15 — Auditoría del Dashboard del director, tanda 1 de 3
+
+**Qué pidió Leonardo:** revisar cada dato del Dashboard, que sea correcto y que responda al filtro;
+cada tabla ordenable por columna con forma simple de volver al orden original. Decisiones suyas:
+todo determinista (sin IA en el cálculo) y en vivo; el Pipeline sólo con lo generado en PRISMA;
+Leads y Propiedades de Tokko se quedan pero corregidos; fuera el reparto Neto 50/50; los
+valores inventados se calculan de verdad; la Clasificación IA queda como está. En 3 tandas.
+
+**Auditoría** (3 agentes de sólo lectura + SQL contra Central): de 10 secciones, 2 estaban bien.
+Lo más grave: cartera en 0 (filtraba `status='Active'`, que no existe: son "Venta"/"Alquiler"/
+"Temporary rent"), Consultas WhatsApp con todo el historial (2.340 vs 483 del período),
+gráficos vacíos por claves que no coinciden, pipeline cortado en 1.000 de 8.182 y con el
+"Cerrado" de Tokko como venta ganada, Conversacional siempre vacía (0 análisis de Central).
+
+**Tanda 1 — errores de cálculo + orden por columna** (rama `fix/dashboard-auditoria`)
+
+- `lib/queries/todas-las-filas.ts`: helper de tandas de 1.000 con orden estable; usado en
+  dashboard, pipeline y propiedades.
+- Cartera por `is_active`; "Días publicada" = alta en Tokko → hoy (antes 45 fijo); stock a fin
+  de mes con alta/baja de Tokko (la baja sólo vale en las inactivas: las activas también la traen).
+- Pipeline: sólo `wa_conversations`. Propiedades: "Eligible"/"Tenant" (inglés de Tokko), m² y
+  promedio sólo ventas. Movimientos ordenados; tipos reales.
+- `hooks/use-orden-tabla.ts` + `components/dashboard/orden-tabla.tsx`: 1er clic menor→mayor,
+  2º mayor→menor, 3º original, botón "Orden original". En Ranking y Objetivos.
+- Verificado en navegador (VAKDOR): 94 / US$11.117.650 / 635 días / 20 aptas / 4 con inquilino,
+  igual que el SQL. Sin NaN, sin scroll lateral en el celular.
+
+Mergeada: PR #62 (`3c78370`).
+
+**Tanda 2 — el filtro de arriba fijo y todo le responde** (misma rama)
+
+- Barra `sticky top-0` dentro del `<main>` que hace scroll (layout del director); en el celular
+  dos filas, 114 px de 844.
+- Consultas WA del período (antes todo el historial); `finDelDia` en todas las fechas de fin.
+- Gráficos: meses del período (hasta 12). Cartera = la que había al cierre del período
+  (`lib/queries/cartera.ts#estabaEnCartera`), también en la sección Propiedades.
+- Pipeline por período + asesor; Objetivos con el año del filtro + asesor (también el server
+  action al cambiar el año); ranking sólo con el asesor elegido.
+- Bug encontrado probando: `DatePeriodFilter` mostraba un día menos (`new Date('yyyy-MM-dd')`
+  es UTC) → `parseISO`.
+- Verificado (VAKDOR, 30 días vs 1/1–30/6): consultas 0→1, cartera 94→89, propiedades 94→89,
+  pipeline 0→1, meses Ene–Jun, objetivos sólo "Leonardo Asesor" al elegirlo.
+
+Mergeada: PR #64 (`a64c961`).
+
+**Tanda 3 — Conversacional en vivo, Leads corregido, días argentinos** (misma rama)
+
+- Brief de sólo lectura + dos agentes en paralelo (archivos disjuntos); yo conecté `page.tsx`.
+- `lib/queries/conversacional.ts`: en vivo, sin IA, sin botón ni caché, con el filtro. Arreglados:
+  claves que no coincidían, derivación 202 %, "necesitan vender" (clave `necesita_vender_para_comprar`),
+  calificados (`metricas.calificado`), visitas con estados inexistentes, horas en UTC y con 11 % de
+  los mensajes, "null" como categoría. Tasa de cierre con las cantidades al lado (2 ganadas, 0 perdidas
+  daba "100 %"). Borradas `/api/conversational-insights/{analyze,status}` y `ConversationalFilters`.
+- `lib/queries/leads-dashboard.ts`: agregados en el servidor, fecha = `tokko_created_date` (el
+  `created_at` es la hora del sync), sin tope de 5.000, estados reales, "Qué está frenando la
+  conversión" calculado (antes textos fijos), tabla por asesor ordenable. Fuera "Ciclo de vida"
+  (`tokko_raw.deleted_at` no es fecha de cierre) y la pestaña de texto fijo.
+- `lib/dashboard/periodo.ts#inicioDelDiaAR/finDelDiaAR`: todos los cortes en -03:00 (antes UTC:
+  el período corría 3 h; Central 483 → 482 en 30 días).
+- Verificado (VAKDOR 1/1–15/9): 1 chat, pico 16 h sábado; 1.594 leads, 285 sin contactar (277 +48 h),
+  todos sin asignar — igual que el SQL. Sin textos de IA, sin NaN, sin errores de página. 4,4 s de carga.
+
+Mergeada: PR #65 (`888123a`); Vercel publicó el deploy ("success").
+
+**Base — APLICADA el 15/9** (OK de Leonardo). El clasificador de Claude Code frenó el DDL contra
+producción ("Modify Shared Resources") antes de ejecutarlo; no se esquivó: Leonardo corrió cada
+comando con `!` y yo verifiqué con SELECT después de cada uno.
+- `dashboard_conversational_insights` borrada DESPUÉS de que Vercel publicó (el código viejo la
+  leía): `20260915130000_borrar_cache_conversacional.sql`. Verificado: la tabla ya no existe y no
+  quedan políticas. Respaldo previo (18 filas, todas de VAKDOR, columnas, 4 políticas,
+  restricciones) en el scratchpad de la sesión del 15/9.
+- Índices con CONCURRENTLY, uno por comando (no va en transacción):
+  `20260915120000_indices_dashboard_por_fecha.sql`. Verificados válidos: `wa_conversations_agency_created_idx`
+  (112 kB), `wa_messages_agency_created_idx` (896 kB), `leads_agency_tokko_created_idx` (456 kB).
+
+---
+
+## 2026-09-15 — Tiempos de respuesta del dashboard: los dos números se calculaban con datos cortados
+
+**Qué pidió Leonardo:** Kevin (Central) veía «1 h y pico» en la tarjeta «Tiempos Respuesta» y
+12 h en la mediana de «Handoffs sin atender», y no sabía cuál mirar. Verificar los dos y
+aclarar cada uno para que pueda ir con fundamentos a sus asesores.
+
+**Qué se encontró** (leído de producción, Central, 15/8 al 14/9)
+
+- **Supabase entrega como máximo 1.000 filas por consulta** (`max_rows: 1000`, Management API
+  `/postgrest`). La tarjeta pedía los mensajes del período sin paginar: Central tenía 9.104 y
+  la tarjeta usaba los 1.000 más viejos. La «1 h y pico» salía de **una sola respuesta**.
+- El panel de handoffs también se cortaba: 1.945 mensajes después de las derivaciones y leía
+  1.000, así que algunas conversaciones atendidas aparecían como «sin atender».
+- **Miden cosas distintas.** La tarjeta cuenta desde el último mensaje del cliente sin respuesta
+  hasta que escribe el asesor, en toda la charla, y deja afuera las respuestas del asesor sin un
+  mensaje del cliente antes (121 de 182). El handoff cuenta desde la derivación hasta la primera
+  respuesta del asesor. **El handoff es el que sirve para exigirles a los asesores.**
+- Con todos los datos: tarjeta, entre mensajes del asesor, 10 h 11 m de promedio y 1 h 34 m de
+  mediana; handoff, 18 h 53 m de mediana, **28 de 101 derivaciones atendidas**.
+- La tarjeta además dejaba afuera el último día del período (`lte` con `yyyy-MM-dd`).
+
+**Qué se hizo** (rama `fix/tiempos-respuesta-dashboard`, 5 archivos)
+
+- `lib/queries/dashboard.ts` y `lib/queries/handoffs.ts`: consultas de a tandas de 1.000
+  (`.range()` + orden por `created_at` e `id`), y promedio + mediana en los dos lugares.
+- `PerformanceMetricsGrid.tsx`: promedio arriba, «mediana X · N veces» abajo, y una aclaración
+  visible al pie. `HandoffsPanel.tsx`: la tarjeta pasa a «Respuesta del asesor» (la mediana y el
+  promedio), las descripciones salen del globito y quedan a la vista, más una línea que explica
+  los dos números. `lib/dashboard/periodo.ts`: `etiquetaPeriodo()` hace que cada aclaración diga
+  el período del filtro.
+
+**Verificación real**
+
+- Las tandas, contra Central, solo lectura: 9.109 traídas, 9.109 distintas, 9.109 en la base,
+  en 1,7 s.
+- Navegador, PRISMAIA - VAKDOR, escritorio y celular 390×844: handoff 6 días (la base da
+  153,7 h), las filas del asesor en «---» (la base da 0 esperas medibles), el filtro del 1 al
+  15/09 cambia el período y los números, y la página no se corre de costado. Los valores del
+  bot solo se vieron, no se compararon contra un cálculo aparte.
+
+**Ojo:** la tarjeta y el panel son los mismos en el dashboard del asesor; ellos también ven las
+aclaraciones.
+
+---
+
+## 2026-09-12 — El descubrimiento diario fallaba hace 4 días: esperábamos menos de lo que tarda
+
+Leonardo avisó por los mails de GitHub Actions. `mercado-descubrimiento` falló 9, 10, 11 y
+12 de septiembre (y 5 y 7). **No era Apify: era nuestra espera.**
+
+- El script esperaba **10 min** fijos (60 vueltas × 10 s) a que terminara el actor. Desde
+  que subimos `--max 1500` (4-sep), la corrida de todo CABA tarda **10 a 13 min**
+  (medido: 11.5 / 11.6 / 10.3 / 12.1 / 11.6 / 12.0 / 12.6). Justo arriba del límite.
+- Lo caro: **la corrida se paga igual** (US$1.507 cada una). Cortábamos la espera 2 min
+  antes de que terminara, tirábamos el dataset de 1500 avisos y encima el job moría, así
+  que **tampoco corrían Don Torcuato ni los embeddings**.
+- Arreglo: `--espera-min` (default **40**), log de progreso cada 2 min, y
+  `timeout-minutes: 30 → 90` en el job.
+- Nuevo: **`--recuperar <runId>`** carga el dataset de una corrida ya pagada que quedó sin
+  cargar, sin lanzar nada nuevo. Recuperar sale US$0; volver a correr, US$1.51.
+
+**Recuperación:** se cargaron las 4 corridas pagadas (9, 10, 11, 12) con `--recuperar`.
+**5.333 avisos nuevos** a la base, US$0 de costo extra, más sus embeddings.
+
+**Cuánto publica CABA por día — medido, no estimado.** El campo del dataset es
+`list_publication_begin`. Uniendo las 4 corridas:
+
+| día | 8-sep | 9-sep | 10-sep | 11-sep |
+|---|---|---|---|---|
+| avisos publicados | 1.347 | 1.336 | 1.277 | **1.543** |
+
+**Lo que esto cambió (decidido, ya aplicado):** `--max 1500 → 1800`.
+
+La clave es que la ventana de `--dentro-de 2` **no son dos días enteros**: es *ayer
+completo + lo que va de hoy* (las corridas arrancan ~11:00 ART, así que de hoy traen 44 a
+237). O sea ~1.500-1.600 avisos, no ~2.800. Como el actor **cobra por item devuelto**,
+subir el tope no encarece la corrida: solo deja de cortar. Con 1500 el 11-sep se
+perdieron 87 avisos (1.543 publicados, 1.456 traídos), y esos no los ve nadie hasta el
+refresco mensual. El log ahora imprime el reparto por día de publicación, que es el
+termómetro: si `n < --max`, ayer entró completo.
+
+**Lo que NO se tocó y sigue siendo decisión de Leonardo:** el descubrimiento cuesta
+~US$1.55/día ≈ **US$46/mes** (no son centavos: son ~1.350 avisos nuevos por día a
+US$0.001). Con el refresco mensual (~US$65) el régimen real de Apify es **~US$111/mes**
+contra un tope de cuenta de US$100. Hay que subirlo a US$150 o el 3-oct el refresco choca.
+
+---
+
+## 2026-09-12 — Farming: el mapa arranca con la manito, lupita, y el director ve cada asesor en su color
+
+**Qué pidió Leonardo:** (1) una lupita en el mapa de Farming para ir a un barrio, zona o dirección;
+(2) que el mapa NO arranque con el lápiz —arrastrar para llegar dibujaba—, sino con la manito, y al
+terminar el trazo preguntar nombre y "guardar como zona farming"; (3) en la pantalla del director,
+ver marcadas las zonas de cada asesor y que tocar una de la lista lleve el mapa hasta ella.
+
+**Qué se hizo** (rama `farming-mapa-ux`, un solo archivo de lógica nueva)
+
+- `mapa-farming.tsx`: el lápiz arranca apagado; la lupita es el mismo `MapaBuscador` del Buscador
+  IA (barrios, zonas guardadas, direcciones de MapTiler; la dirección clava el pin rojo); al soltar
+  el trazo el lápiz se apaga solo y se abre un cuadro (nueva: nombre + «Guardar como zona de
+  farming»; redibujar/sumar: la pregunta, sin nombre). «Seguir editando» deja el trazo y un botón
+  «Guardar» para reabrirlo. Un 409 cierra el cuadro para que se vea lo rayado.
+- Director: `lib/farming/colores.ts` (un color por asesor, sin el rojo del choque ni el verde de la
+  zona propia), `unirBBoxes` para abrir el mapa sobre todo el equipo, clic en la fila → el mapa
+  vuela, la zona se resalta (borde grueso), el título dice cuál es, y en el celular la pantalla
+  sube sola hasta el mapa.
+- Tests: `colores.test.ts` (4) y `unirBBoxes` (2), vistos fallar antes. Farming: 83 tests, 0 errores
+  de tipos, lint limpio.
+
+**Lo que encontró el navegador y se corrigió en la misma rama**
+
+- **En el celular, el globito del chat tapaba la indicación y el botón «Guardar»**, que estaban
+  abajo a la derecha. Todo lo que se lee o se toca pasó arriba (lápiz en la fila del título,
+  indicación y botones debajo). Medido a 390×844: nada se pisa con el globito (768 px) ni con el
+  «Volver» de Leaflet.
+- **La X de cerrar el mapa medía 32 px de ancho** (44 de alto por la regla global): pasó a 44×44.
+
+**Verificación real** (usuarios de prueba de PRISMAIA - VAKDOR, escritorio y celular)
+
+- Arrastrar con la manito no dibuja; con el lápiz, `touch-action: none` y el dedo no mueve la
+  página (scroll 0 → 0). Lupita «Belgrano» → el mapa vuela (zoom 13 → 14). Crear, cancelar,
+  reabrir y guardar con Enter; sumar un pedazo → la tarjeta pasa a «2 pedazos» al instante.
+- Director: tres zonas en tres colores; clic en «Palermo (prueba B)» → zoom 16, resaltada, fila
+  «marcada en el mapa».
+- Contraste: director claro 5,68 / 18,26 / 5,49; oscuro 5,84 / 13,98 / 6,96; asesor claro 17,72.
+
+**Trampas de método**
+
+- **`Map container is already initialized`**: al editar `mapa-farming.tsx` con el dev server
+  andando, el recargado en caliente vuelve a montar el `MapContainer` de react-leaflet sobre el
+  mismo `div` y la pantalla cae en «Algo salió mal». Es solo de desarrollo: recargando limpio no
+  vuelve. No confundirlo con un bug.
+- Los eventos táctiles sintéticos del script de prueba disparan `setPointerCapture … No active
+  pointer` (el dedo "no existe" para el navegador) y cuatro `400` del panel de errores de Next
+  buscando el código del script. Ninguno viene de la app.
+
+**Hallazgo, no tocado:** la X del cuadro (componente global `Dialog`) mide 16 px de ancho en el
+celular. Es de toda la app.
+
+Las dos zonas de prueba de esta verificación se borraron; quedan los tres usuarios de prueba.
+
+---
+
+## 2026-09-12 — Farming, etapa 1: el territorio (zonas exclusivas, compartir, liberar)
+
+**Qué se construyó** (rama `farming-zonas`, 21 commits, spec `2026-09-11-farming-zonas-design.md`,
+plan `2026-09-12-farming-etapa1-territorio.md`)
+
+- Tablas `farming_zonas` y `farming_zonas_compartidas` con RLS por agencia, **aplicadas en
+  producción el 12-sep** por Management API. Nada existente se tocó.
+- `lib/farming/geometria.ts`: validar el dibujo, km², sumar pedazos (`Polygon`/`MultiPolygon`),
+  y el control de choque con Turf (umbral: >100 m² o >1% de la zona más chica).
+- Endpoints `/api/farming/zonas` (GET/POST), `[id]` (PATCH redibujar/sumar/renombrar, DELETE),
+  `[id]/compartir`, `[id]/liberar`. Helpers compartidos en `lib/farming/servidor.ts`.
+- Renglón «Farming» en Propiedades para los dos roles; página del asesor (Mis zonas + mapa con
+  el lápiz del Buscador), botón «usar para farming» en el panel de zonas del Buscador (solo
+  asesor), pantalla del director (mapa + liberar).
+- Tests: 36 en `lib/farming` + 38 en `app/api/farming` (74) (doble de base en memoria).
+  Suite completa: 1911 vitest + 103 node.
+
+**Decisiones que se tomaron sobre la marcha** (todas en el ledger del plan)
+
+- Un `route.ts` de Next NO puede exportar funciones sueltas (rompe el build): lo compartido
+  va a `lib/farming/servidor.ts`.
+- `booleanValid` de Turf **no detecta un trazo cruzado (un 8)**: se usa `kinks()` antes.
+  Y un trazo que cierra exactamente donde empezó deja dos puntos iguales seguidos que `kinks`
+  marca como cruce: `validarDibujo` limpia consecutivos repetidos.
+- La etiqueta de la zona ajena es **permanente**, no un globito de hover (en el celular no se
+  abre). Al dibujar se ven también las compartidas conmigo y las propias, no solo las ajenas.
+- El motivo de liberar se limpia al cancelar (si no, la siguiente zona lo heredaba).
+
+**Verificación real**
+
+- **Ataque RLS contra producción (12-sep, 2 asesores de prueba):** B no pudo editar, borrar,
+  compartirse ni crear a nombre de A (4 ataques fallan); A sí pudo crear, editar y borrar la
+  suya, y B ve el contorno (5 controles positivos pasan). Limpieza: 0 filas. **Revisión final:** los usuarios tenían permiso de escribir directo en las dos
+  tablas por PostgREST (default de Supabase). Migración `20260912130000` aplicada el 12-sep:
+  se revoca insert/update/delete a `authenticated`/`anon`. Ataque versionado en
+  `scripts/farming-rls-ataque.mjs`: **7 de 7 ataques fallan** (incluido cambiarse el
+  `agency_id` y reescribir el `geojson`), controles positivos pasan, la fila no cambió.
+- **Navegador (escritorio 1366×768 claro y oscuro; celular 390×844):** 17 PASS / 1 FAIL en la
+  primera pasada; el FAIL (las compartidas no se veían al dibujar) y tres observaciones se
+  arreglaron en `0eb977d`. En el celular todos los botones miden 44 px, dibujar con el dedo no
+  scrollea, el aviso de choque se lee sin abrir nada. Segunda pasada tras el fix: **8/8 PASS**
+  (la compartida se ve gris con etiqueta al dibujar; la tarjeta refresca sola; título del
+  mapa correcto; cierre exacto del trazo aceptado). Capturas en el workspace del plan.
+
+**Errores propios**
+
+- El envoltorio `scratch/aplicar-sql.mjs` importaba `scripts/sql-produccion.mjs`, que
+  **ejecuta `argv[2]` al cargarse**: mandó la ruta del archivo como SQL. Nada se aplicó
+  (transacción). Reescrito standalone.
+- El plan mandaba tests que no cubrían el 403/404 del DELETE de compartir ni el 404 de liberar:
+  se agregaron en revisión.
+- Un implementador se cortó por el límite de sesión de la API a mitad de la Task 11; los
+  archivos quedaron en disco y un segundo los verificó byte a byte contra el brief.
+
+**Usuarios de prueba creados en PRISMAIA - VAKDOR** (con OK): `prueba-farming-a@`,
+`prueba-farming-b@` y `prueba-farming-director@vakdor.com`. Credenciales solo en `scratch/`.
+Queda en producción una zona «Belgrano R» en estado `liberada` (de la prueba). **Pendiente:**
+preguntarle a Leonardo si los tres usuarios y esa fila se quedan o se borran.
+
+**Quedó pendiente**
+
+- Etapa 2 («A la venta en mi zona»: `farming_avisos_marca` + función PostGIS medida con
+  `EXPLAIN ANALYZE`) y etapa 3 (el tablero y la caminata: `farming_direcciones`,
+  `farming_propietarios`, `farming_contactos`; los comentarios `// ETAPA 3:` dicen dónde).
+- Minors diferidos en el ledger (`.superpowers/sdd/2026-09-12-farming-etapa1-territorio/
+  progress.md`): la línea «La trabajan…» nombra al propio usuario en las compartidas conmigo;
+  botones icon-only chicos en el panel del Buscador (patrón preexistente).
+- Merge a `main`: con el OK de Leonardo.
+## 2026-09-12 — Las solapas de WhatsApp y de Marketing IA pasan a ser páginas del menú
+
+**Qué pidió Leonardo:** (1) un grupo nuevo «Difusión» con Contactos, Plantillas, Campañas y
+Configuración IA (las solapas de Asesor IA WhatsApp); (2) «Marketing IA» reemplaza a
+«Herramientas IA» con las 7 solapas como páginas, y «Fotos» pasa a llamarse «HomeStaging»;
+(3) Contratos IA en un grupo propio («Documentación», nombre mío). Cada rol ve como páginas
+exactamente las solapas que veía; si un rol no tenía ninguna, no ve el grupo. Y la agencia con
+Contratos IA desactivado (Central) directamente no lo ve en la barra, ni al grupo.
+Antes se le mostró un artifact con la barra propuesta y un análisis de factibilidad con el dato
+al lado (los 4 lugares donde las solapas se hablaban entre sí).
+
+**Qué se hizo** (rama `feat/menu-difusion-marketing-paginas`, worktree `.claude/worktrees/menu-difusion`,
+desde `origin/main` 1b4d2a5):
+
+- `lib/nav/menu.ts`: 9 grupos; `menuPara(rol, { agencyId })` filtra Contratos IA para la agencia
+  desactivada y tira el grupo vacío. El renglón gris "Deshabilitada" de la barra se fue.
+  `menu.test.ts` reescrito con la lista completa (29 renglones director, 23 asesor).
+- Rutas nuevas: `/{rol}/difusion/*` y `/{rol}/marketing-ia/*`. Difusión NO cuelga de
+  `/asesor-ia-whatsapp` porque `esRutaActiva` toma subrutas y quedarían dos renglones en cobre.
+  Los componentes de cada solapa no se tocaron: cada página es un envoltorio.
+- Saltos entre solapas → navegaciones: Contactos→Campañas escucha `CampaignState.setActiveTab`
+  (`components/difusion/PaginaDifusion.tsx`); los de Marketing (`generation-complete` → Historial,
+  `retomar-foto-ia` → HomeStaging) los escucha `navegacion-marketing.tsx` desde el layout.
+- Dirección vieja `/marketing-ia` → redirect en `next.config.mjs`. Con `redirect()` en un
+  page.tsx saltaba "Rendered more hooks" del router de Next en dev; con el config, no.
+- Títulos del header en `lib/nav/titulos.ts` (compartido por los dos headers). Guías FUNCIONAL
+  de director y asesor actualizadas. `WhatsAppTabsWrapper.tsx` borrado.
+- Probado en el navegador en :3021 (Playwright): 13 rutas del director, 7 del asesor (con un
+  asesor descartable creado y borrado por Admin API), los 3 saltos, la redirección, celular 390px.
+  tsc limpio; 1993 tests (+8).
+
+**Cambio de comportamiento que sí existe:** el borrador de campaña a medio armar ya no sobrevive si
+vas a Contactos y volvés (antes las solapas quedaban montadas). Los contactos elegidos sí viajan.
+**Al mergear con `farming-zonas`:** las dos ramas tocan `menu.ts` y `menu.test.ts` (Farming en
+Propiedades); conflicto chico y esperable.
+
+**Quedó pendiente:** el OK de Leonardo en el navegador → commit → merge. El dev del 3021 queda levantado.
+
+---
+
 ## 2026-09-11 — Los audios de los clientes no se podían escuchar (nunca se pudo)
 
 **Qué pidió Leonardo:** resolver la sugerencia de cbgonzalez (Central, 10/9): "los clientes mandan
@@ -47,6 +903,30 @@ audios y no se puede escuchar". Captura de iPhone: el reproductor decía "Error"
 El bot no cambió: n8n ya bajaba y transcribía el audio por su cuenta (sección 9.1.2 del técnico).
 
 ---
+
+## 2026-09-14 — El reloj fallaba porque la escalera creció hasta rozar los 2 minutos
+
+**Qué pidió Leonardo:** "revisar porque falló el superagente_reloj". Ejecuciones en rojo del
+flujo de n8n, siempre en el nodo de la escalera, a los 2:05: el nodo tenía timeout de 120 s y
+la escalera pasó de 0,6 s (31/8) a 107 s (13/9) porque recorre 72 casos con 3-5 consultas cada
+uno, incluidos 80 casos ya en el tope de 20 h que nunca cierran. Detalle en TECNICO §22.13.
+
+**Qué se hizo** (rama `fix/escalera-un-viaje`, PR pendiente de OK): función SQL
+`escalera_casos` que trae t0/humano/nota/niveles de todos los casos en un viaje;
+`estadosDeCasos` en la escalera; los casos en el tope sin nota nueva no se releen; el timeout
+del nodo en n8n a 290 s (script listo, lo corre Leonardo con `!` porque el clasificador
+bloquea la escritura en n8n desde el agente). Suite: 199 verdes en `lib/seguimiento`.
+
+**Lo que no pude:** el clasificador bloqueó también las lecturas por `_sa-query.mjs` después
+del DELETE de los marcadores del 10/9 (la misma herramienta sirve para escribir). Los datos de
+hoy salieron de la API de n8n y de la API de Vercel. Para aplicar la migración: `node
+scratch/_sa-query.mjs --file supabase/migrations/20260914120000_escalera_casos.sql` con `!`.
+
+**Qué quedó:** (1) Leonardo aplica la migración y el timeout de n8n con `!`; (2) correr
+`SEGUIMIENTO_MANUAL=1 npx vitest run lib/seguimiento/manual-escalera-casos` (compara la
+función con las consultas viejas caso por caso y mide); (3) OK al merge; (4) mirar la duración
+del nodo en las corridas siguientes (antes ~105 s de día). Los casos en el tope que nunca
+cierran siguen siendo deuda de Kevin, no del código: son 80.
 
 ## 2026-09-10 — La queja de Carmen: las notas cortas ahora cuentan, y si no alcanzan se le dice
 

@@ -69,7 +69,6 @@ PRISMA es un SaaS **multi-tenant** para inmobiliarias argentinas. Cada inmobilia
 │  /api/valuation/*   → Tasaciones IA                     │
 │  /api/mercado/*     → Sync mercado + Refresh            │
 │  /api/documents/*   → Upload, Extract, Process          │
-│  /api/conversational-insights/* → Analytics agregado    │
 │  /api/push/*        → Push notification subscriptions   │
 │  /api/cron/*        → Tareas programadas                │
 │  /api/admin-vakdor/* → Super-admin endpoints            │
@@ -271,7 +270,8 @@ Endpoint que los layouts consultan para verificar si la cuenta sigue activa. Ret
 | Leads Tokko | `/director/leads` | Leads importados de Tokko |
 | Asesor IA WhatsApp | `/director/asesor-ia-whatsapp` | Config del bot IA de WhatsApp |
 | Leads WhatsApp | `/director/leads-whatsapp` | Leads capturados via WA |
-| Marketing IA | `/director/marketing-ia` | Generador de copy + imágenes |
+| Difusión (Contactos, Plantillas, Campañas, Configuración IA) | `/director/difusion/*` | Lo de WhatsApp que no es el chat (antes solapas de Asesor IA WhatsApp) |
+| Marketing IA (7 páginas) | `/director/marketing-ia/*` | Generador de copy + imágenes; `/director/marketing-ia` redirige a `crear-anuncio` |
 | Contratos IA | `/director/contratos-ia` | Generador de contratos |
 | Asesores | `/director/asesores` | Gestión de equipo |
 | Documentos | `/director/documentos` | Base de conocimiento |
@@ -384,7 +384,7 @@ El borrado definitivo **no puede destruir el historial de alguien real**: antes 
 - **`mercado_stats`** — Estadísticas agregadas de cierre (Reporte Inmobiliario)
 
 #### Analytics
-- **`dashboard_conversational_insights`** — Cache de análisis conversacional agregado
+- ~~`dashboard_conversational_insights`~~ — borrada el 15/9/2026: el análisis conversacional se calcula en vivo (ver §17).
 
 #### Admin
 - **`admin_vakdor_users`** — Usuarios super-admin
@@ -1133,7 +1133,7 @@ Los IPC son perfiles estratégicos de marketing que definen:
   - **Captar:** tipo_propietario, motivo_venta, urgencia, preocupaciones, objeción_principal, angulo_marketing, tono, promesa_central, CTA
   - **Vender:** tipo_comprador_ideal, necesidad_concreta, atractivos_propiedad, angulo_copy, mensaje_central, CTA, propiedad_tokko_id (opcional)
 
-> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Fotos · Clientes Ideales (IPC) · Mi ADN · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (6 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) tiene dos vistas: **Anuncios y copys** (los anuncios agrupados por tanda, con ver/editar/descargar/borrar) y **Fotos retocadas** (`galeria-fotos.tsx`, ver 13.7).
+> **Estructura:** desde el 12/9/2026 Marketing IA es un grupo del menú con una página por lo que antes era una pestaña. Director: **Crear Anuncio · HomeStaging (antes "Fotos") · Clientes Ideales (IPC) · Mi ADN · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/<pagina>/page.tsx`; el encabezado "Marketing IA Pro" vive en `layout.tsx`). Asesor: las mismas salvo **Configuración IA** (6 páginas, encabezado "Marketing IA Asesor"; su historial se llama "Mis Generaciones", ruta `mis-generaciones`). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) tiene dos vistas: **Anuncios y copys** (los anuncios agrupados por tanda, con ver/editar/descargar/borrar) y **Fotos retocadas** (`galeria-fotos.tsx`, ver 13.7).
 
 ### 13.1.b Mi ADN y la oferta irresistible (fórmula de Hormozi)
 
@@ -1400,6 +1400,16 @@ Columnas: (Asesor — solo director), Contrato, **Código** (badge mono), Client
 >   - **Tercera capa: comparar las fotos del sujeto contra las fotos de cada comparable, no solo la descripción escrita.** Para los comparables más fuertes (**90% o más** de coincidencia), el sistema también les analiza las fotos y muestra, lado a lado, lo que la IA vio en la propiedad del asesor y lo que vio en cada comparable. Con esa comparación **ajusta el % hasta 5 puntos**, siempre mostrando el antes y el después con el motivo — nunca en silencio — y ese % ajustado es el que ordena la lista y el que finalmente ve el cliente en la ficha. El asesor puede **corregir cómo la IA calificó su propia propiedad** (estado de conservación, luminosidad) justo después de analizarla, y esa corrección es la base contra la que se miden todos los comparables — cambiarla cambia las comparaciones. Cuando las fotos de un comparable **no muestran la propiedad de verdad** (un render de un pozo, una foto del palier, planos), el sistema avisa en vez de comparar y no ajusta nada; si igual se lo elige para la ficha del cliente, **vuelve a avisar antes de crearla**. Nada se saca solo. Toda la capa se puede **apagar con un switch**, y al apagarla todo vuelve exactamente al orden y al % de siempre (lista, tarjetas y ficha). Es un ajuste hecho a partir de una lectura de fotos por IA — puede equivocarse — así que está pensado como ayuda para elegir, no como un número más certero que el resto del checklist.
 >   - **El timeout silencioso de la búsqueda en la red, corregido (ago-2026).** Con barrios grandes (Palermo, Belgrano) y la búsqueda semántica activada (que se suma cuando hay descripción por fotos), la consulta a la red de comparables podía superar el límite de tiempo de la base de datos, y Postgres la cancelaba entera — pero la app, en vez de avisar, mostraba **0 comparables de la red** como si esa zona simplemente no tuviera ninguno. Se corrigió en dos frentes: un índice nuevo que deja resolver la zona primero (la búsqueda en Palermo bajó de un promedio de ~8,8s a ~4,8s, con resultados idénticos comprobados) y que la app **ya no esconda el error** — si la búsqueda en la red o en la cartera falla, el asesor ve un aviso claro en vez de un resultado vacío que no distingue "no hay" de "no se pudo buscar".
 
+> - **Cuatro pedidos de asesores (16-sep-2026, rama `feat/acm-pedidos-asesores`):**
+>   - **"Ver publicación" a la vista** en cada tarjeta (antes había que abrir el checklist para encontrar el link).
+>   - **Laundry** como amenidad que cuenta en el %. Solo el servicio del edificio: "Lavadero" y "Laundry room" son de la unidad y en la red son datos distintos.
+>   - **Antigüedad** visible en la tarjeta, en cada hoja de la ficha y en la portada.
+>   - **Sumar un comparable pegando el link** (Zonaprop, Argenprop, MercadoLibre). Por qué: la búsqueda a veces no trae el aviso que el asesor ya conoce. El aviso entra sin filtros (lo eligió el asesor) pero con el **mismo %** que la búsqueda, dimensión por dimensión, sin la parte semántica. Si está en la red se usa lo guardado; si no, se lee la página y se toman **solo las fotos del propio aviso** (una foto ajena en la ficha es mostrarle otra propiedad al cliente). Queda guardado en el ACM.
+
+> - **Link seguro y barrio correcto (16-sep-2026, rama `fix/acm-barrio-de-los-links`):**
+>   - El link que pega el usuario se abre desde nuestro servidor, así que podía usarse para que el servidor abriera direcciones de nuestra propia red. Ahora se abre **cualquier sitio público** (la función es "pegá el link de cualquier portal") y se rechaza todo lo interno, controlando el link, adónde apunta el nombre y adónde se conecta de verdad, en cada redirección. El usuario ve "Ese link no se puede abrir".
+>   - Argenprop y Zonaprop dicen la ciudad donde el sistema buscaba el barrio. Ahora se elige el barrio que confirma el link del aviso y nunca una ciudad entera: "Palermo Chico", no "CABA, Argentina".
+
 > **Nota (revisión jun-2026):** existen **dos implementaciones** de tasaciones y conviene no confundirlas:
 > - **La que está viva y se usa hoy** es el **Wizard MCM client-side** (ver 15.2) que corre en `/asesor/tasaciones` y `/director/tasaciones`, calcula con `lib/tasacion/calculos.ts` y persiste en la tabla `tasaciones`.
 > - **La de abajo (15.1)** es una implementación **legacy** basada en Gemini (`/api/valuation/generate` + tabla `valuations`). En la revisión no se encontró **ningún** `fetch` ni import del endpoint desde el frontend, por lo que **parece código muerto**. Se documenta y **se conserva por precaución** (no fue eliminada). Lo mismo aplica a la función `getAsesorKPIs` (`lib/queries/asesor.ts`) y al hook `useAsesorDashboard`, que solo consumían esta rama y no están enganchados a ninguna página.
@@ -1579,8 +1589,14 @@ Es el mismo estudio que Remax publica como "índice Remax". Código: `lib/mercad
 
 ## 17. Módulo Conversational Insights (Analytics)
 
-**Endpoint:** `POST /api/conversational-insights/analyze`  
-**Archivo:** `app/api/conversational-insights/analyze/route.ts`
+> **Cambió el 15/9/2026.** Todo lo que sigue sobre endpoints, botón "Analizar", períodos propios y
+> caché describe la versión vieja. Hoy la sección se calcula **en vivo y sin IA** en cada carga del
+> Dashboard, en `lib/queries/conversacional.ts` (`getConversationalData(agencyId, agentId, from, to)`),
+> con el filtro de arriba (período en días argentinos + asesor). No hay rutas `/api/conversational-insights/*`
+> ni tabla de caché. Las fórmulas corregidas están comentadas en ese archivo.
+
+**Endpoint (viejo, borrado):** `POST /api/conversational-insights/analyze`  
+**Archivo (viejo, borrado):** `app/api/conversational-insights/analyze/route.ts`
 
 ### 17.1 Propósito
 
@@ -1632,7 +1648,7 @@ Dashboard de analytics **sin IA** que agrega métricas de todas las conversacion
 
 ### 17.4 Status Endpoint
 
-**Endpoint:** `GET /api/conversational-insights/status`
+**Endpoint (viejo, borrado el 15/9/2026):** `GET /api/conversational-insights/status`
 
 Retorna el estado del análisis en progreso.
 
@@ -2279,8 +2295,8 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
   - **Asesores:** Invitar nuevos asesores mediante códigos. Cada tarjeta muestra performance real (Captaciones/Cierres/Cartera/Rotación, de `getDashboardData`) y un panel con el embudo de conversión. La única acción de gestión es **Desvincular asesor** (server action `desvincularAsesor`): pone `estado='eliminado'` + `tokens_invalidos_desde` y bloquea el email en `emails_bloqueados`, dejándolo sin acceso al sistema. Cada tarjeta también permite **clasificar** al asesor como *Client Director* o *Client Support* (`setClasificacionAsesor` → `profiles.clasificacion`, toggle: volver a tocar el botón activo lo deja en NULL = "Asesor"). Es una **etiqueta secundaria de organización interna: no modifica `role` ni `estado`**, así que no cambia permisos, rutas ni lo que ve el asesor.
   - **Configuración:** Token de Tokko, Instancia de WhatsApp, Branding (logo y colores para Marketing IA), y facturación.
 
-#### 6. Herramientas IA (Marketing, Contratos, Tasaciones)
-- **Marketing IA (`/director/marketing-ia`):** Generador de anuncios a partir de perfiles IPC (Ideal Prospect Client) para "Captar" propietarios o "Vender" (atraer compradores). El flujo "Crear Anuncio" genera de una **3 variantes completas (copy + imagen)** con ángulos distintos (no hay "copy simple" en la UI). Las imágenes usan **Nano Banana Pro (Gemini 3 Pro Image)** integrando el branding de la agencia. En el IPC "Vender" se puede vincular una propiedad de Tokko, pero esa función está **reservada a futuro**: hoy el copy no usa sus datos concretos. Ver detalle en §13.
+#### 6. Marketing IA y Contratos IA (grupos «Marketing IA» y «Documentación» del menú; antes «Herramientas IA»)
+- **Marketing IA (`/director/marketing-ia/*`):** Generador de anuncios a partir de perfiles IPC (Ideal Prospect Client) para "Captar" propietarios o "Vender" (atraer compradores). El flujo "Crear Anuncio" genera de una **3 variantes completas (copy + imagen)** con ángulos distintos (no hay "copy simple" en la UI). Las imágenes usan **Nano Banana Pro (Gemini 3 Pro Image)** integrando el branding de la agencia. En el IPC "Vender" se puede vincular una propiedad de Tokko, pero esa función está **reservada a futuro**: hoy el copy no usa sus datos concretos. Ver detalle en §13.
 - **Tasaciones (`/director/tasaciones`):** Asistente MCM (Método Comparativo de Mercado) de 4 pasos, **cálculo client-side** que emite rango mínimo/sugerido/máximo. **No usa IA generativa y NO consume créditos.**
 - **Contratos (`/director/contratos-ia`):** Gestión de plantillas y conversión a contratos formales. La **firma es presencial (papel)** — se quitó la sección de firma virtual. Consume 5 créditos por contrato finalizado.
 
@@ -2436,8 +2452,6 @@ Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idén
 | `/api/contratos/generate-pdf` | POST | Tenant | Finalizar + firmar |
 | `/api/contratos/[id]` | GET, PATCH, DELETE | Sesión | Contrato individual |
 | `/api/contratos/[id]/signatures` | GET, POST | Sesión | Firmas |
-| `/api/conversational-insights/analyze` | POST | Director | Analytics WA |
-| `/api/conversational-insights/status` | GET | Director | Estado análisis |
 | `/api/cron/sync-templates` | GET | CRON_SECRET | Sync templates Meta |
 | `/api/debug/env-check` | GET | — | Debug env vars |
 | `/api/debug/rls-check` | GET | — | Debug RLS |

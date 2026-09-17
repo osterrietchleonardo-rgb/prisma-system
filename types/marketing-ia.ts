@@ -173,6 +173,18 @@ export interface GenerateImagePayload {
    * de que existieran dos logos. La regla completa está en lib/marketing-ia/logo-variante.ts.
    */
   logo_variant?: VarianteLogo;
+  /**
+   * La foto real de la propiedad que eligió el asesor. Si viene, la placa se arma con ESA foto
+   * y NO se llama a Gemini (así no hay forma de que la IA le cambie un mueble al depto que se
+   * vende, y además no consume créditos de imagen).
+   */
+  foto_url?: string;
+  /**
+   * El id de la propiedad. La pantalla manda ESTO y no los datos: hasta el 16-sep-2026 mandaba
+   * `flow_data.tokko_property_details`, que está vacío en los perfiles reales, así que la placa
+   * no recibía ni la foto ni los datos.
+   */
+  propiedad_tokko_id?: number | string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

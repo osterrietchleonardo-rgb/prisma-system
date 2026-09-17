@@ -36,7 +36,8 @@ export function AdvisorFilter({ advisors }: Props) {
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
-      <div className="flex items-center gap-2 shrink-0">
+      {/* En el celular el rótulo se oculta: el desplegable ya dice "Todos los asesores". */}
+      <div className="hidden sm:flex items-center gap-2 shrink-0">
         <Filter className="h-4 w-4 text-muted-foreground" />
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Filtrar por Asesor</span>
       </div>

@@ -37,6 +37,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { TokkoProperty, IpcProfile } from "@/types/marketing-ia"
+import { rutaMarketing } from "@/lib/marketing-ia/rutas"
 
 // Specialized Schemas
 const captarSchema = z.object({
@@ -279,7 +280,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
         onSave()
       } else {
         router.refresh()
-        router.push(window.location.pathname.includes('/director/') ? '/director/marketing-ia' : '/asesor/marketing-ia')
+        router.push(rutaMarketing(window.location.pathname.includes('/director/') ? 'director' : 'asesor', 'clientes-ideales'))
       }
     } catch (error: any) {
       console.error("IPC Save Error:", error)

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { contratosIaDeshabilitado } from "@/lib/access/contratos-ia"
 import {
   esRutaActiva,
   grupoActivo,
@@ -23,6 +22,8 @@ import {
  * - Al navegar a una página, su grupo se abre solo.
  * - Qué grupos quedaron abiertos se guarda en el navegador, por rol, así
  *   sobrevive al cambio de página y al F5.
+ * - Qué páginas ve cada agencia lo decide `menuPara` (hoy: Contratos IA no
+ *   aparece para la agencia que lo tiene desactivado, ni su grupo).
  */
 
 interface SidebarNavProps {
@@ -54,8 +55,8 @@ function guardar(rol: Rol, abiertos: Record<string, boolean>) {
 
 export function SidebarNav({ rol, agencyId, onSelect, badges }: SidebarNavProps) {
   const pathname = usePathname()
-  const grupos = menuPara(rol)
-  const activo = grupoActivo(rol, pathname)
+  const grupos = menuPara(rol, { agencyId })
+  const activo = grupoActivo(rol, pathname, agencyId)
 
   // Arranca con el grupo de la página activa abierto. Es determinista (sale del
   // pathname), así que el servidor y el navegador dibujan lo mismo.
@@ -137,7 +138,6 @@ export function SidebarNav({ rol, agencyId, onSelect, badges }: SidebarNavProps)
                     key={item.id}
                     item={item}
                     pathname={pathname}
-                    agencyId={agencyId}
                     onSelect={onSelect}
                     badge={badges?.[item.id]}
                   />
@@ -166,33 +166,13 @@ export function SidebarPie({ rol, onSelect }: { rol: Rol; onSelect?: () => void 
 interface ItemMenuProps {
   item: NavItem
   pathname: string
-  agencyId?: string
   onSelect?: () => void
   badge?: number
 }
 
 /** Un renglón del menú. Mismas clases y misma regla de "activo" que tenía la barra. */
-function ItemMenu({ item, pathname, agencyId, onSelect, badge }: ItemMenuProps) {
+function ItemMenu({ item, pathname, onSelect, badge }: ItemMenuProps) {
   const isActive = esRutaActiva(item.href, pathname)
-
-  // "Contratos IA" deshabilitada solo para la agencia indicada
-  const isDisabled = item.id === "contratos-ia" && contratosIaDeshabilitado(agencyId)
-
-  if (isDisabled) {
-    return (
-      <div
-        aria-disabled="true"
-        title="Función no disponible en tu plan"
-        className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-muted-foreground cursor-not-allowed select-none"
-      >
-        <item.icon className="w-4 h-4" />
-        {item.name}
-        <span className="ml-auto text-[9px] font-bold uppercase tracking-wide bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
-          Deshabilitada
-        </span>
-      </div>
-    )
-  }
 
   return (
     <Link

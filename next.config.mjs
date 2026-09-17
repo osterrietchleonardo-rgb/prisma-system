@@ -26,6 +26,12 @@ const nextConfig = {
     return [
       // Tasaciones pasó a llamarse ACM (Análisis Comparativo de Mercado).
       { source: '/director/tasaciones', destination: '/director/acm', permanent: true },
+      // Marketing IA dejó de ser una página con solapas (12/9/2026): cada solapa es una
+      // página. La dirección vieja lleva a la primera. Va acá y no en un page.tsx con
+      // redirect() porque en desarrollo ese redirect hacía saltar un error de hooks del
+      // router de Next al cargar la dirección vieja.
+      { source: '/director/marketing-ia', destination: '/director/marketing-ia/crear-anuncio', permanent: false },
+      { source: '/asesor/marketing-ia', destination: '/asesor/marketing-ia/crear-anuncio', permanent: false },
       { source: '/asesor/tasaciones', destination: '/asesor/acm', permanent: true },
     ];
   },

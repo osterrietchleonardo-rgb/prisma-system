@@ -33,6 +33,7 @@
 22. [Personalizaciones de tu agencia](#22-personalizaciones-de-tu-agencia)
 23. [El Mapa del Buscador IA](#23-el-mapa-del-buscador-ia)
 24. [Cuando un cliente queda esperando: los avisos y tus botones](#24-cuando-un-cliente-queda-esperando-los-avisos-y-tus-botones)
+25. [Farming: tu zona](#25-farming-tu-zona)
 
 ---
 
@@ -60,8 +61,10 @@
   - **Mi día:** Mi Dashboard, Mi Calendario, Tracking Performance.
   - **Bandejas:** WhatsApp Bandeja (las conversaciones que entran).
   - **Contactos:** Mi Pipeline, Leads Tokko, Leads WhatsApp (los listados de gente).
+  - **Difusión:** Contactos (tu agenda de WhatsApp).
   - **Propiedades:** Mis Propiedades, Buscador IA, ACM, Pulso de Mercado.
-  - **Herramientas IA:** Marketing IA, Contratos IA.
+  - **Marketing IA:** Crear Anuncio, HomeStaging, Clientes Ideales (IPC), Mi ADN, Mis Generaciones, Guía Mágica.
+  - **Documentación:** Contratos IA. (Si tu agencia no lo tiene contratado, este grupo no aparece.)
   - **Ayuda:** Tutor IA, Biblioteca, Sugerencias.
 - Cada grupo se abre y se cierra tocando su título. Podés cerrarlos todos; el grupo de la sección en la que estás queda con el título en color cobre. Al entrar a una sección, su grupo se abre solo, y el menú se acuerda de qué grupos dejaste abiertos.
 - **Cerrar la barra en la computadora:** arriba a la derecha de la barra hay un botón para esconderla y ver el contenido a todo lo ancho. Para volver a abrirla, usá el botón **"Barra lateral"** arriba a la izquierda. En el celular no cambia nada: la barra sigue saliendo desde el botón de las tres líneas.
@@ -284,7 +287,7 @@ El proceso ya no es sólo "compra o venta": son cuatro opciones, porque la agenc
 - A la izquierda, la **lista de conversaciones**; al centro, el **chat en vivo**.
 - Escribís y respondés directamente desde acá (mensajería en tiempo real).
 - Podés **filtrar los chats por clasificación** (origen del lead); cada chat muestra su **etiqueta de clasificación** con un color.
-- Arriba tenés dos solapas: **💬 Bandeja** (los chats) y **👥 Contactos** (tu agenda para importar leads y campañas).
+- Esta página es solo la **💬 Bandeja** (los chats). Tu agenda de **👥 Contactos** (para importar leads) es una página aparte: **Difusión → Contactos** en el menú.
 - **En Contactos ves solo TUS contactos:** los que vos importaste/cargaste y los de los leads que tenés asignados. **No ves los contactos de los otros asesores** (ni ellos los tuyos). Tu director sí ve los de todos.
 - Si tu director todavía no configuró WhatsApp, vas a ver un cartel de **"WhatsApp no configurado"** (esa configuración la hace el director, no vos).
 
@@ -353,7 +356,7 @@ Al abrir un chat, en **Información del contacto** (el ícono de la persona arri
 
 **Qué es:** un generador de contenido publicitario con inteligencia artificial (la pantalla se titula "Marketing IA Asesor").
 
-**Tiene 6 pestañas:** Crear Anuncio · **Fotos** · Clientes Ideales (IPC) · Mi ADN · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
+**Son 6 páginas, en el grupo Marketing IA del menú:** Crear Anuncio · **HomeStaging** (antes "Fotos") · Clientes Ideales (IPC) · Mi ADN · Mis Generaciones · Guía Mágica. (La "Configuración IA" de la marca es solo del director.)
 
 **Cómo usarlo paso a paso:**
 1. En **Clientes Ideales (IPC)** creás un **perfil IPC** (Cliente Ideal). Elegís el objetivo:
@@ -367,7 +370,7 @@ Al abrir un chat, en **Información del contacto** (el ícono de la persona arri
 4. Apretás el botón de generar: la IA te crea **3 variantes** con ángulos distintos (PAS, Transformación, Autoridad/Datos) para que elijas la mejor.
 5. Todo queda guardado en **Mis Generaciones**, donde lo ves, editás el texto, descargás la imagen o lo borrás.
 
-### Fotos (arreglar las fotos de una propiedad)
+### HomeStaging (arreglar las fotos de una propiedad)
 
 **Qué es:** agarra una foto y te la deja publicable. No hace falta que sepas editar.
 
@@ -398,14 +401,14 @@ Al abrir un chat, en **Información del contacto** (el ícono de la persona arri
 
 > ⚠️ **Sobre ambientes que ya tienen muebles:** lo que los muebles tapaban, el sistema lo tiene que imaginar. Miralo bien antes de publicar, sobre todo si conocés la propiedad.
 
-**Dónde quedan:** en **Historial / Galería**, en la solapa **Fotos retocadas**. Cada foto es **una tarjeta**: la abrís y vas viendo cada paso como un álbum, empezando por la original de la ficha. En cualquiera de ellos podés **seguir editando**, **descargar** o **borrar**.
+**Dónde quedan:** en **Mis Generaciones**, en la solapa **Fotos retocadas**. Cada foto es **una tarjeta**: la abrís y vas viendo cada paso como un álbum, empezando por la original de la ficha. En cualquiera de ellos podés **seguir editando**, **descargar** o **borrar**.
 
 > 💰 Cada paso consume **3 créditos**. Los tres modos juntos son 9.
 
 
 ### Mi ADN (tu oferta irresistible)
 
-**Para qué sirve:** el IPC dice *a quién* le hablás. Esta pestaña dice *quién sos vos y por qué te tienen que elegir a vos y no a la inmobiliaria de la otra cuadra*. Con tus datos, la IA te arma **dos ofertas irresistibles**: una para **captar** (dueños que quieren vender) y otra para **vender** (gente que quiere comprar). Después esas ofertas se meten solas en todos tus anuncios.
+**Para qué sirve:** el IPC dice *a quién* le hablás. Esta página dice *quién sos vos y por qué te tienen que elegir a vos y no a la inmobiliaria de la otra cuadra*. Con tus datos, la IA te arma **dos ofertas irresistibles**: una para **captar** (dueños que quieren vender) y otra para **vender** (gente que quiere comprar). Después esas ofertas se meten solas en todos tus anuncios.
 
 **Son 4 pasos:**
 1. **Mi perfil** (opcional, pero es el que más suma): años en el rubro, la zona en la que sos experto, en qué te especializás, cuántas operaciones cerraste, **2 o 3 casos reales** tuyos y qué incluye tu servicio. También hay un campo para decir **qué NO se puede prometer nunca** en tus anuncios: la IA lo respeta a rajatabla.
@@ -562,7 +565,7 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 **Cómo usarlo paso a paso:**
 1. **Elegí la propiedad a analizar** de una de estas 3 formas:
-   - **Cargar a mano:** completás el formulario (tipo, zona, m², ambientes, baños, amenities…).
+   - **Cargar a mano:** completás el formulario (tipo, zona, m², ambientes, baños, amenities…). Entre las amenities está **Laundry**: es el laundry **del edificio**, no el lavadero del departamento.
    - **Desde la cartera:** abrís el selector y **escribís para buscar** (por título, dirección o zona) entre las propiedades de tu agencia; elegís una y se completa sola. Tener buscador ayuda cuando son muchas propiedades.
    - **Desde un link:** pegás el link de un aviso (MercadoLibre, ZonaProp, Argenprop…) y apretás **Analizar**: trae los datos automáticamente. Si el portal bloquea la lectura o tarda demasiado, te avisa con un mensaje claro y completás a mano.
 
@@ -570,7 +573,14 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 > 📸 **Fotos de la propiedad (opcional).** Antes de buscar comparables podés adjuntar **hasta 4 fotos** de la propiedad y, si querés, decirle a la IA en qué fijarse (por ejemplo "estado de la cocina y del jardín"). Al tocar **"Analizar fotos con IA"**, Gemini te devuelve una **descripción escrita a partir de lo que ve** — no inventa nada ni oculta lo que está deteriorado, pero lo dice sin castigar la propiedad (por ejemplo, "cocina original, con posibilidad de actualización"). Esa descripción **es tuya**: la podés editar o reescribir del todo antes de seguir, y una casilla te deja elegir si va a la ficha del cliente o se queda solo para afinar la búsqueda. **El análisis se hace una sola vez** (no hay botón para repetirlo): una vez que la IA escribió la descripción, las fotos quedan fijas y el botón de analizar desaparece. Si querés rehacerlo con otras fotos, cambiá de forma de carga (manual / cartera / link) — eso limpia el formulario y arranca de cero. Ojo: si el análisis **falla** (se cayó internet o la IA no respondió), eso no cuenta como analizado y podés reintentar sin perder nada. Las fotos **no se guardan en ningún lado**: se usan para el análisis y se descartan. Tener esta descripción también **ayuda a encontrar mejores comparables**, porque el sistema empieza a comparar también por lo que se ve en las fotos, no solo por m²/ambientes/zona. Si elegiste la propiedad **desde la cartera**, no hace falta que busques las fotos en tu dispositivo: te aparece una **grilla con las fotos que esa propiedad ya tiene cargadas** y tildás hasta 4 con un toque (podés combinarlas con fotos subidas a mano; el tope de 4 es entre las dos). En carga a mano o por link, seguís subiendo las fotos vos, como antes. Después de analizar, también ves **cómo calificó la IA el estado de conservación y la luminosidad de tu propiedad** — corregilo con un toque si no estás de acuerdo; esa corrección es la base contra la que se comparan después las fotos de cada comparable (ver más abajo).
 2. Elegí la **operación** (Venta / Alquiler) y apretá **Buscar comparables**.
-3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**.
+3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**. Cada tarjeta muestra también la **antigüedad** (cuando el aviso la informa) y abajo tiene dos botones: **"Ver publicación"**, que abre el aviso original en otra pestaña, y **"Ver checklist"**.
+
+> 🔗 **¿Tenés un aviso que querés usar y no apareció?** Arriba de los resultados hay un cuadro para **pegar el link** de un aviso de **Zonaprop, Argenprop o MercadoLibre**. Tocás **"Sumar"** y el aviso entra en un bloque nuevo, **"Sumados por link"**, con sus datos, sus fotos, su antigüedad y su **% de comparabilidad** calculado igual que el resto. Lo podés elegir para la ficha del cliente como cualquier otro comparable, y queda **guardado en ese ACM** (lo ves al reabrirlo desde Mis ACM). Si te equivocaste, lo sacás con el **tacho** de la tarjeta.
+> - Si el aviso **ya estaba en la lista**, no lo repite: te avisa en qué bloque está y con qué %.
+> - Algunos portales tardan en dejarse leer: puede demorar **hasta 40 segundos**. Si no deja ver los datos, te avisa y no suma nada.
+> - Si el portal no deja leer el precio, la superficie o las fotos, igual lo suma y **te dice qué le faltó**.
+> - Si el aviso es de **otro barrio**, el % lo refleja (baja). Que lo hayas elegido vos no lo convierte en un comparable del mismo barrio.
+> 💰 Sumar un aviso por link **no consume créditos**.
 
 > 💡 El **tipo** y la **operación** son filtros estrictos. El **barrio, por defecto, se compara solo contra el mismo barrio y sus sub-barrios** (si tu propiedad es de Belgrano, un Belgrano R o un Belgrano Chico entran normalmente). Los **barrios limítrofes** (Núñez, Colegiales, Saavedra si tu propiedad es de Belgrano) **no entran salvo que vos lo pidas**: hay una casilla **"Incluir barrios linderos"** arriba del botón de buscar. Es así a propósito — un comparable de otro barrio puede tener el precio correcto, pero si tu cliente lo ve en su propia tasación, deja de confiar en el informe aunque el número esté bien. Si tildás la casilla, esos comparables **sí aparecen, marcados con un chip "lindero"** para que sepas cuáles son y decidas si los mostrás. No le molestan los acentos (Nuñez = Núñez).
 
@@ -595,6 +605,7 @@ Arriba de todo tenés dos solapas: **Nuevo ACM** y **Mis ACM**.
 
 - **Tocá cualquier fila** y volvés a la **misma pantalla de resultados**, tal como quedó ese día.
 - Si de ese ACM armaste una **ficha para el cliente**, la fila te muestra el botón **"Ficha"** para abrir el link directo.
+- Los avisos que **sumaste pegando el link** también quedan guardados ahí.
 - Si armás **otra ficha** desde el mismo ACM (por ejemplo con otros comparables), te queda **una fila por cada ficha**, así no perdés ninguna.
 - Podés **borrar** un ACM del historial con el tacho. Ojo: si ya compartiste la ficha con el cliente, **el link sigue funcionando**.
 
@@ -725,7 +736,7 @@ Tiene 4 pestañas:
 | Buscador IA | 1 crédito |
 | Tutor IA | 1 crédito |
 | Marketing IA — "Generar 3 Variantes" | ~7 créditos (3 textos + 3 imágenes) |
-| Marketing IA — Fotos (cada paso) | 3 créditos |
+| Marketing IA — HomeStaging (cada paso) | 3 créditos |
 | ACM (comparables) | **0 — sin costo por uso** |
 | Contratos (finalizar) | 5 créditos |
 
@@ -923,3 +934,82 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 
 > 💡 **Tip:** el seguimiento automático a los clientes que se enfriaron lo hace PRISMA solo, con mensajes naturales y como mucho tres veces; vos vas a ver en la ficha qué decidió y por qué. Lo tuyo son los clientes que **te esperan a vos**.
 
+
+---
+
+## 25. Farming: tu zona
+
+**Qué es:** tu territorio de farming — las cuadras que vas a trabajar casa por casa para captar propiedades. En PRISMA es una zona dibujada a mano sobre el mapa, que es **tuya**: ningún otro asesor de la inmobiliaria puede dibujar encima.
+
+**Dónde está:** en el menú, dentro de **Propiedades → Farming**.
+
+**Cómo dibujarla (dos caminos):**
+- **Desde Farming:** apretá **"dibujar una zona nueva"**. El mapa abre para **mover** (con el dedo o el mouse lo arrastrás, sin dibujar). Buscá tu zona con la **lupita** de arriba —un barrio, una zona que ya guardaste o una dirección— o llegá arrastrando. Recién ahí tocá el **lápiz** y dibujá el contorno sin soltar. Al soltar, el lápiz se apaga solo y aparece un cuadro para ponerle **nombre** y **"Guardar como zona de farming"**. Si tocás "Seguir editando", el trazo queda en pantalla y lo guardás después con el botón **"Guardar"** de arriba.
+- **Desde el Buscador IA:** si ya tenés una zona guardada en el mapa del Buscador, al lado de su nombre hay un botón con una **hojita** ("usar para farming"). Te copia el dibujo a Farming; la zona del Buscador queda como estaba.
+
+**Las zonas grises son de tus colegas.** Mientras dibujás las ves con el nombre y de quién son, para que no las pises. Si igual tu trazo se mete en una, PRISMA **no lo guarda**: te marca en rojo el pedazo que choca y te dice de quién es. Tu dibujo no se borra — corré el trazo y volvé a guardar.
+
+**Si te faltó una manzana o te pasaste:**
+- **"sumar un pedazo"**: dibujás un trazo más y se suma a la zona (una zona puede tener varios pedazos).
+- **"redibujar"**: el trazo nuevo reemplaza al anterior. **El viejo no queda guardado en ningún lado.** Si ya terminaste con esa zona y vas a trabajar otra, conviene dibujar una zona nueva en vez de reemplazar ésta.
+
+**Compartir la zona:** con **"compartir"** elegís a un colega del desplegable. A él le aparece en su Farming como "zona que comparten conmigo" y la trabajan juntos. Vos seguís siendo el dueño: solo vos podés borrarla o sacar a alguien.
+
+**Borrar:** con **"borrar"**. Ojo: **no queda registro de la zona ni de su trazo**, y esas cuadras quedan libres para que otro las dibuje.
+
+**Los topes:** hasta **3 zonas** activas por asesor y **5 km²** por zona (sumando sus pedazos). Farming es para trabajar una zona concreta, no para dispersarse.
+
+> 💡 Si el director **libera** una zona tuya (por ejemplo, porque cambiaste de territorio), desaparece de tu lista y esas cuadras vuelven a estar disponibles. No se pierde nada: queda en el historial.
+
+### "A la venta en mi zona"
+
+Es la segunda solapa de Farming, al lado de "Mis zonas". **No tenés que cargar nada:** te muestra todas las propiedades que hoy están publicadas adentro de tu zona. Si compartís la zona con un colega, los dos ven la misma lista.
+
+**Arriba están los atajos**, que son las cuatro señales que más sirven para captar:
+
+| Atajo | Qué quiere decir |
+|---|---|
+| **Dueño directo** | lo vende el propietario, sin inmobiliaria. Es el que más conviene tocar. |
+| **Se cayó del portal** | lo bajaron sin venderlo: la propiedad sigue disponible y el dueño ya se cansó. |
+| **Lleva +120 días** | hace más de cuatro meses que está publicado y no se mueve. |
+| **Bajó el precio** | el dueño ya aceptó que estaba caro. |
+
+**Un atajo solo aparece si tiene propiedades.** Si no ves "Se cayó del portal", es porque hoy no hay ninguna en tu zona que cumpla eso, no porque esté roto. Tocás un atajo y la lista se achica; lo tocás de nuevo y volvés a ver todas. Abajo del atajo hay un renglón que te recuerda por qué esa señal importa.
+
+**De cada propiedad ves** la foto, el precio, la dirección, los metros, los ambientes y **quién la publica** (acá no se esconde: es tu pantalla de trabajo, no la del cliente). Con **"ver el aviso"** se abre la publicación original en otra pestaña.
+
+**"Descartar"** es para las que ya miraste o no te sirven: desaparecen de la lista y **no vuelven a aparecer**, ni aunque recargues. Si te equivocaste, tenés **"deshacer"** ahí mismo. Ojo: en una zona compartida, lo que descartás vos también desaparece de la lista de tu colega.
+
+**Si movés el trazo, la lista se acomoda sola.** No hay nada guardado: se calcula cada vez que entrás. Si agrandás la zona aparecen las propiedades nuevas, y si sacás una cuadra se van las de esa cuadra.
+
+**Para pasarla a tu relevamiento** está el botón **"crear tarjeta"**, al lado de "descartar". La propiedad se suma a la solapa "Relevamiento" con lo que el aviso ya sabe (dirección, tipo, precio) y desaparece de esta lista. Si te arrepentís, tenés **deshacer** ahí mismo. Y si esa puerta ya estaba en tu tablero, te lo dice en vez de cargarla dos veces.
+
+### "Relevamiento"
+
+La tercera solapa: **lo que caminaste vos**. Acá va lo que el portal no tiene —que es la mayoría—: el edificio de la esquina, la casa con el cartel de dueño, el PH que te comentó el encargado.
+
+**Para cargar una puerta:** "+ agregar dirección". Lo único obligatorio es **la calle y el tipo de propiedad**. Nada más. Todo lo demás lo completás cuando puedas, desde la oficina o al otro día.
+
+- **El buscador de arriba** te encuentra la dirección y le pone la ubicación en el mapa. Si no aparece, **escribila a mano igual**: se guarda lo mismo, sin ubicación.
+- **Las unidades no se cargan a mano.** Ponés 8 pisos y 4 unidades por piso, y el sistema dice **32 unidades**. Si es una casa, ponés 1.
+- **El encargado va con nombre**, no con un sí/no: "Roberto, turno mañana" sirve; "tiene encargado" no sirve para nada.
+- **Podés marcar que está a la venta aunque no esté publicada**: el cartel de dueño en el balcón también es información.
+- Si escribís algo incompleto —los pisos sin las unidades, por ejemplo— **te avisa pero te deja guardar igual**. Estás parado en la vereda, no llenando una planilla.
+
+**Las personas de cada dirección** se cargan desde la tarjeta, en "personas": nombre, piso, unidad, vínculo y teléfono. El teléfono queda como link para llamar de un toque. Un edificio puede tener muchos propietarios conocidos, cada uno con su unidad.
+
+**La lista está agrupada por etapa.** Por ahora todo nace en "Relevado"; mover las tarjetas entre columnas llega en la próxima etapa.
+
+**Si una dirección queda fuera de tu zona** —porque la cargaste del otro lado de la línea, o porque moviste el trazo— la tarjeta te lo dice y **la podés seguir trabajando igual**. No se borra nada.
+
+**Ojo con borrar una tarjeta:** se borra la dirección, sus propietarios y todo su historial, y no se puede deshacer. Distinto es **borrar una zona**: si tenés tarjetas cargadas, la zona **se archiva** y tu trabajo queda guardado; las cuadras sí vuelven a estar libres para otro asesor.
+
+**Dónde quedan las tarjetas de una zona archivada.** En el mismo desplegable de "Relevamiento", con la palabra **"archivada"** al lado del nombre. La elegís y ves todo lo que habías cargado. Arriba te aparece un renglón que te lo recuerda: **esa zona se lee, no se trabaja** — sus cuadras ya son de quien las dibuje ahora.
+
+- Las **tarjetas** se leen enteras, como siempre.
+- **"ver personas"** sigue funcionando: abrís la puerta y ahí están tus propietarios con su piso, su unidad, el vínculo, las notas y **el teléfono para llamar de un toque**. Lo que no aparece es el formulario para sumar a alguien, ni el lápiz, ni el tacho.
+- Los botones de **agregar dirección, editar y borrar** quedan apagados.
+
+Si querés volver a trabajar esas calles, dibujá la zona de nuevo desde "Mis zonas"; las tarjetas viejas se quedan donde están, en la zona archivada.
+
+> 🔜 El tablero con las 6 columnas —donde vas moviendo cada dirección según avanzás, y que se anota solo quién hizo qué y cuándo—, los indicadores del método y el botón para pasar un propietario a tu pipeline de Tracking llegan en la próxima etapa.
