@@ -199,6 +199,17 @@ describe("POST /api/farming/direcciones/[id]/propietarios/[pid]/tracking", () =>
     expect(savePerformanceLogMock).not.toHaveBeenCalled()
   })
 
+  // FIX 6 (revisión final): el mensaje dice «del equipo», no «tuyo». En una zona compartida la
+  // actividad puede ser de un COLEGA que llegó primero —la regla es una persona, una actividad
+  // del EQUIPO, no del asesor que la mira ahora—, y «ya está en tu pipeline» le mentiría a este
+  // asesor sobre algo que ni siquiera puede ver en su propio Tracking.
+  it("el mensaje de 409 dice «del equipo», no «tu pipeline»: puede ser la actividad de un colega", async () => {
+    const r = await pasar(D_MIA, P_YA_ENLAZADO, { proceso: "vendedor" })
+    const d = await r.json()
+    expect(d.error).toBe("Esta persona ya está en el pipeline del equipo")
+    expect(d.error).not.toMatch(/tu pipeline/i)
+  })
+
   it("la tarjeta de la zona de un colega que no comparte: 403 y no llama a savePerformanceLog", async () => {
     const r = await pasar(D_JUAN, P_DE_JUAN, { proceso: "vendedor" })
     expect(r.status).toBe(403)

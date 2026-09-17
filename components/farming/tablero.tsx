@@ -99,13 +99,18 @@ function CuerpoTarjeta({
         arrastrando && "opacity-40",
       )}
     >
-      {/* El título es también la manija del arrastre: el resto de la tarjeta queda libre para
-          scrollear la columna con el dedo. Y al tocarlo se abre el historial de esa puerta. */}
+      {/* El título es la manija del arrastre: el resto de la tarjeta queda libre para scrollear
+          la columna con el dedo. NO tiene además un `onClick` propio a propósito —el historial
+          es el botón de abajo, aparte— porque las dos cosas colgadas del MISMO control chocan
+          con el teclado: `KeyboardSensor` de dnd-kit también dispara con Enter/Espacio, así que
+          un botón que a la vez mueve y abre el historial le hacía las dos cosas de un solo
+          toque a quien navega sin mouse, sin forma de elegir una sola. Separados, un asesor con
+          teclado puede mover la tarjeta (acá) o abrir su historial (el botón de abajo), nunca
+          las dos a la fuerza. */}
       <button
         type="button"
-        onClick={() => onHistorial(d)}
         className="w-full min-h-[44px] text-left"
-        aria-label={`Historial de ${d.calle} ${d.altura ?? ""}`}
+        aria-label={`Mover ${d.calle} ${d.altura ?? ""}: arrastrá, o usá "Mover a…" más abajo`}
         {...(manija ?? {})}
       >
         <p className="font-medium leading-tight">{d.calle} {d.altura ?? ""}</p>
@@ -161,12 +166,20 @@ function CuerpoTarjeta({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuLabel className="text-xs">Mover a…</DropdownMenuLabel>
+              {/* «Anotar sin moverla» es «pasé otra carta»: la acción más repetida del método,
+                  y hasta esta revisión NO TENÍA CAMINO DIRECTO — la columna actual estaba
+                  deshabilitada acá abajo, así que para anotar una visita más sin cambiar de
+                  columna había que elegir una columna DISTINTA y corregirla adentro del
+                  diálogo. Va primera, con su propio nombre, y abre el mismo diálogo con el
+                  destino ya puesto en la columna en la que la tarjeta está parada. El servidor
+                  ya acepta mover a la misma etapa (y también anota su historial): esto solo le
+                  da un camino corto a algo que la ruta de abajo ya permitía. */}
+              <DropdownMenuItem className="min-h-[44px]" onClick={() => onMover(d, d.etapa)}>
+                Anotar sin moverla
+              </DropdownMenuItem>
               {DESTINOS.map((clave) => (
                 <DropdownMenuItem
                   key={clave}
-                  // La columna en la que ya está NO se ofrece: para anotar «pasé otra carta» sin
-                  // cambiar de columna está el diálogo, con la columna destino a mano.
-                  disabled={clave === d.etapa}
                   className="min-h-[44px]"
                   onClick={() => onMover(d, clave)}
                 >

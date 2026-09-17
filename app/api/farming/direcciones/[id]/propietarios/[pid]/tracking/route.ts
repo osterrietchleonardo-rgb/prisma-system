@@ -41,7 +41,11 @@ async function buscarPropietario(admin: ReturnType<typeof createAdminClient>, di
   return data as any
 }
 
-const YA_ESTA = "Esta persona ya está en tu pipeline"
+// «tu pipeline» sería mentira en una zona compartida: la actividad la creó QUIEN LA APRETÓ
+// primero, no necesariamente este asesor — «una persona, una actividad» es del EQUIPO, y el
+// colega que llegó segundo tiene que leer que es del equipo, no que es suya y que por eso no
+// la ve en su propio Tracking.
+const YA_ESTA = "Esta persona ya está en el pipeline del equipo"
 
 /** ¿Esta persona YA tiene una actividad en Tracking, aunque la tarjeta no la muestre?
  *

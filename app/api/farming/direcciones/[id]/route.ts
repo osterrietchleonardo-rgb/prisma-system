@@ -12,19 +12,25 @@ import {
   rechazoDeDireccion,
   responderError,
 } from "@/lib/farming/servidor"
-import { ETAPAS, normalizarDireccion, tieneAlturaComparable, valoresImposibles } from "@/lib/farming/direcciones"
+import { normalizarDireccion, tieneAlturaComparable, valoresImposibles } from "@/lib/farming/direcciones"
 
 export const dynamic = "force-dynamic"
 
-const CLAVES_ETAPA = ETAPAS.map((e) => e.clave) as string[]
-
 /**
  * Lista blanca EXPLÍCITA de lo que un PATCH puede tocar: cualquier subconjunto de
- * `EntradaDireccion` más `etapa` y `orden`. Se arma campo por campo (nunca `...body` ni un
- * `delete` de las prohibidas), así que ninguna clave fuera de esta lista llega al UPDATE por
- * esta vía — ni `zona_id`, `agency_id`, `creada_por`, `created_at`, `id`, `aviso_id`,
+ * `EntradaDireccion` más `orden`. Se arma campo por campo (nunca `...body` ni un `delete` de
+ * las prohibidas), así que ninguna clave fuera de esta lista llega al UPDATE por esta vía — ni
+ * `zona_id`, `agency_id`, `creada_por`, `created_at`, `id`, `aviso_id`,
  * `aviso_es_dueno_directo`, `origen`, y sobre todo nunca `unidades_totales`: es GENERADA, y
  * mandarla hace fallar el UPDATE con 428C9.
+ *
+ * `etapa` TAMPOCO está acá, a propósito, desde la revisión final de la 3-B: cambiar de columna
+ * es trabajo de `/mover` y SOLO de `/mover`, porque es el único endpoint que firma el
+ * movimiento con su fila de historial. Si este PATCH todavía pudiera tocar `etapa`, una tarjeta
+ * podía saltar de columna sin dejar rastro de qué se hizo, cuál es el próximo paso ni para
+ * cuándo — exactamente lo que el tablero existe para impedir. Un PATCH que manda `etapa` no
+ * revienta ni avisa: el campo se ignora, igual que cualquier otra clave fuera de esta lista
+ * (`zona_id`, `id`, etc.).
  *
  * `fuera_de_zona` y `fuera_de_zona_desde` tampoco están acá — el body nunca las decide — pero
  * SÍ pueden terminar en el payload: el bloque de más abajo las recalcula a mano, con el mismo
@@ -43,7 +49,6 @@ const COLUMNAS_EDITABLES = [
   "encargado_notas",
   "lat",
   "lng",
-  "etapa",
   "orden",
   "a_la_venta",
   "cartel",
@@ -52,7 +57,13 @@ const COLUMNAS_EDITABLES = [
   "moneda",
   "observaciones",
   "relevada_en",
-  // «Qué sigue» y para cuándo: se editan desde el mismo diálogo que el resto de la tarjeta.
+  // «Qué sigue» y para cuándo SÍ se editan desde acá, aunque `etapa` no: corregir el texto o la
+  // fecha del próximo paso es arreglar un error de tipeo, no anotar un movimiento nuevo — obligar
+  // a mover la tarjeta (con su carta, su fecha y su historial) solo para corregir una fecha mal
+  // tipeada ensuciaría el historial con un movimiento que nunca pasó. El costo, dicho en voz
+  // alta: en una zona compartida, un colega puede corregir el próximo paso de una tarjeta sin
+  // que quede su firma en ningún lado — a diferencia de un movimiento real, que siempre queda
+  // firmado en farming_contactos con el `user_id` de quien lo hizo.
   "proxima_accion",
   "proxima_accion_en",
 ] as const
@@ -85,16 +96,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       if (body.altura != null) body.altura = String(body.altura)
     }
 
-    // Antes de tocar la base: una etapa fuera de las siete del check de la migración, o
-    // cualquier otro valor imposible (tipo, cartel, moneda, pisos, unidades_por_piso,
-    // unidades_manual fuera de lo que la migración acepta), es un error del que se avisa (400),
-    // no un 500 crudo de Postgres con un 23514/22P02 sin traducir. `valoresImposibles` —y no
-    // `validarDireccion`— porque el PATCH manda datos PARCIALES: un cuerpo sin calle ni tipo es
-    // legítimo acá (se está corrigiendo un solo campo), cosa que `validarDireccion` rechazaría.
+    // Antes de tocar la base: un valor imposible (tipo, cartel, moneda, pisos,
+    // unidades_por_piso, unidades_manual fuera de lo que la migración acepta), es un error del
+    // que se avisa (400), no un 500 crudo de Postgres con un 23514/22P02 sin traducir.
+    // `valoresImposibles` —y no `validarDireccion`— porque el PATCH manda datos PARCIALES: un
+    // cuerpo sin calle ni tipo es legítimo acá (se está corrigiendo un solo campo), cosa que
+    // `validarDireccion` rechazaría.
     const errores: string[] = []
-    if (Object.prototype.hasOwnProperty.call(body, "etapa") && !CLAVES_ETAPA.includes(body.etapa)) {
-      errores.push("Esa etapa no existe.")
-    }
+    // `etapa` no se valida más acá: no está en `COLUMNAS_EDITABLES`, así que cualquier valor que
+    // el body traiga en esa clave —válido, inválido, lo que sea— se ignora antes de llegar al
+    // payload. Validarla sería fingir que este endpoint todavía decide algo sobre ella.
     // `orden` es `integer not null` y solo se puede tocar desde acá (el alta lo fija en 0): un
     // `orden: "x"` no rompe ninguna regla de negocio, rompe el cast de Postgres y vuelve como
     // un 500 en inglés. Mismo criterio que lat/lng/precio en valoresImposibles.
@@ -153,9 +164,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         }
       }
     }
-
-    // ETAPA 3-B: cuando el PATCH cambia `etapa`, acá va el insert en farming_contactos que
-    // deja el historial firmado del movimiento (etapa_desde/etapa_hasta). Todavía no se escribe.
 
     const payload: Record<string, unknown> = { updated_at: new Date().toISOString() }
     for (const col of COLUMNAS_EDITABLES) {

@@ -40,8 +40,15 @@ export function baseFalsa(inicial: Record<string, Fila[]>, rpcs: Record<string, 
     let soloCabecera = false
 
     const q: any = {
+      // El real manda `count` como un header `Prefer` que se ACUMULA: `.update(v, {count:
+      // "exact"}).eq(...).select()` pide el conteo en el update Y las filas tocadas en el mismo
+      // pedido, y un `.select()` sin su propio `count` no apaga el que ya había pedido el
+      // update/delete de antes. Por eso `||=` y no `=`: si se sobreescribiera acá, cualquier
+      // `.update(..., {count:"exact"}).eq(...).select("*")` (la carrera perdida de "mover",
+      // FIX 3) volvería siempre `count: null`, y `count === 0` nunca podría distinguirse de
+      // "no se pidió".
       select: (_cols?: string, opciones?: { count?: "exact"; head?: boolean }) => {
-        pedirCuenta = opciones?.count === "exact"
+        pedirCuenta ||= opciones?.count === "exact"
         soloCabecera = !!opciones?.head
         return q
       },

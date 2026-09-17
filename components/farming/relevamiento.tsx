@@ -181,11 +181,16 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
   const [editando, setEditando] = useState<FilaDireccion | null>(null)
   const [viendoPersonas, setViendoPersonas] = useState<FilaDireccion | null>(null)
 
-  // La LISTA es la que arranca: es la vista probada, la que sirve en pantalla chica y la que ya
-  // conoce el asesor. Lo que eligió la última vez se lee después de montar, nunca en el
-  // `useState` inicial: el servidor no tiene `localStorage`, y leerlo ahí haría que lo que
-  // dibuja el servidor y lo que dibuja el navegador no coincidan.
-  const [vista, setVista] = useState<Vista>("lista")
+  // El TABLERO es el que arranca cuando el asesor no tiene una elección guardada: es donde vive
+  // «Mover a…» y el historial, y esta etapa existe justamente para que mover una tarjeta sea lo
+  // primero que se pueda hacer al abrir Relevamiento parado en la vereda — no algo que haya que
+  // descubrir apretando un botón más. (Esto invierte la regla anterior, que arrancaba en la
+  // lista: esa regla dejaba al asesor sin forma de mover nada hasta encontrar «tablero».) La
+  // lista sigue un toque al lado, y sigue siendo lo que se recuerda para quien la elige.
+  // Lo que eligió la última vez se lee después de montar, nunca en el `useState` inicial: el
+  // servidor no tiene `localStorage`, y leerlo ahí haría que lo que dibuja el servidor y lo que
+  // dibuja el navegador no coincidan.
+  const [vista, setVista] = useState<Vista>("tablero")
   useEffect(() => {
     const v = vistaGuardada()
     if (v) setVista(v)
@@ -252,10 +257,19 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
     )
   }
 
-  // Después de mover una tarjeta en el tablero. Es el mismo camino que `guardada` para una
-  // fila que ya existía: la fila del servidor —que ya viene con la etapa, la próxima acción y
-  // su fecha nuevas— pisa a la vieja, y la tarjeta aparece sola en su columna nueva.
-  const movida = (d: FilaDireccion) => guardada(d, false)
+  // Después de mover una tarjeta en el tablero. La tarjeta se actualiza DE UNA con la fila que
+  // devolvió el servidor —el mismo camino que `guardada`— para que el salto de columna se vea
+  // instantáneo. Pero los nueve indicadores (`datos.indicadores`, que solo `traer()` reescribe)
+  // no salen de esa fila suelta: sin este `traer()`, «Contactos realizados» y «Respuestas
+  // recibidas» se quedaban con el número de ANTES del movimiento hasta que el asesor cambiaba de
+  // zona o recargaba la página — el tablero ES el reporte, y el reporte tiene que cambiar en el
+  // mismo instante que la tarjeta. `traer()` ya lleva su propio `gen`: si esta recarga tarda y
+  // mientras tanto el asesor cambió de zona o movió otra tarjeta, una respuesta vieja no puede
+  // pisar un estado más nuevo.
+  const movida = (d: FilaDireccion) => {
+    guardada(d, false)
+    traer()
+  }
 
   const borrar = async (d: FilaDireccion) => {
     if (
@@ -309,9 +323,11 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
               ? "No pudimos traer las direcciones de esta zona."
               : "Buscando…"}
         </p>
-        {/* El interruptor lista ↔ tablero. La lista NO se tira: es la que sirve en pantalla
-            chica y la que ya está probada, y por eso es la que arranca. Dos botones de verdad,
-            de 44 px, con el nombre escrito al lado del dibujito: un ícono solo no se entiende. */}
+        {/* El interruptor lista ↔ tablero. El TABLERO es el que arranca sin una elección
+            guardada —ver el comentario del `useState` de `vista`—, pero la lista no se tira:
+            sigue un toque al lado, y sigue siendo la que se recuerda para quien la prefiere. Dos
+            botones de verdad, de 44 px, con el nombre escrito al lado del dibujito: un ícono
+            solo no se entiende. */}
         <div className="ml-auto flex items-center gap-1 rounded-xl border border-zinc-200 p-1 dark:border-zinc-800">
           <button
             type="button"

@@ -446,10 +446,14 @@ export function Propietarios({
                         teléfono (sin eso no hay con qué seguirla en Tracking), y nunca en una
                         zona archivada: ahí no hay nada que el asesor pueda hacer, y el servidor
                         lo rechazaría igual. Como LÍNEA VISIBLE cuando ya está enlazada: nunca
-                        un globito, porque en el celular no se abren. */}
+                        un globito, porque en el celular no se abren.
+                        «del equipo», no «tuyo»: en una zona compartida la actividad puede ser de
+                        un colega que llegó primero, y ese colega es quien la ve en SU Tracking.
+                        Decir «tu pipeline» acá sería mentirle a este asesor sobre algo que ni
+                        siquiera le pertenece. */}
                     {p.telefono && p.tracking_log_id && (
                       <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-500">
-                        <ArrowRightCircle className="h-3.5 w-3.5" /> Ya está en tu pipeline
+                        <ArrowRightCircle className="h-3.5 w-3.5" /> Ya está en el pipeline del equipo
                       </p>
                     )}
                     {p.telefono && !p.tracking_log_id && !soloLectura && (

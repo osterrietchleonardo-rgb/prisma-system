@@ -9,10 +9,11 @@ import { baseFalsa } from "@/lib/farming/base-falsa"
  *  2. Lista blanca EXPLÍCITA de columnas que el PATCH puede tocar: nunca por descarte.
  *     `zona_id`, `agency_id`, `creada_por`, `created_at`, `id`, `unidades_totales` (generada,
  *     manda un 428C9 si aparece en el UPDATE), `aviso_id`, `aviso_es_dueno_directo`, `origen`,
- *     `fuera_de_zona` y `fuera_de_zona_desde` NUNCA se tocan desde acá.
+ *     `fuera_de_zona` y `fuera_de_zona_desde` NUNCA se tocan desde acá. Tampoco `etapa` (desde la
+ *     revisión final de la 3-B): cambiar de columna es trabajo de `/mover`, el único que firma
+ *     el movimiento con su historial — un PATCH que la manda simplemente la ignora.
  *  3. `updated_at` lo pisa el servidor siempre.
- *  4. Una `etapa` fuera de las siete del check: 400, no un 500 de Postgres.
- *  5. `DELETE` borra de verdad.
+ *  4. `DELETE` borra de verdad.
  */
 
 const AGENCIA = "ag-1"
@@ -150,20 +151,29 @@ describe("PATCH /api/farming/direcciones/[id]", () => {
     expect(r.status).toBe(404)
   })
 
-  it("una etapa que no está entre las siete del check: 400, y no escribe", async () => {
-    const r = await patch(D_MIA, { etapa: "ganada" })
-    const d = await r.json()
-    expect(r.status).toBe(400)
-    const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!
-    expect(fila.etapa).toBe("relevado")
-    expect(typeof d.error).toBe("string")
-  })
-
-  it("una etapa válida sí se guarda", async () => {
-    const r = await patch(D_MIA, { etapa: "presentado" })
+  // Revisión final de la 3-B (FIX 2): cambiar de columna es trabajo de /mover, y solo de
+  // /mover — es el único endpoint que firma el movimiento con su fila de historial. Si este
+  // PATCH todavía moviera `etapa`, esta prueba muere: una tarjeta podría saltar de columna sin
+  // dejar ningún rastro de qué se hizo, cuál es el próximo paso ni para cuándo.
+  it("un PATCH con etapa (válida o no) NO la cambia: se ignora como cualquier campo fuera de la lista blanca", async () => {
+    const r = await patch(D_MIA, { etapa: "presentado", encargado_nombre: "Doña Rosa" })
     const d = await r.json()
     expect(r.status).toBe(200)
-    expect(d.direccion.etapa).toBe("presentado")
+    // Ni siquiera avisa que la ignoró: es una clave más, como zona_id o id.
+    expect(d.direccion.etapa).toBe("relevado")
+    const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!
+    expect(fila.etapa).toBe("relevado")
+    // El resto del PATCH sí se aplica: ignorar `etapa` no tira abajo el resto del body.
+    expect(fila.encargado_nombre).toBe("Doña Rosa")
+  })
+
+  // Una etapa que ni siquiera existe entre las siete tampoco revienta: se ignora igual, sin
+  // 400 — ya no hay ningún chequeo de `etapa` en este endpoint, para bien o para mal.
+  it("un PATCH con una etapa que no existe entre las siete: no da 400, se ignora igual", async () => {
+    const r = await patch(D_MIA, { etapa: "ganada" })
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.direccion.etapa).toBe("relevado")
   })
 
   // Este test muere si se saca la lista blanca (por ejemplo, si el PATCH pasara a mandar

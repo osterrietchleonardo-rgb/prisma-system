@@ -16,6 +16,12 @@ import { baseFalsa } from "@/lib/farming/base-falsa"
  *     tarjeta ya validada, nunca del body.
  *  6. Si el INSERT falla, la etapa vuelve a etapa_desde y contesta 500 diciéndolo.
  *  7. Mover a la MISMA etapa se permite y también escribe historial.
+ *  8. FIX 3 (revisión final): el UPDATE de avance solo pisa la fila si SIGUE en la etapa que
+ *     este pedido leyó (`.eq("etapa", antes.etapa)` + `count: "exact"`). Si otro pedido ya la
+ *     movió, `count === 0` y esto contesta 409 SIN escribir nada — ni la etapa ni el historial.
+ *     Y la reversión (regla 6) solo revierte si la tarjeta SIGUE en la etapa que este pedido
+ *     acaba de escribir (`.eq("etapa", etapa_hasta)`): si alguien más la volvió a mover
+ *     mientras el insert fallaba, no se pisa ESE movimiento más nuevo.
  */
 
 const AGENCIA = "ag-1"
@@ -326,6 +332,98 @@ describe("POST /api/farming/direcciones/[id]/mover", () => {
     expect(fila.zona_id).toBe(Z_MIA)
     expect(fila.agency_id).toBe(AGENCIA)
     expect(fila.unidades_totales).toBeNull()
+  })
+
+  // FIX 3 (revisión final): la carrera perdida en el UPDATE de avance. Simula lo que pasaría en
+  // una zona compartida si dos pedidos llegan casi juntos: los dos leen `etapa: "relevado"" en
+  // `direccionAccesible`, pero justo antes de que ESTE pedido escriba, el otro ya ganó y la
+  // tarjeta quedó en "presentado". Sin el `.eq("etapa", antes.etapa)`, este pedido pisaría igual
+  // el trabajo del otro asesor.
+  function simularQueOtroPedidoYaMovioAntes(etapaGanadora: string) {
+    const fromOriginal = base.from
+    let yaSimulado = false
+    base.from = ((tabla: string) => {
+      const q: any = fromOriginal(tabla)
+      if (tabla === "farming_direcciones") {
+        const updateOriginal = q.update
+        q.update = (payload: any, opts?: any) => {
+          if (!yaSimulado) {
+            yaSimulado = true
+            const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)
+            if (fila) fila.etapa = etapaGanadora
+          }
+          return updateOriginal(payload, opts)
+        }
+      }
+      return q
+    }) as typeof base.from
+  }
+
+  it("el forward update pierde la carrera: 409, no escribe nada, ni historial", async () => {
+    simularQueOtroPedidoYaMovioAntes("presentado")
+
+    const r = await mover(D_MIA, { ...movimientoValido, etapa_hasta: "tasacion" })
+    const d = await r.json()
+    expect(r.status).toBe(409)
+    expect(d.error).toMatch(/alguien movió esta tarjeta/i)
+
+    // La tarjeta queda en la etapa que puso el "ganador" de la carrera, no en la que este
+    // pedido pidió, y no hay ninguna fila de historial de ESTE pedido.
+    const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!
+    expect(fila.etapa).toBe("presentado")
+    expect(base.tablas.farming_contactos).toHaveLength(0)
+  })
+
+  // FIX 3 (revisión final): la compensación NO pisa un movimiento más nuevo. Se sabotea el
+  // insert del historial (como en la prueba de arriba) para forzar la reversión, y JUSTO antes
+  // de que la reversión escriba, otro pedido ya volvió a mover la tarjeta a una tercera etapa
+  // (con su propio historial, ya guardado). La reversión tiene que ver que la tarjeta ya no
+  // está en la etapa que este pedido había escrito, y no tocarla.
+  it("la compensación no revierte por encima de un movimiento más nuevo de otro asesor", async () => {
+    // El insert del historial de ESTE pedido falla siempre.
+    const fromOriginal = base.from
+    let llamadasUpdate = 0
+    base.from = ((tabla: string) => {
+      const q: any = fromOriginal(tabla)
+      if (tabla === "farming_contactos") {
+        const insertOriginal = q.insert
+        q.insert = (payload: any) => {
+          const encadenado = insertOriginal(payload)
+          encadenado.then = (resolve: any) => resolve({ data: null, error: { message: "boom, se cayó el insert" } })
+          return encadenado
+        }
+      }
+      if (tabla === "farming_direcciones") {
+        const updateOriginal = q.update
+        q.update = (payload: any, opts?: any) => {
+          llamadasUpdate++
+          // La primera llamada es el avance de ESTE pedido (relevado → presentado): la dejamos
+          // pasar tal cual. Justo antes de la SEGUNDA llamada (la reversión), un colega ya
+          // volvió a mover la tarjeta a "tasacion" — un movimiento real, con su propio
+          // historial ya insertado por su propio pedido (acá alcanza con pisar la etapa: lo que
+          // se prueba es que la reversión no la toca).
+          if (llamadasUpdate === 2) {
+            const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)
+            if (fila) fila.etapa = "tasacion"
+          }
+          return updateOriginal(payload, opts)
+        }
+      }
+      return q
+    }) as typeof base.from
+
+    const r = await mover(D_MIA, { ...movimientoValido, etapa_hasta: "presentado" })
+    const d = await r.json()
+    expect(r.status).toBe(500)
+    // Ni el mensaje de "la dejamos donde estaba" (no la revirtió) ni el de la doble falla
+    // (no hubo ningún error de SQL en la reversión, solo tocó cero filas).
+    expect(d.error).not.toBe("No pudimos anotar el movimiento, así que dejamos la tarjeta donde estaba.")
+    expect(d.error).not.toMatch(/tampoco devolver/i)
+    expect(d.error).toMatch(/alguien volvió a mover/i)
+
+    // La etapa del colega (su movimiento más nuevo) sigue intacta: no se pisó con "relevado".
+    const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!
+    expect(fila.etapa).toBe("tasacion")
   })
 })
 
