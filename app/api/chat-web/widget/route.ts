@@ -55,9 +55,14 @@ export async function POST(req: Request) {
     if (!revisado.ok) return NextResponse.json({ errores: revisado.errores }, { status: 400 })
 
     const db = createAdminClient()
+    // `ruteo` (el reparto por tipo de consulta) vive en la columna `destinos_por_objetivo`.
+    const { ruteo, ...resto } = revisado.valor
     const { data, error } = await db
       .from("web_widgets")
-      .upsert({ agency_id: agencyId, ...revisado.valor, updated_at: new Date().toISOString() }, { onConflict: "agency_id" })
+      .upsert(
+        { agency_id: agencyId, ...resto, destinos_por_objetivo: ruteo, updated_at: new Date().toISOString() },
+        { onConflict: "agency_id" }
+      )
       .select("*")
       .single()
     if (error) throw new Error(error.message)

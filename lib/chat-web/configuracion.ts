@@ -14,6 +14,23 @@ import { normalizarSitio } from "./rastreo"
 /** Leer un sitio entero cuesta tiempo y vectores: no se relee a los dos minutos. */
 export const MINUTOS_ENTRE_RASTREOS = 10
 
+/**
+ * Los cinco tipos de consulta que puede traer el chat, y que se reparten entre el contacto
+ * principal y el asesor elegido. Son los mismos cinco caminos del asistente (lib/chat-web/agente).
+ */
+export const OBJETIVOS_RUTEABLES = [
+  "busca_propiedad",
+  "vender_propiedad",
+  "sumarse_equipo",
+  "consulta_empresa",
+  "reclamo",
+] as const
+export type ObjetivoRuteable = (typeof OBJETIVOS_RUTEABLES)[number]
+
+/** A dónde va cada tipo de consulta. Uno solo por tipo: no hay forma de que se repita. */
+export type Destino = "externo" | "asesor"
+export type Ruteo = Record<ObjetivoRuteable, Destino>
+
 export interface Seccion {
   nombre: string
   url: string
@@ -26,9 +43,13 @@ export interface ConfiguracionWidget {
   whatsapp_destino: string
   /** El canal que no depende de que Meta apruebe una plantilla: es el que funciona primero. */
   email_destino: string
-  /** La persona de PRISMA que recibe los "quiero sumarme al equipo". Null = va al principal. */
+  /** La persona de PRISMA que recibe lo que el director le haya asignado. Null = nadie. */
   perfil_equipo_id: string | null
-  destinos_por_objetivo: Record<string, string>
+  /**
+   * El reparto. Se guarda en la columna `destinos_por_objetivo` (antes guardaba números de
+   * teléfono sueltos; nunca llegó a usarse así).
+   */
+  ruteo: Ruteo
   secciones: Seccion[]
   acento: string | null
   activo: boolean
@@ -75,17 +96,16 @@ export function validarConfiguracion(entrada: unknown): Validacion {
   if (perfilEquipo && !ES_ID.test(perfilEquipo))
     errores.perfil_equipo_id = "Elegí a alguien de la lista del equipo."
 
-  // Vacío significa "usá el principal", así que no es un error: simplemente no se guarda.
-  const destinos: Record<string, string> = {}
-  for (const [objetivo, valor] of Object.entries((e.destinos_por_objetivo ?? {}) as Record<string, unknown>)) {
-    const n = soloNumeros(valor)
-    if (!n) continue
-    if (!esTelefonoPosible(n)) {
-      errores[`destino_${objetivo}`] = `El WhatsApp de "${objetivo}" no parece un número.`
-      continue
-    }
-    destinos[objetivo] = n
-  }
+  // El reparto: cada tipo de consulta a UN destino. Lo que no se diga, al contacto principal;
+  // un destino que no existe también cae ahí, en vez de desviar el lead a la nada.
+  const pedido = (e.ruteo ?? e.destinos_por_objetivo ?? {}) as Record<string, unknown>
+  const ruteo = Object.fromEntries(
+    OBJETIVOS_RUTEABLES.map((o) => [o, pedido[o] === "asesor" ? "asesor" : "externo"])
+  ) as Ruteo
+  const leTocaAlAsesor = Object.values(ruteo).some((d) => d === "asesor")
+  if (leTocaAlAsesor && !perfilEquipo)
+    errores.perfil_equipo_id =
+      "Marcaste consultas para un asesor pero no elegiste a ninguno: esos contactos no le llegarían a nadie."
 
   // Una sección incompleta no frena el guardado: se descarta y el director la ve faltar.
   const secciones: Seccion[] = []
@@ -117,7 +137,7 @@ export function validarConfiguracion(entrada: unknown): Validacion {
       whatsapp_destino: whatsapp,
       email_destino: email,
       perfil_equipo_id: perfilEquipo,
-      destinos_por_objetivo: destinos,
+      ruteo,
       secciones,
       acento,
       // Nace apagado siempre: un widget recién creado no atiende a nadie hasta que el director

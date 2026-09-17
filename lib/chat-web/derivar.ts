@@ -41,6 +41,12 @@ export interface OpcionesAviso {
   resumen: string
   datos: DatosVisitante
   paginaOrigen: string
+  /**
+   * Si la consulta le toca a un asesor de PRISMA, el link al chat DENTRO de PRISMA: la
+   * conversación se sigue ahí, no desde el WhatsApp personal de nadie, así que todo queda
+   * registrado (Leonardo, 17/9). Cuando está, el botón deja de ser el de wa.me.
+   */
+  chatEnPrisma?: string
 }
 
 export interface AvisoDerivacion {
@@ -153,7 +159,10 @@ export function armarAvisoDerivacion(o: OpcionesAviso): AvisoDerivacion {
       ),
     `<tr><td style="padding:3px 12px 3px 0;color:#666">Vino de</td><td style="padding:3px 0">${esc(o.paginaOrigen)}</td></tr>`,
     `</table>`,
-    link
+    o.chatEnPrisma
+      ? `<p><a href="${esc(o.chatEnPrisma)}" style="display:inline-block;background:#111;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Abrir el chat en PRISMA</a></p>
+         <p style="color:#666;font-size:13px">Ya le escribimos por WhatsApp para abrir la conversación. Cuando conteste, seguí desde PRISMA: queda todo registrado.</p>`
+      : link
       ? `<p><a href="${link}" style="display:inline-block;background:#25D366;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Escribirle por WhatsApp</a></p>`
       : `<p style="color:#666">No dejó teléfono. ${o.datos.email ? `Escribile a <a href="mailto:${esc(o.datos.email)}">${esc(o.datos.email)}</a>.` : "Tampoco dejó email."}</p>`,
     `<p style="color:#888;font-size:13px">— ${esc(o.nombreBot)}, el asistente del sitio · ${esc(o.nombreAgencia)}</p>`,

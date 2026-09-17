@@ -25,6 +25,19 @@ interface Conversacion {
   derivada_a?: string | null
 }
 
+interface Resumen {
+  total: number
+  conversaron: number
+  dejaronContacto: number
+  soloPreguntas: number
+  derivadas: number
+  tasaContacto: number
+  porObjetivo: Record<string, number>
+  sinDefinir: number
+  costoTotalUSD: number
+  costoPromedioUSD: number
+}
+
 interface MensajeGuardado {
   rol: string
   texto: string
@@ -54,6 +67,7 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
   const [error, setError] = useState<string | null>(null)
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([])
   const [soloMias, setSoloMias] = useState(false)
+  const [resumen, setResumen] = useState<Resumen | null>(null)
   const [abierta, setAbierta] = useState<Conversacion | null>(null)
   const [mensajes, setMensajes] = useState<MensajeGuardado[]>([])
 
@@ -67,6 +81,7 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
         return
       }
       setConversaciones(d.conversaciones ?? [])
+      setResumen(d.resumen ?? null)
       setSoloMias(Boolean(d.soloMias))
     } catch {
       setError("No se pudo abrir la bandeja.")
@@ -107,6 +122,32 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
           </Button>
         )}
       </header>
+
+      {resumen && resumen.total > 0 && (
+        <Card className="p-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Numero valor={resumen.conversaron} de={resumen.total} titulo="Conversaron" ayuda="Intercambiaron al menos un ida y vuelta. Los que abrieron el chat y se fueron no cuentan." />
+            <Numero valor={resumen.dejaronContacto} titulo="Dejaron contacto" ayuda={`${resumen.tasaContacto}% de los que conversaron`} />
+            <Numero valor={resumen.soloPreguntas} titulo="Solo preguntas" ayuda="Hablaron pero no dejaron teléfono ni email." />
+            <Numero valor={resumen.derivadas} titulo="Derivadas al equipo" ayuda={`Costó US$${resumen.costoTotalUSD.toFixed(2)} en total`} />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
+            {Object.entries(resumen.porObjetivo)
+              .filter(([, n]) => n > 0)
+              .map(([objetivo, n]) => (
+                <span key={objetivo} className="rounded-full border px-3 py-1 text-xs">
+                  {QUE_QUIERE[objetivo] ?? objetivo}: <strong>{n}</strong>
+                </span>
+              ))}
+            {resumen.sinDefinir > 0 && (
+              <span className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
+                Sin definir: <strong>{resumen.sinDefinir}</strong>
+              </span>
+            )}
+          </div>
+        </Card>
+      )}
 
       {!conversaciones.length && (
         <Card className="p-6 text-sm text-muted-foreground">
@@ -203,6 +244,20 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
           </Card>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Un número del panel, con su explicación al lado: un número sin contexto se malinterpreta. */
+function Numero({ valor, de, titulo, ayuda }: { valor: number; de?: number; titulo: string; ayuda: string }) {
+  return (
+    <div>
+      <p className="text-2xl font-semibold tabular-nums">
+        {valor}
+        {de !== undefined && <span className="text-base font-normal text-muted-foreground"> / {de}</span>}
+      </p>
+      <p className="text-sm font-medium">{titulo}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{ayuda}</p>
     </div>
   )
 }

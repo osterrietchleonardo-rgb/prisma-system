@@ -77,6 +77,12 @@ describe("guardar la configuración", () => {
     })
   })
 
+  it("el reparto se guarda en la columna que existe, no en una inventada", async () => {
+    await guardar({ ...valido, ruteo: { busca_propiedad: "externo" } })
+    expect(base.guardado[0].destinos_por_objetivo).toMatchObject({ busca_propiedad: "externo" })
+    expect(base.guardado[0].ruteo).toBeUndefined()
+  })
+
   it("la agencia sale de la SESIÓN: mandarla en el cuerpo no sirve de nada", async () => {
     await guardar({ ...valido, agency_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" })
     expect(base.guardado[0].agency_id).toBe(AGENCIA)

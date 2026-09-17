@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { MINUTOS_ENTRE_RASTREOS, puedeRastrearDeNuevo, validarConfiguracion } from "./configuracion"
+import { MINUTOS_ENTRE_RASTREOS, OBJETIVOS_RUTEABLES, puedeRastrearDeNuevo, validarConfiguracion } from "./configuracion"
 
 const base = {
   sitio: "centralrealestate.com.ar",
@@ -43,18 +43,6 @@ describe("validarConfiguracion: lo que carga el director", () => {
       expect(r.ok, malo).toBe(false)
       if (!r.ok) expect(r.errores.whatsapp_destino).toBeTruthy()
     }
-  })
-
-  it("se puede mandar cada tipo de consulta a un WhatsApp distinto", () => {
-    const r = validarConfiguracion({
-      ...base,
-      destinos_por_objetivo: { sumarse_equipo: "+54 11 4444-5555", vender_propiedad: "" },
-    })
-    expect(r.ok).toBe(true)
-    if (!r.ok) return
-    expect(r.valor.destinos_por_objetivo.sumarse_equipo).toBe("541144445555")
-    // el vacío no se guarda: significa "usá el principal"
-    expect(r.valor.destinos_por_objetivo.vender_propiedad).toBeUndefined()
   })
 
   it("una sección sin nombre o con un link que no es un link no entra", () => {
@@ -142,5 +130,57 @@ describe("puedeRastrearDeNuevo: leer el sitio cuesta plata y tiempo", () => {
   })
   it("una fecha rota no bloquea para siempre", () => {
     expect(puedeRastrearDeNuevo("cualquier cosa", ahora).puede).toBe(true)
+  })
+})
+
+describe("el reparto: qué consulta le toca a quién (Leonardo, 17/9)", () => {
+  const conAsesor = { ...base, perfil_equipo_id: "cdfcd033-e84a-4310-8113-f67449634131" }
+
+  it("sin decir nada, TODO va al contacto principal", () => {
+    const r = validarConfiguracion(base)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    for (const objetivo of OBJETIVOS_RUTEABLES) expect(r.valor.ruteo[objetivo], objetivo).toBe("externo")
+  })
+
+  it("se puede repartir: unos al contacto principal y otros al asesor", () => {
+    const r = validarConfiguracion({
+      ...conAsesor,
+      ruteo: { sumarse_equipo: "asesor", vender_propiedad: "asesor" },
+    })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.valor.ruteo.sumarse_equipo).toBe("asesor")
+    expect(r.valor.ruteo.vender_propiedad).toBe("asesor")
+    expect(r.valor.ruteo.busca_propiedad).toBe("externo")
+  })
+
+  it("se puede mandar TODO al asesor", () => {
+    const todo = Object.fromEntries(OBJETIVOS_RUTEABLES.map((o) => [o, "asesor"]))
+    const r = validarConfiguracion({ ...conAsesor, ruteo: todo })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    for (const objetivo of OBJETIVOS_RUTEABLES) expect(r.valor.ruteo[objetivo], objetivo).toBe("asesor")
+  })
+
+  it("mandarle algo a un asesor que no se eligió NO se guarda: el lead caería en la nada", () => {
+    const r = validarConfiguracion({ ...base, ruteo: { sumarse_equipo: "asesor" } })
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.errores.perfil_equipo_id).toMatch(/asesor/i)
+  })
+
+  it("un destino que no existe se toma como el principal, no rompe ni desvía nada", () => {
+    const r = validarConfiguracion({ ...conAsesor, ruteo: { busca_propiedad: "el-vecino" } })
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.valor.ruteo.busca_propiedad).toBe("externo")
+  })
+
+  it("cada consulta tiene UN solo destino: no hay forma de que se repita", () => {
+    const r = validarConfiguracion({ ...conAsesor, ruteo: { reclamo: "asesor" } })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(Object.keys(r.valor.ruteo).sort()).toEqual([...OBJETIVOS_RUTEABLES].sort())
+    for (const v of Object.values(r.valor.ruteo)) expect(["externo", "asesor"]).toContain(v)
   })
 })

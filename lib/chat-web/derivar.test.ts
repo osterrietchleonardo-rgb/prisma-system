@@ -49,6 +49,14 @@ describe("armarAvisoDerivacion", () => {
     expect(a.html).toContain("wa.me/5491159289642")
   })
 
+  it("si le toca a un asesor de PRISMA, el botón lleva al chat de PRISMA y NO a wa.me", () => {
+    const a = armarAvisoDerivacion({ ...base, chatEnPrisma: "https://prisma.vakdor.com/asesor/whatsapp?c=abc" })
+    expect(a.html).toContain("Abrir el chat en PRISMA")
+    expect(a.html).toContain("/asesor/whatsapp?c=abc")
+    // el punto de la decisión: que NO se conteste desde el WhatsApp personal
+    expect(a.html).not.toContain("wa.me/")
+  })
+
   it("sin teléfono, no promete un WhatsApp que no se puede abrir: muestra el email", () => {
     const a = armarAvisoDerivacion({ ...base, datos: { nombre: "Alicia", email: "alicia@mail.com" } })
     expect(a.html).not.toContain("wa.me/")

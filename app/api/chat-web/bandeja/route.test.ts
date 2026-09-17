@@ -87,6 +87,21 @@ describe("quién entra", () => {
     expect((await pedir()).status).toBe(403)
   })
 
+  it("devuelve el resumen calculado sobre LAS MISMAS filas que muestra", async () => {
+    const cuerpo = await (await pedir()).json()
+    expect(cuerpo.resumen.total).toBe(cuerpo.conversaciones.length)
+    expect(cuerpo.resumen.porObjetivo.busca_propiedad).toBe(1)
+    expect(cuerpo.resumen.derivadas).toBe(2)
+  })
+
+  it("el asesor ve el resumen de LO SUYO, no el de toda la agencia", async () => {
+    sesion.role = "asesor"
+    sesion.userId = "a-1"
+    const cuerpo = await (await pedir()).json()
+    expect(cuerpo.resumen.total).toBe(1)
+    expect(cuerpo.resumen.porObjetivo.sumarse_equipo).toBe(1)
+  })
+
   it("siempre se filtra por la agencia de la sesión", async () => {
     await pedir()
     expect(base.filtros).toContainEqual(["agency_id", AGENCIA])

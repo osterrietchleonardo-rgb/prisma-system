@@ -51,6 +51,15 @@ interface PaginaLeida {
   excluida: boolean
 }
 
+/** Los cinco tipos de consulta que puede traer el chat. Se reparten sin repetirse. */
+const TIPOS_DE_CONSULTA = [
+  { id: "busca_propiedad", nombre: "Busca una propiedad" },
+  { id: "vender_propiedad", nombre: "Quiere vender o alquilar la suya" },
+  { id: "sumarse_equipo", nombre: "Quiere sumarse al equipo" },
+  { id: "consulta_empresa", nombre: "Consulta sobre la empresa" },
+  { id: "reclamo", nombre: "Reclamo" },
+] as const
+
 const MOTIVOS: Record<string, string> = {
   sitio_invalido: "La dirección del sitio no es válida.",
   interna: "Esa dirección apunta a una red interna y no se puede leer.",
@@ -75,6 +84,9 @@ export function ConfiguracionChatWeb() {
   const [email, setEmail] = useState("")
   const [email2, setEmail2] = useState("")
   const [perfilEquipo, setPerfilEquipo] = useState("ninguno")
+  const [ruteo, setRuteo] = useState<Record<string, string>>(
+    Object.fromEntries(TIPOS_DE_CONSULTA.map((t) => [t.id, "externo"]))
+  )
   const [equipo, setEquipo] = useState<PersonaDelEquipo[]>([])
   const [acento, setAcento] = useState("")
   const [secciones, setSecciones] = useState<Seccion[]>([])
@@ -96,6 +108,11 @@ export function ConfiguracionChatWeb() {
         setEmail(d.widget.email_destino ?? "")
         setEmail2(d.widget.email_destino ?? "")
         setPerfilEquipo(d.widget.perfil_equipo_id ?? "ninguno")
+        setRuteo(
+          Object.fromEntries(
+            TIPOS_DE_CONSULTA.map((t) => [t.id, d.widget.destinos_por_objetivo?.[t.id] === "asesor" ? "asesor" : "externo"])
+          )
+        )
         setAcento(d.widget.acento ?? "")
         setSecciones(d.widget.secciones ?? [])
       }
@@ -123,6 +140,7 @@ export function ConfiguracionChatWeb() {
           whatsapp_destino: whatsapp,
           email_destino: email,
           perfil_equipo_id: perfilEquipo,
+          ruteo,
           secciones,
           acento,
           activo: widget?.activo ?? false,
@@ -235,14 +253,14 @@ export function ConfiguracionChatWeb() {
         />
 
         <div className="space-y-2">
-          <Label htmlFor="perfil-equipo">Quién recibe los «quiero sumarme al equipo»</Label>
+          <Label htmlFor="perfil-equipo">Asesor de PRISMA que recibe consultas</Label>
           <select
             id="perfil-equipo"
             value={perfilEquipo}
             onChange={(e) => setPerfilEquipo(e.target.value)}
             className="h-11 w-full rounded-md border bg-background px-3 text-sm"
           >
-            <option value="ninguno">Que vayan al contacto de arriba</option>
+            <option value="ninguno">Ninguno: todo al contacto principal</option>
             {equipo.map((p) => (
               <option key={p.id} value={p.id} disabled={!p.tieneEmail}>
                 {p.nombre} · {p.rol}
@@ -252,8 +270,58 @@ export function ConfiguracionChatWeb() {
           </select>
           {errores.perfil_equipo_id && <p className="text-sm text-red-600">{errores.perfil_equipo_id}</p>}
           <p className="text-xs text-muted-foreground">
-            Se elige de tu equipo: el sistema ya sabe su celular y su email, así que no hay nada
-            que escribir ni nada que se pueda tipear mal.
+            Se elige del equipo: el sistema ya sabe su celular y su email, así que no hay nada que
+            escribir ni nada que se pueda tipear mal.
+          </p>
+        </div>
+
+        <div className="space-y-3 rounded-lg border p-3">
+          <div>
+            <p className="font-medium">Qué le toca a cada uno</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Cada tipo de consulta va a un solo lado. Tocá para cambiarlo: lo que le sacás a uno,
+              se lo lleva el otro.
+            </p>
+          </div>
+
+          <ul className="space-y-2">
+            {TIPOS_DE_CONSULTA.map((t) => {
+              const alAsesor = ruteo[t.id] === "asesor"
+              const puedeAsesor = perfilEquipo !== "ninguno"
+              const nombreAsesor = equipo.find((p) => p.id === perfilEquipo)?.nombre ?? "el asesor"
+              return (
+                <li key={t.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm">{t.nombre}</span>
+                  <div className="flex overflow-hidden rounded-md border" role="group" aria-label={t.nombre}>
+                    <button
+                      type="button"
+                      onClick={() => setRuteo((r) => ({ ...r, [t.id]: "externo" }))}
+                      className={`h-11 px-3 text-xs ${!alAsesor ? "bg-foreground text-background" : "bg-background"}`}
+                    >
+                      Contacto principal
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!puedeAsesor}
+                      onClick={() => setRuteo((r) => ({ ...r, [t.id]: "asesor" }))}
+                      className={`h-11 px-3 text-xs ${
+                        alAsesor ? "bg-foreground text-background" : "bg-background"
+                      } ${puedeAsesor ? "" : "opacity-40"}`}
+                      title={puedeAsesor ? undefined : "Primero elegí un asesor arriba"}
+                    >
+                      {nombreAsesor.split(" ")[0]}
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          <p className="text-xs text-muted-foreground">
+            Lo que va al <strong>contacto principal</strong> se atiende por afuera, desde su
+            WhatsApp. Lo que va al <strong>asesor</strong> se atiende{" "}
+            <strong>desde PRISMA</strong>: el sistema le escribe al visitante para abrir la
+            conversación y el asesor sigue desde la bandeja, con todo registrado.
           </p>
         </div>
       </Card>

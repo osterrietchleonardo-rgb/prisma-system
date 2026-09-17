@@ -19,6 +19,8 @@ import { armarContexto, resumenParaElAgente } from "@/lib/chat-web/buscar"
 import { buscarPaginas } from "@/lib/chat-web/almacen-supabase"
 import { armarAvisoDerivacion, enviarDerivacionPorEmail, telefonoUsable, type ObjetivoDerivacion } from "@/lib/chat-web/derivar"
 import { decidirAtencion, revisarOrigen, type WidgetPublico } from "@/lib/chat-web/puerta"
+import { derivarDentroDePrisma } from "@/lib/chat-web/derivar-a-prisma"
+import { linkAlChat } from "@/lib/seguimiento/avisos"
 
 export const maxDuration = 60
 
@@ -28,6 +30,8 @@ const MAX_TEXTO = 1000
 const MEMORIA = 16
 /** Ritmo: más que esto en cinco minutos no es una persona conversando. */
 const MAX_EN_5_MIN = 15
+
+const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "https://prisma.vakdor.com"
 
 function cors(origin: string | null, permitido: boolean) {
   const h = new Headers({ "Content-Type": "application/json" })
@@ -173,7 +177,7 @@ export async function POST(req: Request) {
 
   // Las herramientas de verdad.
   const datosAcumulados: Record<string, string> = { ...((existente?.datos as Record<string, string>) ?? {}) }
-  let pidioDerivar: string | null = null
+  let pidioDerivar = null as string | null
 
   const herramientas: Herramientas = {
     buscar_en_el_sitio: async ({ consulta }) => {
@@ -266,56 +270,84 @@ export async function POST(req: Request) {
     costo_usd: Number(existente?.costo_usd ?? 0) + resultado.costoUSD,
   }
 
-  // La derivación: el equipo recibe el aviso con el botón para escribirle.
+  // La derivación. A dónde va depende del REPARTO que cargó el director (Leonardo, 17/9):
+  // cada tipo de consulta tiene un solo destino, el contacto de afuera o el asesor de PRISMA.
   if (pidioDerivar) {
+    const objetivo = resultado.respuesta.objetivo as ObjetivoDerivacion
+    const ruteo = (fila.destinos_por_objetivo as Record<string, string>) ?? {}
+    const nombreAgencia = (agencia?.name as string) ?? "la inmobiliaria"
+    const telefono = telefonoUsable(datosAcumulados.telefono)
+    const perfilId = fila.perfil_equipo_id as string | null
+
+    // El asesor elegido tiene que seguir activo: si se desvinculó, el lead vuelve al contacto de
+    // afuera en vez de ir a alguien que ya no está.
+    let asesor: { id: string; email: string | null } | null = null
+    if (ruteo[objetivo] === "asesor" && perfilId) {
+      const { data } = await db
+        .from("profiles")
+        .select("id, email, estado, deleted_at")
+        .eq("id", perfilId)
+        .maybeSingle()
+      if (data && data.estado === "activo" && !data.deleted_at)
+        asesor = { id: data.id as string, email: (data.email as string | null) ?? null }
+    }
+
+    // Si le toca al asesor, la conversación se abre DENTRO de PRISMA: se le escribe al visitante
+    // con la plantilla aprobada y el chat queda en su bandeja.
+    let chatEnPrisma: string | undefined
+    let dentro: Awaited<ReturnType<typeof derivarDentroDePrisma>> | null = null
+    if (asesor && telefono) {
+      try {
+        dentro = await derivarDentroDePrisma(db, {
+          agencyId: widget.agency_id,
+          perfilId: asesor.id,
+          telefono,
+          nombre: datosAcumulados.nombre ?? "",
+          deQueConsulto: pidioDerivar.slice(0, 180),
+        })
+        if (dentro.conversationId)
+          chatEnPrisma = linkAlChat({ role: "asesor" }, dentro.conversationId, appUrl())
+      } catch (e) {
+        console.error("[chat-web] derivarDentroDePrisma:", e instanceof Error ? e.message : e)
+      }
+    }
+
     const aviso = armarAvisoDerivacion({
-      nombreAgencia: (agencia?.name as string) ?? "la inmobiliaria",
+      nombreAgencia,
       nombreBot: (ajustes?.bot_name as string) ?? "el asistente",
-      objetivo: resultado.respuesta.objetivo as ObjetivoDerivacion,
+      objetivo,
       resumen: pidioDerivar,
       datos: datosAcumulados,
       paginaOrigen,
+      chatEnPrisma,
     })
-    const destino =
-      ((fila.destinos_por_objetivo as Record<string, string>) ?? {})[resultado.respuesta.objetivo] ??
-      widget.whatsapp_destino
 
-    // A quién le llega. El email principal siempre; y si es "quiero sumarme al equipo" y el
-    // director eligió a alguien de PRISMA, también a esa persona (que se busca acá, para no
-    // guardar su correo copiado en el widget y que quede viejo).
-    const para: Array<string | null | undefined> = [fila.email_destino as string | null]
-    if (resultado.respuesta.objetivo === "sumarse_equipo" && fila.perfil_equipo_id) {
-      const { data: elegido } = await db
-        .from("profiles")
-        .select("email, estado, deleted_at")
-        .eq("id", fila.perfil_equipo_id as string)
-        .maybeSingle()
-      // Si esa persona ya no está activa, el aviso NO se pierde: va igual al email principal.
-      if (elegido?.email && elegido.estado === "activo" && !elegido.deleted_at) para.push(elegido.email as string)
-    }
-
-    const envio = await enviarDerivacionPorEmail({
-      aviso,
-      para,
-      nombreAgencia: (agencia?.name as string) ?? "la inmobiliaria",
-    })
+    // A quién se le avisa: al asesor si le tocaba a él; si no tiene email (o no le tocaba), al
+    // contacto principal. Nunca a los dos, para no duplicar; nunca a nadie, tampoco.
+    const para: Array<string | null | undefined> = asesor?.email
+      ? [asesor.email]
+      : [fila.email_destino as string | null]
+    const envio = await enviarDerivacionPorEmail({ aviso, para, nombreAgencia })
 
     await guardarMensaje("sistema", `Derivado al equipo: ${aviso.asunto}`, {
       pasos: [
         {
           herramienta: "derivar_a_whatsapp",
-          destino,
-          telefono: telefonoUsable(datosAcumulados.telefono),
+          destino: asesor ? `prisma:${asesor.id}` : widget.whatsapp_destino ?? "externo",
+          telefono,
           email: envio.resultado,
           email_id: envio.id,
+          // Qué pasó del lado de PRISMA: el chat, si quedó asignado, y si la plantilla salió.
+          chat_prisma: dentro?.conversationId ?? null,
+          asignado: dentro?.asignado ?? null,
+          ya_era_de: dentro?.yaEraDe ?? null,
+          plantilla: dentro?.plantilla ?? null,
         },
       ],
     })
     actualizacion.estado = "derivada"
     actualizacion.derivada_en = new Date().toISOString()
-    actualizacion.derivada_a = destino ?? null
-    // El aviso por WhatsApp (plantilla aprobada en Meta) sale en el paso siguiente. El email ya
-    // sale ahora, y su resultado queda guardado: un lead que no llegó tiene que poder rastrearse.
+    actualizacion.derivada_a = asesor ? `prisma:${asesor.id}` : widget.whatsapp_destino ?? null
   }
 
   return contestar(resultado.respuesta.texto, {

@@ -11,6 +11,7 @@ import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
 import { filtroDeBandeja } from "@/lib/chat-web/acceso"
+import { resumirConversaciones, type FilaParaMetricas } from "@/lib/chat-web/metricas"
 
 export async function GET(req: Request) {
   try {
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
     // La lista.
     let q = db
       .from("web_conversaciones")
-      .select("id, objetivo, datos, estado, pagina_origen, last_message_at, mensajes_count")
+      .select("id, objetivo, datos, estado, pagina_origen, last_message_at, mensajes_count, costo_usd, created_at")
       .eq("agency_id", agencyId)
       .order("last_message_at", { ascending: false })
       .limit(100)
@@ -59,7 +60,10 @@ export async function GET(req: Request) {
     const { data, error } = await q
     if (error) throw new Error(error.message)
 
-    return NextResponse.json({ conversaciones: data ?? [], soloMias: !filtro.todas })
+    // El resumen sale de las MISMAS filas que se devuelven: lo que ve en la lista es lo que
+    // cuentan los números, siempre. Un tablero que cuenta otra cosa se vuelve indiscutible y falso.
+    const resumen = resumirConversaciones((data ?? []) as unknown as FilaParaMetricas[])
+    return NextResponse.json({ conversaciones: data ?? [], resumen, soloMias: !filtro.todas })
   } catch (error) {
     const mensaje = error instanceof Error ? error.message : "Error"
     return NextResponse.json({ error: mensaje }, { status: mensaje === "Unauthorized" ? 401 : 500 })

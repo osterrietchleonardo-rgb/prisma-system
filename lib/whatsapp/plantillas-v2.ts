@@ -132,3 +132,27 @@ export const NOMBRES_EQUIPO = [
   "director_aprobacion_pendiente",
   "asesor_registro_pendiente",
 ] as const
+
+/**
+ * Chat web (Leonardo, 17/9). El visitante dejó su teléfono en el chat de la web y la consulta le
+ * toca a un asesor de PRISMA. Como es PRISMA quien abre la conversación en WhatsApp, hace falta
+ * una plantilla aprobada: se le recuerda POR QUÉ le estamos escribiendo —nos escribió él, por la
+ * web— y con su respuesta se abre la ventana de 24 h, desde la cual el asesor sigue normal.
+ *
+ * UTILITY y no MARKETING: es la respuesta a una consulta que hizo la propia persona, minutos
+ * antes, en el sitio de la agencia. {{1}} = nombre, {{2}} = de qué consultó; cierra con texto
+ * fijo porque Meta no acepta una variable al final.
+ */
+export function plantillasWeb(prefix: string, agencia: string): PlantillaV2[] {
+  const A = agencia.trim()
+  return [
+    {
+      template_name: `${prefix}_web_primer_contacto`,
+      category: "UTILITY",
+      language: "es_AR",
+      body: `Hola {{1}}, te escribimos de ${A} por tu consulta en nuestra web: {{2}} Seguimos por acá, contame y lo vemos.`,
+      body_examples: ["Leo", "querías sumarte al equipo y nos dejaste tu teléfono."],
+      buttons: [],
+    },
+  ]
+}
