@@ -3,6 +3,7 @@ import {
   LIMITES,
   esFichaDePropiedad,
   esIpInterna,
+  esNotaDeBlog,
   htmlATexto,
   linksDeHtml,
   normalizarSitio,
@@ -54,6 +55,7 @@ describe("revisarUrl: el guardia del rastreo", () => {
     expect(revisarUrl("https://otro.com", dominios)).toMatchObject({ ok: false, motivo: "dominio" })
     expect(revisarUrl("https://vakdor.com/a.pdf", dominios)).toMatchObject({ ok: false, motivo: "extension" })
     expect(revisarUrl("https://vakdor.com/propiedad/123-depto", dominios)).toMatchObject({ ok: false, motivo: "ficha" })
+    expect(revisarUrl("https://vakdor.com/blog/una-nota", dominios)).toMatchObject({ ok: false, motivo: "nota" })
   })
 })
 
@@ -81,6 +83,27 @@ describe("esFichaDePropiedad: las fichas sueltas no entran, la cartera es mejor 
       "https://central.com/venta/departamentos/la-plata",
     ])
       expect(esFichaDePropiedad(u), u).toBe(false)
+  })
+})
+
+describe("esNotaDeBlog: las notas sueltas no entran (Leonardo, 17/9)", () => {
+  it("deja afuera la nota, en sus formas habituales", () => {
+    for (const u of [
+      "https://c.com/blog/como-vender-tu-casa",
+      "https://c.com/noticias/mercado-2026",
+      "https://c.com/novedades/nueva-sucursal",
+      "https://c.com/prensa/nota-en-clarin",
+      "https://c.com/es/news/market-report",
+    ])
+      expect(esNotaDeBlog(u), u).toBe(true)
+  })
+  it("la PORTADA del blog queda: es una sección del sitio", () => {
+    for (const u of ["https://c.com/blog", "https://c.com/blog/", "https://c.com/noticias", "https://c.com/"])
+      expect(esNotaDeBlog(u), u).toBe(false)
+  })
+  it("no se lleva puesta una sección que apenas se parece", () => {
+    for (const u of ["https://c.com/servicios/tasaciones", "https://c.com/blogger-de-cocina", "https://c.com/nosotros"])
+      expect(esNotaDeBlog(u), u).toBe(false)
   })
 })
 
@@ -223,8 +246,9 @@ describe("rastrearSitio", () => {
   it("en un sitio de inmobiliaria, las fichas no se comen el cupo: primero las secciones", async () => {
     // Un sitemap como el de verdad: 3 secciones perdidas entre 200 fichas de propiedades.
     const fichas = Array.from({ length: 200 }, (_, i) => `https://vakdor.com/propiedad/${i}-departamento`)
-    const secciones = ["https://vakdor.com/", "https://vakdor.com/tasaciones", "https://vakdor.com/blog/vender-mejor"]
-    const todas = [...fichas.slice(0, 100), ...secciones, ...fichas.slice(100)]
+    const secciones = ["https://vakdor.com/", "https://vakdor.com/tasaciones", "https://vakdor.com/sumate-al-equipo"]
+    // una nota del blog en el medio: tampoco entra (Leonardo, 17/9)
+    const todas = [...fichas.slice(0, 100), ...secciones, "https://vakdor.com/blog/vender-mejor", ...fichas.slice(100)]
     const fetchSitio = (async (u: string | URL) => {
       const url = String(u)
       const cuerpo = url.endsWith("sitemap.xml")
@@ -237,6 +261,7 @@ describe("rastrearSitio", () => {
     // ninguna ficha, y las secciones ordenadas de la más general a la más profunda
     expect(r.paginas.map((p) => p.url)).toEqual(secciones)
     expect(r.paginas.some((p) => p.url.includes("/propiedad/"))).toBe(false)
+    expect(r.paginas.some((p) => p.url.includes("/blog/"))).toBe(false)
   })
 
   it("si el sitio apunta a una dirección interna, no se lee NADA", async () => {

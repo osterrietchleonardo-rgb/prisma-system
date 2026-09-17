@@ -338,6 +338,39 @@ export function ConfiguracionChatWeb() {
         {errores.acento && <p className="text-sm text-red-600">{errores.acento}</p>}
       </Card>
 
+      <Card className="space-y-3 p-4 sm:p-5">
+        <h2 className="font-medium">Cómo va a quedar en tu web</h2>
+        <ol className="space-y-2 text-sm">
+          <li className="flex gap-2">
+            <span aria-hidden>{widget ? "✓" : "1."}</span>
+            <span className={widget ? "text-muted-foreground" : ""}>
+              Configurar a dónde van los contactos y cuál es tu sitio.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span aria-hidden>{widget?.rastreo_estado === "ok" ? "✓" : "2."}</span>
+            <span className={widget?.rastreo_estado === "ok" ? "text-muted-foreground" : ""}>
+              Leer tu sitio, para que el asistente sepa de qué habla tu web.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span aria-hidden>3.</span>
+            <span>
+              <strong>El código para pegar en tu web.</strong> Todavía no está: aparece acá, para
+              copiar y pegar, cuando el asistente esté terminado. Hasta entonces no tendría a quién
+              contestarle.
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span aria-hidden>4.</span>
+            <span>
+              <strong>La bandeja.</strong> Las conversaciones del chat van a aparecer acá mismo,
+              como una bandeja más.
+            </span>
+          </li>
+        </ol>
+      </Card>
+
       <div className="sticky bottom-0 flex justify-end bg-background/80 py-3 backdrop-blur">
         <Button onClick={guardar} disabled={guardando} className="h-11 min-w-[140px]">
           {guardando ? "Guardando…" : "Guardar"}

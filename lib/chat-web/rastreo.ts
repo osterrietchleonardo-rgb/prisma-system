@@ -89,6 +89,26 @@ export function esFichaDePropiedad(entrada: string): boolean {
   return i !== -1 && partes.length > i + 1
 }
 
+/** Las secciones que cuelgan de sí las notas: blog, novedades, prensa. */
+const SEGMENTOS_NOTA =
+  /^(blog|blogs|noticias|noticia|novedades|novedad|prensa|nota|notas|articulo|articulos|art[ií]culo|art[ií]culos|news|post|posts)$/i
+
+/**
+ * ¿Es UNA nota del blog? No entran (Leonardo, 17/9): casi nunca responden lo que pregunta quien
+ * entra a una inmobiliaria, y se comen el cupo de 60 páginas que necesitan las secciones.
+ * La PORTADA del blog sí queda: es una sección del sitio, y sirve para mandar a alguien a leer.
+ */
+export function esNotaDeBlog(entrada: string): boolean {
+  let partes: string[]
+  try {
+    partes = new URL(entrada).pathname.split("/").filter(Boolean)
+  } catch {
+    return false
+  }
+  const i = partes.findIndex((p) => SEGMENTOS_NOTA.test(p))
+  return i !== -1 && partes.length > i + 1
+}
+
 /** Qué tan adentro del sitio está una dirección: "/" es 0, "/tasaciones" es 1. */
 function profundidad(url: string): number {
   try {
@@ -98,7 +118,7 @@ function profundidad(url: string): number {
   }
 }
 
-export type MotivoRechazo = "esquema" | "dominio" | "extension" | "ficha" | "invalida"
+export type MotivoRechazo = "esquema" | "dominio" | "extension" | "ficha" | "nota" | "invalida"
 export type RevisionUrl = { ok: true; url: URL } | { ok: false; motivo: MotivoRechazo }
 
 /** El guardia de cada dirección antes de pedirla. */
@@ -113,6 +133,7 @@ export function revisarUrl(entrada: string, dominios: string[]): RevisionUrl {
   if (!dominios.includes(u.hostname.toLowerCase())) return { ok: false, motivo: "dominio" }
   if (EXTENSIONES_FUERA.test(u.pathname)) return { ok: false, motivo: "extension" }
   if (esFichaDePropiedad(u.toString())) return { ok: false, motivo: "ficha" }
+  if (esNotaDeBlog(u.toString())) return { ok: false, motivo: "nota" }
   return { ok: true, url: u }
 }
 
