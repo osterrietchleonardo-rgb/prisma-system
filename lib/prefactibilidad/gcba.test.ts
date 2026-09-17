@@ -56,4 +56,28 @@ describe("cliente del GCBA", () => {
   it("si el GCBA no responde, tira GcbaNoResponde (no un error genérico)", async () => {
     await expect(crearClienteGcba(fetchFalso(true)).parcela("053-050-006")).rejects.toBeInstanceOf(GcbaNoResponde);
   });
+
+  // esquinaOficial: evidencia real sacada de las teselas de linea_oficial que ya tenemos como
+  // fixture (decodificadas con `decodificar` y agrupadas por smp, igual que hace gcba.ts).
+  //
+  // - 053-050-006 (Roosevelt 4554, medio de cuadra, tesela 17/44243/78964): UNA sola línea
+  //   oficial, rumbo 31.18°. Un solo rumbo nunca puede superar el umbral de 30° contra sí
+  //   mismo → no es esquina.
+  // - 053-050-025 (misma tesela 17/44243/78964, misma manzana 053-050 que Roosevelt): una
+  //   línea oficial MultiLineString con dos tramos, rumbos 30.03° y 131.60° — difieren 101.57°
+  //   (o 78.43° por el otro lado del semicírculo), muy por encima de 30° → SÍ es esquina.
+  // - Se probó primero Cabildo 2040 (039-097-008B, tesela 17/44252/78960) como pedía el
+  //   reviewer: su línea oficial también es un MultiLineString de dos tramos, pero con rumbos
+  //   130.47° y 130.56° (casi paralelos, difieren <0.1°) → NO califica, pese a tener puertas
+  //   sobre dos calles (Cabildo y Ciudad de la Paz) en el padrón de catastro. Se descartó y se
+  //   usó 053-050-025, que sí tiene evidencia real de esquina en la propia tesela.
+  it("esquinaOficial: Roosevelt 4554 es medio de cuadra (un solo rumbo) → false", async () => {
+    const c = crearClienteGcba(fetchFalso());
+    expect(await c.esquinaOficial("053-050-006", BBOX)).toBe(false);
+  });
+  it("esquinaOficial: la parcela 053-050-025 tiene dos rumbos reales (30° y 132°) → true", async () => {
+    const c = crearClienteGcba(fetchFalso());
+    const bboxEsquina: [number, number, number, number] = [-58.4806, -34.5707, -58.4801, -34.5701];
+    expect(await c.esquinaOficial("053-050-025", bboxEsquina)).toBe(true);
+  });
 });
