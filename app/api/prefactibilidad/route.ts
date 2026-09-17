@@ -1,7 +1,11 @@
-// GET: "Mis prefactibilidades" (asesor: las suyas; director: la agencia). POST: guardar el informe.
+// GET: "Mis prefactibilidades" (asesor: las suyas; director: la agencia). POST: guardar el informe
+// (recalculado en el servidor a partir de la parcela).
 import { NextResponse } from "next/server";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { analizarParcela, ParcelaNoEncontrada } from "@/lib/prefactibilidad/analizar";
+import { dependenciasSupabase } from "@/lib/prefactibilidad/dependencias-supabase";
+import { GcbaNoResponde } from "@/lib/prefactibilidad/gcba";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +30,20 @@ export async function POST(req: Request) {
   try {
     const { userId, agencyId } = await requireTenant();
     const body = await req.json().catch(() => null);
-    const p = body?.prefactibilidad;
-    if (!p?.smp || !p?.direccion || !p?.edificabilidad?.modo) return NextResponse.json({ error: "No hay un análisis para guardar." }, { status: 400 });
+    const smp = typeof body?.smp === "string" ? body.smp.trim().toLowerCase() : "";
+    const direccion = typeof body?.direccion === "string" ? body.direccion.trim() : "";
+    if (!smp || !direccion) return NextResponse.json({ error: "No hay un análisis para guardar." }, { status: 400 });
+    // Lo que se guarda (y después se comparte por link) lo calcula el SERVIDOR de nuevo: el navegador
+    // solo dice qué parcela. Así nadie puede guardar números que PRISMA no calculó. Con la caché de la
+    // parcela ya caliente, cuesta una consulta de Código y una de terrenos.
     const admin = createAdminClient();
+    const p = await analizarParcela(smp, direccion, dependenciasSupabase(admin));
     const { data, error } = await admin.from("prefactibilidades").insert({ agency_id: agencyId, user_id: userId, direccion: p.direccion, smp: p.smp, modo: p.edificabilidad.modo, resultado: p }).select("id").single();
     if (error) throw error;
     return NextResponse.json({ id: data.id });
   } catch (e: any) {
+    if (e instanceof ParcelaNoEncontrada) return NextResponse.json({ error: e.message }, { status: 404 });
+    if (e instanceof GcbaNoResponde) return NextResponse.json({ error: e.message }, { status: 502 });
     console.error("Prefactibilidad guardar error:", e);
     return NextResponse.json({ error: e.message }, { status: e.message === "Unauthorized" ? 401 : 500 });
   }

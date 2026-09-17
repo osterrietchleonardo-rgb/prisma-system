@@ -49,8 +49,8 @@ create index if not exists gcba_puertas_lote_idx on public.gcba_puertas (lote_ca
 
 create table if not exists public.gcba_parcela_cache (
   smp            text primary key,
-  geom_lote      geometry(Geometry, 4326),     -- epok devuelve MultiPolygon, pero un Polygon también tiene que entrar
-  geom_manzana   geometry(Geometry, 4326),
+  geom_lote      jsonb,                        -- GeoJSON tal cual lo devuelve epok (PostgREST no convierte JSON a geometry al escribir)
+  geom_manzana   jsonb,
   catastro       jsonb,                       -- respuesta de epok catastro/parcela
   volumenes      jsonb,                       -- VolumenOficial[] de las teselas, ya en lon/lat
   manzana_tipo   text,                        -- TIPICA | ATIPICA según la tesela manzana
@@ -58,7 +58,6 @@ create table if not exists public.gcba_parcela_cache (
   consultado_en  timestamptz not null default now()
 );
 comment on table public.gcba_parcela_cache is 'Lo que se le pidió en vivo al catastro (epok) y a Ciudad 3D. La segunda consulta no toca al GCBA.';
-create index if not exists gcba_parcela_cache_geom_idx on public.gcba_parcela_cache using gist (geom_lote);
 
 -- Solo lectura para la app; escriben los scripts y el servidor con service_role.
 alter table public.gcba_parcelas_cur enable row level security;

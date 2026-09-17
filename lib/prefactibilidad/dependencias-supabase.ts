@@ -29,7 +29,10 @@ export function dependenciasSupabase(admin: SupabaseClient): Dependencias {
         return { smp: data.smp, geomLote: data.geom_lote, geomManzana: data.geom_manzana, catastro: data.catastro, volumenes: data.volumenes ?? [], manzanaTipo: data.manzana_tipo, esquinaOficial: Boolean(data.esquina_oficial) } as CacheParcela;
       },
       async guardar(c) {
-        await admin.from("gcba_parcela_cache").upsert({ smp: c.smp, geom_lote: c.geomLote, geom_manzana: c.geomManzana, catastro: c.catastro, volumenes: c.volumenes, manzana_tipo: c.manzanaTipo, esquina_oficial: c.esquinaOficial, consultado_en: new Date().toISOString() }, { onConflict: "smp" });
+        // Si la caché no se puede escribir, el análisis sale igual; pero tiene que quedar en el log,
+        // si no la parcela se le pide al GCBA en cada consulta sin que nadie se entere.
+        const { error } = await admin.from("gcba_parcela_cache").upsert({ smp: c.smp, geom_lote: c.geomLote, geom_manzana: c.geomManzana, catastro: c.catastro, volumenes: c.volumenes, manzana_tipo: c.manzanaTipo, esquina_oficial: c.esquinaOficial, consultado_en: new Date().toISOString() }, { onConflict: "smp" });
+        if (error) console.error("Prefactibilidad: no se pudo guardar la caché de la parcela", c.smp, error.message);
       },
     },
   };
