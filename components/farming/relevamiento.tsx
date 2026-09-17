@@ -141,8 +141,13 @@ function Tarjeta({
         <Button variant="ghost" size="sm" className="h-11 gap-1.5 text-xs" disabled={soloLectura} onClick={() => onEditar(d)}>
           <Pencil className="h-3.5 w-3.5" /> editar
         </Button>
-        <Button variant="ghost" size="sm" className="h-11 gap-1.5 text-xs" disabled={soloLectura} onClick={() => onPersonas(d)}>
-          <Users className="h-3.5 w-3.5" /> personas
+        {/* «personas» NO se apaga en una zona archivada: se abre de solo lectura. Lo que el
+            cartel del archivado promete guardado es «tus tarjetas, tus PROPIETARIOS y su
+            historial», y dejar este botón muerto repetiría en chiquito el mismo problema —el
+            trabajo está en la base y ninguna pantalla lo muestra. Adentro del diálogo se apaga
+            lo que escribe, y el servidor rechaza igual cualquier escritura. */}
+        <Button variant="ghost" size="sm" className="h-11 gap-1.5 text-xs" onClick={() => onPersonas(d)}>
+          <Users className="h-3.5 w-3.5" /> {soloLectura ? "ver personas" : "personas"}
         </Button>
         {/* El que destruye no puede parecerse a los otros dos: va en rojo y al otro extremo de
             la fila, para que el pulgar no lo encuentre por error a un centímetro de «editar».
@@ -352,7 +357,7 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
         onGuardada={guardada}
       />
 
-      <Propietarios direccion={viendoPersonas} onCerrar={() => setViendoPersonas(null)} />
+      <Propietarios direccion={viendoPersonas} soloLectura={soloLectura} onCerrar={() => setViendoPersonas(null)} />
     </div>
   )
 }

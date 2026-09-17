@@ -996,6 +996,12 @@ La tercera solapa: **lo que caminaste vos**. Acá va lo que el portal no tiene �
 
 **Ojo con borrar una tarjeta:** se borra la dirección, sus propietarios y todo su historial, y no se puede deshacer. Distinto es **borrar una zona**: si tenés tarjetas cargadas, la zona **se archiva** y tu trabajo queda guardado; las cuadras sí vuelven a estar libres para otro asesor.
 
-**Dónde quedan las tarjetas de una zona archivada.** En el mismo desplegable de "Relevamiento", con la palabra **"archivada"** al lado del nombre. La elegís y ves todo lo que habías cargado: las direcciones, las personas y lo que anotaste. Arriba te aparece un renglón que te lo recuerda, y los botones de agregar, editar, personas y borrar quedan apagados: **esa zona se lee, no se trabaja** — sus cuadras ya son de quien las dibuje ahora. Si querés volver a trabajar esas calles, dibujá la zona de nuevo desde "Mis zonas"; las tarjetas viejas se quedan donde están, en la zona archivada.
+**Dónde quedan las tarjetas de una zona archivada.** En el mismo desplegable de "Relevamiento", con la palabra **"archivada"** al lado del nombre. La elegís y ves todo lo que habías cargado. Arriba te aparece un renglón que te lo recuerda: **esa zona se lee, no se trabaja** — sus cuadras ya son de quien las dibuje ahora.
+
+- Las **tarjetas** se leen enteras, como siempre.
+- **"ver personas"** sigue funcionando: abrís la puerta y ahí están tus propietarios con su piso, su unidad, el vínculo, las notas y **el teléfono para llamar de un toque**. Lo que no aparece es el formulario para sumar a alguien, ni el lápiz, ni el tacho.
+- Los botones de **agregar dirección, editar y borrar** quedan apagados.
+
+Si querés volver a trabajar esas calles, dibujá la zona de nuevo desde "Mis zonas"; las tarjetas viejas se quedan donde están, en la zona archivada.
 
 > 🔜 El tablero con las 6 columnas —donde vas moviendo cada dirección según avanzás, y que se anota solo quién hizo qué y cuándo—, los indicadores del método y el botón para pasar un propietario a tu pipeline de Tracking llegan en la próxima etapa.

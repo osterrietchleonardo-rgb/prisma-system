@@ -8,7 +8,7 @@
 // Lo único obligatorio es el nombre. El teléfono es un link `tel:`: el asesor está caminando y
 // tiene que poder llamar desde acá sin copiar nada a mano.
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Loader2, Pencil, Phone, Plus, Trash2 } from "lucide-react"
+import { Archive, Loader2, Pencil, Phone, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -154,10 +154,23 @@ function CamposPersona({
 
 export function Propietarios({
   direccion,
+  soloLectura,
   onCerrar,
 }: {
   /** null = cerrado. La tarjeta entera y no solo el id: el título dice de qué puerta se trata. */
   direccion: FilaDireccion | null
+  /**
+   * La zona está archivada: la gente SE MIRA y no se trabaja.
+   *
+   * Se mira de verdad —nombre, piso, unidad, vínculo, teléfono como link `tel:` y notas—,
+   * porque es exactamente lo que el cartel del archivado promete: «tus tarjetas, tus
+   * propietarios y su historial quedan guardados». Lo que se apaga es lo que escribe: el
+   * formulario de sumar, el lápiz y el tacho.
+   *
+   * Esto es la PANTALLA, no el candado: el servidor rechaza igual cualquier escritura en una
+   * zona archivada (ver app/api/farming/direcciones/[id]/propietarios/*), pase lo que pase acá.
+   */
+  soloLectura: boolean
   onCerrar: () => void
 }) {
   const [gente, setGente] = useState<PropietarioFarming[]>([])
@@ -271,13 +284,29 @@ export function Propietarios({
           <DialogTitle>Personas de {direccion?.calle} {direccion?.altura ?? ""}</DialogTitle>
         </DialogHeader>
 
+        {/* LÍNEA VISIBLE, nunca un globito: es lo que explica por qué acá no hay con qué
+            escribir. La misma frase que la pantalla de Relevamiento. */}
+        {soloLectura && (
+          <p className="flex items-start gap-2 rounded-xl border border-zinc-200 bg-muted p-3 text-sm dark:border-zinc-800">
+            <Archive className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Esta zona está archivada: su gente quedó guardada y la podés leer y llamar desde
+              acá, pero no se puede cambiar.
+            </span>
+          </p>
+        )}
+
         {cargando ? (
           <div className="flex h-24 items-center justify-center">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : gente.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Todavía no anotaste a nadie de esta dirección. El encargado suele ser el primero.
+            {soloLectura
+              // «El encargado suele ser el primero» es un consejo para cargar, y acá no se
+              // puede cargar: decirlo sería mandar al asesor a buscar un botón que no está.
+              ? "En esta dirección no habías anotado a nadie."
+              : "Todavía no anotaste a nadie de esta dirección. El encargado suele ser el primero."}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -320,6 +349,9 @@ export function Propietarios({
                           ].filter(Boolean).join(" · ")}
                         </p>
                       </div>
+                      {/* Los dos que escriben. En una zona archivada no se dibujan: no hay
+                          nada que puedan hacer, y el servidor los rechazaría igual. */}
+                      {!soloLectura && (
                       <div className="flex shrink-0 items-start">
                         {/* Corregir, sin borrar. Un teléfono mal tipeado no puede costar la
                             persona entera con sus notas. */}
@@ -340,6 +372,7 @@ export function Propietarios({
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
+                      )}
                     </div>
 
                     {/* El email y las notas, VISIBLES: se venían guardando y no se veían en
@@ -370,15 +403,17 @@ export function Propietarios({
           </ul>
         )}
 
-        <div className="space-y-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-          <p className="text-sm font-medium">Sumar una persona</p>
+        {!soloLectura && (
+          <div className="space-y-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <p className="text-sm font-medium">Sumar una persona</p>
 
-          <CamposPersona id="p-nueva" valor={nuevo} onCambio={setNuevo} />
+            <CamposPersona id="p-nueva" valor={nuevo} onCambio={setNuevo} />
 
-          <Button className="h-11 w-full gap-1.5" disabled={guardando || !nuevo.nombre.trim()} onClick={sumar}>
-            {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4" /> Agregar</>}
-          </Button>
-        </div>
+            <Button className="h-11 w-full gap-1.5" disabled={guardando || !nuevo.nombre.trim()} onClick={sumar}>
+              {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4" /> Agregar</>}
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

@@ -442,22 +442,40 @@ describe("propietarios de una tarjeta en zona archivada", () => {
     base.tablas.farming_direcciones.push(direccionFixture(D_VIEJA, Z_ARCHIVADA, AGENCIA))
     base.tablas.farming_propietarios.push({
       id: P_VIEJO, direccion_id: D_VIEJA, agency_id: AGENCIA, creado_por: YO,
-      piso: null, unidad: null, nombre: "Marta", vinculo: "propietario",
-      telefono: null, email: null, notas: null, tracking_log_id: null, created_at: "2026-09-16T10:00:00.000Z",
+      piso: "3", unidad: "B", nombre: "Marta", vinculo: "encargado",
+      telefono: "+541155554444", email: "marta@ejemplo.com", notas: "Atiende después de las 18",
+      tracking_log_id: null, created_at: "2026-09-16T10:00:00.000Z",
     })
   })
 
-  it("GET: la gente SÍ se lee", async () => {
+  // EL PAR QUE DEFINE LA REGLA: la lectura pasa, la escritura no. La pantalla abre «ver
+  // personas» de solo lectura sobre una zona archivada, y lo que sostiene esa decisión es este
+  // GET: si contestara 404, el diálogo se abriría vacío y la promesa del archivado («tus
+  // propietarios y su historial quedan guardados») volvería a ser falsa.
+  it("GET: la gente SÍ se lee, con todo lo que la pantalla muestra", async () => {
     const r = await leer(D_VIEJA)
     const d = await r.json()
     expect(r.status).toBe(200)
-    expect(d.propietarios.map((x: any) => x.id)).toEqual([P_VIEJO])
+    expect(d.propietarios).toHaveLength(1)
+    // No alcanza con el id: el diálogo de solo lectura muestra el vínculo, el piso, la unidad,
+    // las notas y el teléfono como link `tel:` — que es el motivo entero de haberlo anotado.
+    expect(d.propietarios[0]).toEqual(
+      expect.objectContaining({
+        id: P_VIEJO, nombre: "Marta", vinculo: "encargado", piso: "3", unidad: "B",
+        telefono: "+541155554444", email: "marta@ejemplo.com", notas: "Atiende después de las 18",
+      }),
+    )
   })
 
-  it("POST: no se suma gente nueva", async () => {
+  // La otra mitad, y la que NO depende de la pantalla: aunque el diálogo muestre la lista, el
+  // servidor rechaza cualquier alta ahí. Si mañana alguien vuelve a dibujar el formulario por
+  // error, o alguien pega contra la API a mano, la zona archivada sigue sin recibir gente nueva.
+  it("POST: no se suma gente nueva, muestre lo que muestre la pantalla", async () => {
     const antes = base.tablas.farming_propietarios.length
     const r = await post(D_VIEJA, { nombre: "Nuevo" })
+    const d = await r.json()
     expect(r.status).toBe(409)
+    expect(d.error).toMatch(/archivada/i)
     expect(base.tablas.farming_propietarios).toHaveLength(antes)
   })
 
