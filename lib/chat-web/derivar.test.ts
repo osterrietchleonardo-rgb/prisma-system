@@ -1,0 +1,83 @@
+import { describe, it, expect } from "vitest"
+import { armarAvisoDerivacion, linkWhatsApp, telefonoUsable } from "./derivar"
+
+const base = {
+  nombreAgencia: "Central",
+  nombreBot: "Sofía",
+  objetivo: "vender_propiedad" as const,
+  resumen: "Quiere vender un PH en Belgrano, lo intentó 6 meses con otra inmobiliaria.",
+  datos: { nombre: "Alicia", telefono: "+54 9 11 5928-9642", email: "alicia@mail.com", zona: "Belgrano" },
+  paginaOrigen: "https://central.com/tasaciones",
+}
+
+describe("telefonoUsable", () => {
+  it("deja el número solo con dígitos", () => {
+    expect(telefonoUsable("+54 9 11 5928-9642")).toBe("5491159289642")
+  })
+  it("lo que no puede ser un teléfono, null", () => {
+    for (const malo of ["", "1234", "no tengo", undefined]) expect(telefonoUsable(malo), String(malo)).toBeNull()
+  })
+})
+
+describe("linkWhatsApp: el equipo tiene que poder escribirle en un toque", () => {
+  it("abre el chat CON EL VISITANTE, con el saludo escrito", () => {
+    const link = linkWhatsApp("5491159289642", "Hola Alicia, soy del equipo de Central")
+    expect(link).not.toBeNull()
+    expect(link!.startsWith("https://wa.me/5491159289642?text=")).toBe(true)
+    expect(decodeURIComponent(link!)).toContain("Hola Alicia, soy del equipo de Central")
+  })
+  it("sin teléfono no hay link", () => {
+    expect(linkWhatsApp(null, "hola")).toBeNull()
+  })
+})
+
+describe("armarAvisoDerivacion", () => {
+  it("el asunto dice QUÉ quiere y quién es: se entiende sin abrirlo", () => {
+    const a = armarAvisoDerivacion(base)
+    expect(a.asunto).toContain("Alicia")
+    expect(a.asunto.toLowerCase()).toContain("vender")
+  })
+
+  it("el cuerpo trae los datos, el resumen y de qué página vino", () => {
+    const a = armarAvisoDerivacion(base)
+    for (const dato of ["Alicia", "alicia@mail.com", "Belgrano", "PH en Belgrano", "tasaciones"])
+      expect(a.html, dato).toContain(dato)
+  })
+
+  it("trae el botón para escribirle por WhatsApp", () => {
+    const a = armarAvisoDerivacion(base)
+    expect(a.html).toContain("wa.me/5491159289642")
+  })
+
+  it("sin teléfono, no promete un WhatsApp que no se puede abrir: muestra el email", () => {
+    const a = armarAvisoDerivacion({ ...base, datos: { nombre: "Alicia", email: "alicia@mail.com" } })
+    expect(a.html).not.toContain("wa.me/")
+    expect(a.html).toContain("alicia@mail.com")
+    expect(a.linkWhatsApp).toBeNull()
+  })
+
+  it("el texto del visitante no puede meter HTML en el correo del equipo", () => {
+    const a = armarAvisoDerivacion({
+      ...base,
+      resumen: '<script>alert(1)</script> quiere vender',
+      datos: { ...base.datos, nombre: '<img src=x onerror="robar()">' },
+    })
+    // Doble protección: las etiquetas se SACAN, y lo que quede se escapa.
+    expect(a.html).not.toContain("<script>")
+    expect(a.html).not.toContain("<img")
+    expect(a.html).not.toContain("onerror=")
+    expect(a.html).toContain("quiere vender")
+  })
+
+  it("un signo < que escribió el visitante queda escapado, no rompe el correo", () => {
+    const a = armarAvisoDerivacion({ ...base, datos: { ...base.datos, presupuesto: "< 100k USD" } })
+    expect(a.html).toContain("&lt; 100k USD")
+  })
+
+  it("el mensaje corto para WhatsApp dice lo mismo, sin HTML", () => {
+    const a = armarAvisoDerivacion(base)
+    expect(a.textoWhatsApp).toContain("Alicia")
+    expect(a.textoWhatsApp).not.toContain("<")
+    expect(a.textoWhatsApp.length).toBeLessThanOrEqual(600)
+  })
+})
