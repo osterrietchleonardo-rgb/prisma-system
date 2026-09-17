@@ -3050,15 +3050,18 @@ export function PrefactibilidadModule({ esDirector = false }: { esDirector?: boo
     } catch { setError("No se pudo analizar."); } finally { setCargando(false); }
   }, []);
 
-  const guardar = async () => {
-    if (!p) return;
+  // Devuelve el id: el estado de React no se actualiza dentro del mismo tick, así que quien lo
+  // llame no puede leer `idGuardada` recién seteado.
+  const guardar = async (): Promise<string | null> => {
+    if (!p) return null;
     const r = await fetch("/api/prefactibilidad", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ smp: p.smp, direccion: p.direccion }) });
     const j = await r.json();
-    if (r.ok) { setIdGuardada(j.id); setRecargar((n) => n + 1); } else setError(j.error || "No se pudo guardar.");
+    if (!r.ok) { setError(j.error || "No se pudo guardar."); return null; }
+    setIdGuardada(j.id); setRecargar((n) => n + 1);
+    return j.id as string;
   };
   const compartir = async () => {
-    let id = idGuardada;
-    if (!id) { await guardar(); id = idGuardada; }
+    const id = idGuardada ?? (await guardar());
     if (!id) return;
     const r = await fetch(`/api/prefactibilidad/${id}/compartir`, { method: "POST" });
     const j = await r.json();
