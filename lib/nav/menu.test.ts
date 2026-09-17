@@ -17,6 +17,7 @@ const DIRECTOR = [
   { name: "Dashboard",              href: "/director/dashboard" },
   { name: "Calendario",             href: "/director/calendario" },
   { name: "Asesor IA WhatsApp",     href: "/director/asesor-ia-whatsapp" },
+  { name: "Chat de la web",         href: "/director/chat-web" },
   { name: "Pipeline",               href: "/director/pipeline" },
   { name: "Leads Tokko",            href: "/director/leads" },
   { name: "Leads WhatsApp",         href: "/director/leads-whatsapp" },
@@ -90,8 +91,8 @@ describe("las páginas del menú, por nombre y dirección", () => {
     expect(ahora).toEqual(esperados.map(clave).sort())
   })
 
-  it("director: 30 renglones; asesor: 24", () => {
-    expect(planos("director")).toHaveLength(30)
+  it("director: 31 renglones; asesor: 24", () => {
+    expect(planos("director")).toHaveLength(31)
     expect(planos("asesor")).toHaveLength(24)
   })
 

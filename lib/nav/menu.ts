@@ -24,6 +24,7 @@ import {
   Inbox,
   LayoutGrid,
   Users,
+  Globe,
   MessageCircle,
   BookUser,
   FileText,
@@ -116,6 +117,9 @@ const RENGLONES: Renglon[] = [
   { id: "leads-tokko", icon: Users, grupo: "contactos",
     director: { name: "Leads Tokko", href: "/director/leads" },
     asesor:   { name: "Leads Tokko", href: "/asesor/leads" } },
+  { id: "chat-web", icon: Globe, grupo: "bandejas",
+    director: { name: "Chat de la web", href: "/director/chat-web" } },
+
   { id: "leads-whatsapp", icon: MessageCircle, grupo: "contactos",
     director: { name: "Leads WhatsApp", href: "/director/leads-whatsapp" },
     asesor:   { name: "Leads WhatsApp", href: "/asesor/leads-whatsapp" } },
