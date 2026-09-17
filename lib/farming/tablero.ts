@@ -68,7 +68,16 @@ export function validarMovimiento(m: Partial<Movimiento>): string[] {
   // con fecha es una tarjeta que se va a olvidar.
   const f = (m.proxima_accion_en || "").trim()
   if (!f) errores.push("Decinos para cuándo es el próximo paso.")
-  else if (!ES_FECHA.test(f) || Number.isNaN(new Date(f).getTime())) errores.push("Esa fecha no se entiende.")
+  else if (!ES_FECHA.test(f)) errores.push("Esa fecha no se entiende.")
+  else {
+    // JS Date silently rolls over (2026-02-30 → 2026-03-02), pero Postgres rechaza.
+    // Rebuild and round-trip: si año/mes/día no coinciden, la fecha no es válida.
+    const [year, month, day] = f.split("-").map(Number)
+    const d = new Date(year, month - 1, day)
+    if (d.getFullYear() !== year || d.getMonth() + 1 !== month || d.getDate() !== day) {
+      errores.push("Esa fecha no se entiende.")
+    }
+  }
 
   if (m.cartas_entregadas != null && (!Number.isInteger(m.cartas_entregadas) || m.cartas_entregadas < 0)) {
     errores.push("Las cartas entregadas van como un número entero.")

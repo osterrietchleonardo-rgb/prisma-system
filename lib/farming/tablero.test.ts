@@ -59,6 +59,26 @@ describe("validarMovimiento", () => {
     expect(validarMovimiento({ ...ok, proxima_accion_en: "el jueves" })).toHaveLength(1)
   })
 
+  it("rechaza 30 de febrero (no existe)", () => {
+    expect(validarMovimiento({ ...ok, proxima_accion_en: "2026-02-30" })).toHaveLength(1)
+  })
+
+  it("rechaza 31 de abril (no existe)", () => {
+    expect(validarMovimiento({ ...ok, proxima_accion_en: "2026-04-31" })).toHaveLength(1)
+  })
+
+  it("rechaza 31 de junio (no existe)", () => {
+    expect(validarMovimiento({ ...ok, proxima_accion_en: "2026-06-31" })).toHaveLength(1)
+  })
+
+  it("rechaza 29 de febrero en año no bisiesto", () => {
+    expect(validarMovimiento({ ...ok, proxima_accion_en: "2027-02-29" })).toHaveLength(1)
+  })
+
+  it("acepta 29 de febrero en año bisiesto", () => {
+    expect(validarMovimiento({ ...ok, proxima_accion_en: "2028-02-29" })).toEqual([])
+  })
+
   it("junta todos los problemas, no corta en el primero", () => {
     expect(validarMovimiento({}).length).toBeGreaterThan(2)
   })
@@ -72,6 +92,8 @@ describe("calcularIndicadores", () => {
       contactos: [{ tipo: "carta_1", etapa_hasta: "presentado" }, { tipo: "llamada", etapa_hasta: "respondio" }] },
     { tramo: "Av. Ejemplo 1200", etapa: "relevado", unidades_totales: null, encargado_nombre: "Marta",
       contactos: [] },
+    { tramo: "Av. Ejemplo 1200", etapa: "captada", unidades_totales: 10, encargado_nombre: null,
+      contactos: [{ tipo: "llamada", etapa_hasta: "respondio" }, { tipo: "tasacion", etapa_hasta: "tasacion" }] },
   ]
 
   it("cuenta las cuadras distintas que tienen al menos una dirección", () => {
@@ -80,12 +102,12 @@ describe("calcularIndicadores", () => {
 
   it("las propiedades son las tarjetas, y las unidades su suma", () => {
     const i = calcularIndicadores(filas)
-    expect(i.propiedades).toBe(3)
-    expect(i.unidades).toBe(40)
+    expect(i.propiedades).toBe(4)
+    expect(i.unidades).toBe(50)
   })
 
   it("los contactos son todas las filas del historial", () => {
-    expect(calcularIndicadores(filas).contactos).toBe(4)
+    expect(calcularIndicadores(filas).contactos).toBe(6)
   })
 
   it("un encargado cuenta solo si además lo fueron a ver", () => {
@@ -94,17 +116,17 @@ describe("calcularIndicadores", () => {
   })
 
   it("las respuestas son las tarjetas que PASARON por «respondió», aunque después avanzaran", () => {
-    expect(calcularIndicadores(filas).respuestas).toBe(1)
+    expect(calcularIndicadores(filas).respuestas).toBe(2)
   })
 
   it("tasaciones y entrevistas salen del tipo de contacto", () => {
     const i = calcularIndicadores(filas)
-    expect(i.tasaciones).toBe(1)
+    expect(i.tasaciones).toBe(2)
     expect(i.entrevistas).toBe(0)
   })
 
   it("las captaciones son las tarjetas que están en «captada» hoy", () => {
-    expect(calcularIndicadores(filas).captaciones).toBe(1)
+    expect(calcularIndicadores(filas).captaciones).toBe(2)
   })
 
   it("sin ninguna tarjeta, todo en cero y nada explota", () => {
