@@ -1,5 +1,5 @@
 // app/api/farming/direcciones/[id]/propietarios/[pid]/tracking/route.test.ts
-import { describe, it, expect, beforeEach, vi } from "vitest"
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { baseFalsa } from "@/lib/farming/base-falsa"
 
 /**
@@ -18,6 +18,13 @@ import { baseFalsa } from "@/lib/farming/base-falsa"
  *  6. El id que devuelve se guarda en `farming_propietarios.tracking_log_id`. Si ESE guardado
  *     falla, la actividad YA EXISTE: 200 con un `aviso`, nunca un error que invite a apretar
  *     de nuevo y duplicar la actividad.
+ *  7. Y si el asesor aprieta igual (recargó, cambió de pestaña), el servidor ENCUENTRA esa
+ *     actividad colgada por el id de la persona que viaja en `metadata`: 409, repara el
+ *     enlace y no crea una segunda.
+ *  8. El enlace se escribe con condición («solo si sigue vacío»). Si dos apretones corren a la
+ *     par, el que pierde BORRA su propia actividad; y si ni eso puede, lo dice con otras
+ *     palabras en vez de mentirle al asesor.
+ *  9. La fecha de la actividad es la de Buenos Aires, no la del servidor.
  */
 
 const AGENCIA = "ag-1"
@@ -260,5 +267,116 @@ describe("POST /api/farming/direcciones/[id]/propietarios/[pid]/tracking", () =>
     // aviso le está contando al asesor: la actividad existe en Tracking, pero acá no se ve.
     const fila = base.tablas.farming_propietarios.find((p: any) => p.id === P_DE_MIA)!
     expect(fila.tracking_log_id).toBeNull()
+  })
+
+  // EL DUPLICADO DE VERDAD, el que no necesita dos dedos a la vez: la actividad se creó, el
+  // enlace no se guardó, el asesor recargó la página y el botón volvió a aparecer. Si el
+  // servidor no buscara la actividad colgada antes de crear, este apretón haría la SEGUNDA
+  // prospección de la misma persona en el pipeline del equipo.
+  it("si la actividad ya existe aunque la tarjeta no la muestre: 409, repara el enlace y NO crea otra", async () => {
+    base.tablas.performance_logs = [
+      { id: "log-colgado", agency_id: AGENCIA, type: "prospeccion", metadata: { farming_propietario_id: P_DE_MIA } },
+    ]
+
+    const r = await pasar(D_MIA, P_DE_MIA, { proceso: "vendedor" })
+    const d = await r.json()
+    expect(r.status).toBe(409)
+    expect(d.tracking_log_id).toBe("log-colgado")
+    expect(savePerformanceLogMock).not.toHaveBeenCalled()
+
+    // Y de paso deja la tarjeta arreglada, para que el botón no vuelva a aparecer.
+    const fila = base.tablas.farming_propietarios.find((p: any) => p.id === P_DE_MIA)!
+    expect(fila.tracking_log_id).toBe("log-colgado")
+  })
+
+  it("la actividad colgada de OTRA persona no cuenta: crea la suya normalmente", async () => {
+    base.tablas.performance_logs = [
+      { id: "log-de-otro", agency_id: AGENCIA, type: "prospeccion", metadata: { farming_propietario_id: P_DE_MIA_2 } },
+    ]
+    const r = await pasar(D_MIA, P_DE_MIA, { proceso: "vendedor" })
+    expect(r.status).toBe(200)
+    expect(savePerformanceLogMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("una actividad colgada de OTRA agencia no se toca ni se devuelve", async () => {
+    base.tablas.performance_logs = [
+      { id: "log-ajeno", agency_id: OTRA_AGENCIA, type: "prospeccion", metadata: { farming_propietario_id: P_DE_MIA } },
+    ]
+    const r = await pasar(D_MIA, P_DE_MIA, { proceso: "vendedor" })
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.tracking_log_id).toBe("log-nuevo")
+  })
+
+  // LA CARRERA: dos apretones casi juntos (dos pestañas, dos dispositivos). El segundo crea su
+  // actividad y, al ir a enlazar, se encuentra con que el primero ya enlazó. La suya sobra.
+  const carrera = () => {
+    savePerformanceLogMock.mockImplementation(async () => {
+      // Mientras esta actividad se creaba, el OTRO apretón enlazó a la persona.
+      const fila = base.tablas.farming_propietarios.find((p: any) => p.id === P_DE_MIA)!
+      fila.tracking_log_id = "log-del-otro"
+      base.tablas.performance_logs = [
+        ...(base.tablas.performance_logs ?? []),
+        { id: "log-mio", agency_id: AGENCIA, type: "prospeccion", metadata: { farming_propietario_id: P_DE_MIA } },
+      ]
+      return { id: "log-mio" }
+    })
+  }
+
+  it("si otro apretón ganó la carrera: 409 con el id del otro, y borra la actividad que sobró", async () => {
+    carrera()
+    const r = await pasar(D_MIA, P_DE_MIA, { proceso: "vendedor" })
+    const d = await r.json()
+    expect(r.status).toBe(409)
+    expect(d.tracking_log_id).toBe("log-del-otro")
+
+    // La actividad de más NO queda en el pipeline del equipo.
+    expect(base.tablas.performance_logs.map((l: any) => l.id)).toEqual([])
+    // El enlace que ya estaba no se pisó.
+    const fila = base.tablas.farming_propietarios.find((p: any) => p.id === P_DE_MIA)!
+    expect(fila.tracking_log_id).toBe("log-del-otro")
+  })
+
+  it("si además falla el borrado de la que sobró: 409 con OTRO mensaje, que no miente", async () => {
+    carrera()
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => {
+      const q: any = fromOriginal(tabla)
+      if (tabla === "performance_logs") {
+        const deleteOriginal = q.delete
+        q.delete = (...args: any[]) => {
+          const encadenado = deleteOriginal(...args)
+          encadenado.then = (resolve: any) => resolve({ data: null, count: null, error: { message: "boom" } })
+          return encadenado
+        }
+      }
+      return q
+    }) as typeof base.from
+
+    const r = await pasar(D_MIA, P_DE_MIA, { proceso: "vendedor" })
+    const d = await r.json()
+    expect(r.status).toBe(409)
+    expect(d.error).not.toBe("Esta persona ya está en tu pipeline")
+    expect(d.error).toMatch(/repetida/i)
+    expect(d.tracking_log_id).toBe("log-del-otro")
+  })
+
+  it("manda el nombre de la persona en nombre_cliente, que es la única columna donde se ve", async () => {
+    await pasar(D_MIA, P_DE_MIA, { proceso: "vendedor" })
+    expect(savePerformanceLogMock.mock.calls[0][0].nombre_cliente).toBe("Marta Gómez")
+  })
+})
+
+// El farming se hace a la tardecita: a las 22:30 de Buenos Aires ya es el día siguiente en
+// UTC. La fecha de la actividad tiene que ser la del asesor, no la del servidor.
+describe("la fecha de la actividad es la de Buenos Aires", () => {
+  afterEach(() => { vi.useRealTimers() })
+
+  it("a las 22:30 del 20 en Buenos Aires, fecha_actividad es el 20 (no el 21)", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-09-21T01:30:00Z"))
+
+    await pasar(D_MIA, P_DE_MIA, { proceso: "vendedor" })
+    expect(savePerformanceLogMock.mock.calls[0][0].fecha_actividad).toBe("2026-09-20")
   })
 })

@@ -312,9 +312,15 @@ export function Propietarios({
       if (d.aviso) toast.warning(d.aviso)
       else toast.success("Pasó a tu pipeline de Tracking")
     } catch (e: any) {
-      // 409: alguien (u otra pestaña) ya lo había pasado entre el último GET y este click. Se
-      // refresca la lista para mostrar la línea real en vez de dejar el botón desactualizado.
-      if (e.status === 409 && gen.current === mio) traer(direccion.id)
+      // 409: alguien (u otra pestaña) ya lo había pasado entre el último GET y este click, o la
+      // actividad existía aunque la tarjeta no la mostrara. No es un error del asesor: la
+      // persona QUEDA en el pipeline. Se refresca la lista para mostrar la línea real en vez de
+      // dejar el botón desactualizado, y se avisa sin cara de rojo.
+      if (e.status === 409) {
+        if (gen.current === mio) traer(direccion.id)
+        toast.warning(e.message)
+        return
+      }
       toast.error(e.message)
     } finally {
       if (gen.current === mio) setPasando((prev) => ({ ...prev, [p.id]: false }))

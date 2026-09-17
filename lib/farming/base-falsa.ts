@@ -1,7 +1,7 @@
 // lib/farming/base-falsa.ts
 //
 // DOBLE DE PRUEBA. Un cliente de Supabase en memoria, con lo justo que usan los endpoints de
-// Farming: from().select().eq().neq().in().order().limit().single().maybeSingle(), insert(),
+// Farming: from().select().eq().neq().in().is().order().limit().single().maybeSingle(), insert(),
 // update(), delete(), upsert(). Es thenable, como el real. No toca red.
 //
 // Solo lo importan los *.test.ts: no va a producción.
@@ -9,6 +9,18 @@
 type Fila = Record<string, any>
 type Predicado = (f: Fila) => boolean
 type OpcionesUpsert = { onConflict?: string; ignoreDuplicates?: boolean }
+type OpcionesCuenta = { count?: "exact" }
+
+/** El valor de una columna, entendiendo también el operador `->>` de PostgREST sobre un jsonb:
+ *  `metadata->>farming_propietario_id` lee dentro del objeto. El real devuelve texto; acá se
+ *  devuelve el valor tal cual, que para un id (string) es lo mismo. */
+function valorDeColumna(f: Fila, col: string) {
+  if (!col.includes("->")) return f[col]
+  const [raiz, ...resto] = col.split(/->>?/)
+  let v: any = f[raiz]
+  for (const paso of resto) v = v == null ? undefined : v[paso]
+  return v
+}
 
 export function baseFalsa(inicial: Record<string, Fila[]>, rpcs: Record<string, (args: any) => Fila[]> = {}) {
   const tablas: Record<string, Fila[]> = JSON.parse(JSON.stringify(inicial))
@@ -34,12 +46,20 @@ export function baseFalsa(inicial: Record<string, Fila[]>, rpcs: Record<string, 
         return q
       },
       insert: (f: any) => { op = "insert"; carga = f; return q },
-      update: (p: any) => { op = "update"; carga = p; return q },
-      delete: () => { op = "delete"; return q },
+      // `update` y `delete` también aceptan `{ count: "exact" }`, igual que el real: es la
+      // única forma de saber CUÁNTAS filas tocó una escritura condicional.
+      update: (p: any, o?: OpcionesCuenta) => { op = "update"; carga = p; pedirCuenta ||= o?.count === "exact"; return q },
+      delete: (o?: OpcionesCuenta) => { op = "delete"; pedirCuenta ||= o?.count === "exact"; return q },
       upsert: (f: any, o?: OpcionesUpsert) => { op = "upsert"; carga = f; opcionesUpsert = o || {}; return q },
-      eq: (c: string, v: any) => { filtros.push((f) => f[c] === v); return q },
-      neq: (c: string, v: any) => { filtros.push((f) => f[c] !== v); return q },
-      in: (c: string, vs: any[]) => { filtros.push((f) => vs.includes(f[c])); return q },
+      eq: (c: string, v: any) => { filtros.push((f) => valorDeColumna(f, c) === v); return q },
+      neq: (c: string, v: any) => { filtros.push((f) => valorDeColumna(f, c) !== v); return q },
+      in: (c: string, vs: any[]) => { filtros.push((f) => vs.includes(valorDeColumna(f, c))); return q },
+      // `.is(col, null)` de PostgREST es «IS NULL»: una columna que en el doble ni siquiera
+      // está puesta cuenta como nula, igual que en la base.
+      is: (c: string, v: any) => {
+        filtros.push((f) => (v === null ? valorDeColumna(f, c) == null : valorDeColumna(f, c) === v))
+        return q
+      },
       order: (c: string, o?: { ascending?: boolean }) => { orden = { col: c, asc: o?.ascending !== false }; return q },
       limit: (n: number) => { tope = n; return q },
       single: () => { unico = true; return q },
@@ -61,9 +81,11 @@ export function baseFalsa(inicial: Record<string, Fila[]>, rpcs: Record<string, 
         } else if (op === "update") {
           res = filas().filter(pasa)
           for (const f of res) Object.assign(f, carga)
+          count = pedirCuenta ? res.length : null
         } else if (op === "delete") {
           res = filas().filter(pasa)
           tablas[tabla] = filas().filter((f) => !res.includes(f))
+          count = pedirCuenta ? res.length : null
         } else if (op === "upsert") {
           // ON CONFLICT DO NOTHING (con ignoreDuplicates:true): si ya existe una fila con las
           // mismas columnas de onConflict, no se toca ni se duplica; si no existe, se inserta.
