@@ -79,8 +79,14 @@ export function validarMovimiento(m: Partial<Movimiento>): string[] {
     }
   }
 
-  if (m.cartas_entregadas != null && (!Number.isInteger(m.cartas_entregadas) || m.cartas_entregadas < 0)) {
-    errores.push("Las cartas entregadas van como un número entero.")
+  // `farming_contactos.cartas_entregadas` es `smallint` (tope 32767): sin este techo acá,
+  // «999999» pasa la validación, mueve la tarjeta, y recién en el INSERT explota con un 22003
+  // de Postgres — la compensación se dispara por un número absurdo, no por una falla real.
+  if (
+    m.cartas_entregadas != null &&
+    (!Number.isInteger(m.cartas_entregadas) || m.cartas_entregadas < 0 || m.cartas_entregadas > 32767)
+  ) {
+    errores.push("Las cartas entregadas van como un número entero, y no más de 32767.")
   }
 
   return errores

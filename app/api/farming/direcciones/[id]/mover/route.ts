@@ -43,12 +43,26 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
     const m = body as Movimiento
 
-    // Se guarda ANTES de tocar nada: es adónde se vuelve si el historial no se puede anotar.
-    const etapa_desde = direccion.etapa as string
+    // Se guardan ANTES de tocar nada los CINCO campos que el UPDATE de abajo va a pisar, no
+    // solo la etapa: si el insert del historial falla y la compensación solo devolviera
+    // `etapa`, la tarjeta quedaría en su columna vieja pero con la próxima acción, la fecha de
+    // esa próxima acción, el orden y el `updated_at` de un movimiento que nunca quedó
+    // anotado — mintiendo tan bien como si no hubiera vuelto.
+    const antes = {
+      etapa: direccion.etapa as string,
+      orden: direccion.orden as number,
+      proxima_accion: direccion.proxima_accion ?? null,
+      proxima_accion_en: direccion.proxima_accion_en ?? null,
+      updated_at: direccion.updated_at as string,
+    }
+    const etapa_desde = antes.etapa
 
     // Lista blanca explícita, campo por campo: nunca `...body`. `orden` siempre vuelve a 0 (no
     // se arrastra entre tarjetas: al caer en una columna, la tarjeta va al principio). Nunca
     // `unidades_totales` (es GENERADA: mandarla es un 428C9), ni `zona_id`, ni `agency_id`.
+    // Mover a la MISMA etapa en la que ya está también pasa por acá y también escribe
+    // historial: es como anotar «pasé otra carta» sin cambiar de columna, y no hay ninguna
+    // rama que lo bloquee.
     const { data: movida, error: eUpdate } = await admin
       .from("farming_direcciones")
       .update({
@@ -88,14 +102,29 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     if (eInsert) {
       // El historial es la otra mitad de "mover": si no se pudo anotar, la tarjeta vuelve
-      // adonde estaba. Mover sin dejar rastro es peor que no mover.
+      // adonde estaba — los cinco campos, no solo la etapa (ver el comentario de `antes`).
       const { error: eRevertir } = await admin
         .from("farming_direcciones")
-        .update({ etapa: etapa_desde })
+        .update(antes)
         .eq("id", params.id)
-      if (eRevertir) console.error("Farming (revertir mover, tras insert fallido):", eRevertir)
 
       console.error("Farming (mover tarjeta, insert de historial):", eInsert)
+
+      if (eRevertir) {
+        // La doble falla es la que este endpoint existe para evitar: si se contestara el
+        // mensaje de siempre, el asesor leería «la dejamos donde estaba» sobre una tarjeta que
+        // en realidad SÍ se movió, sin historial que lo respalde. Un texto distinto para un
+        // problema distinto.
+        console.error("Farming (revertir mover, tras insert fallido):", eRevertir)
+        return NextResponse.json(
+          {
+            error:
+              "No pudimos anotar el movimiento y tampoco devolver la tarjeta a su columna: revisá esa tarjeta antes de seguir.",
+          },
+          { status: 500 },
+        )
+      }
+
       return NextResponse.json(
         { error: "No pudimos anotar el movimiento, así que dejamos la tarjeta donde estaba." },
         { status: 500 },

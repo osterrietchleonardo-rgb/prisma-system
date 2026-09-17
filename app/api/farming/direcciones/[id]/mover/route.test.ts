@@ -1,5 +1,5 @@
 // app/api/farming/direcciones/[id]/mover/route.test.ts
-import { describe, it, expect, beforeEach, vi } from "vitest"
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { baseFalsa } from "@/lib/farming/base-falsa"
 
 /**
@@ -149,6 +149,9 @@ describe("POST /api/farming/direcciones/[id]/mover", () => {
     expect(fila.orden).toBe(0)
     expect(fila.proxima_accion).toBe("Llamar de nuevo")
     expect(fila.proxima_accion_en).toBe("2026-09-20")
+    // Muere si se saca `updated_at` de la lista blanca: sin este assert, borrar esa línea del
+    // update no rompía ningún test.
+    expect(fila.updated_at).not.toBe("2026-09-16T10:00:00.000Z")
 
     expect(base.tablas.farming_contactos).toHaveLength(1)
     const contacto = base.tablas.farming_contactos[0]
@@ -219,9 +222,7 @@ describe("POST /api/farming/direcciones/[id]/mover", () => {
     expect(contacto.direccion_id).toBe(D_MIA)
   })
 
-  // EL MÁS IMPORTANTE: si se borra la línea que revierte la etapa cuando el insert falla, esta
-  // prueba muere (la tarjeta se queda movida con el historial roto).
-  it("si el insert del historial falla, la etapa vuelve a la de antes", async () => {
+  function sabotearInsertDeHistorial() {
     const fromOriginal = base.from
     base.from = ((tabla: string) => {
       const q: any = fromOriginal(tabla)
@@ -235,6 +236,15 @@ describe("POST /api/farming/direcciones/[id]/mover", () => {
       }
       return q
     }) as typeof base.from
+  }
+
+  // EL MÁS IMPORTANTE: si se borra la línea que revierte la tarjeta cuando el insert falla,
+  // esta prueba muere (la tarjeta se queda movida con el historial roto). Revierte los CINCO
+  // campos que el update tocó, no solo `etapa`: si la compensación solo devolviera la etapa,
+  // la tarjeta quedaría en su columna vieja pero con la próxima acción, la fecha y el orden de
+  // un movimiento que nunca quedó anotado.
+  it("si el insert del historial falla, la tarjeta vuelve TAL COMO ESTABA (los cinco campos, no solo la etapa)", async () => {
+    sabotearInsertDeHistorial()
 
     const r = await mover(D_MIA, movimientoValido)
     const d = await r.json()
@@ -243,7 +253,46 @@ describe("POST /api/farming/direcciones/[id]/mover", () => {
 
     const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!
     expect(fila.etapa).toBe("relevado")
+    expect(fila.orden).toBe(5) // el orden original del fixture, no el 0 que puso el update
+    expect(fila.proxima_accion).toBeNull() // el fixture no tenía próxima acción cargada
+    expect(fila.proxima_accion_en).toBeNull()
+    expect(fila.updated_at).toBe("2026-09-16T10:00:00.000Z") // el updated_at original, no el del intento fallido
     expect(base.tablas.farming_contactos).toHaveLength(0)
+  })
+
+  // La doble falla es la que este endpoint existe para evitar: si también falla el UPDATE que
+  // revierte, la tarjeta SÍ quedó movida sin historial, y el mensaje tiene que decir eso —no
+  // «la dejamos donde estaba», que sería mentirle al asesor sobre el estado real.
+  it("si TAMBIÉN falla la reversión, el mensaje avisa que la tarjeta pudo haber quedado movida", async () => {
+    sabotearInsertDeHistorial()
+
+    // El update de avance y el de reversión mandan la MISMA forma de payload (los cinco
+    // campos), así que se distinguen por orden de llamada: el primero mueve, el segundo
+    // revierte. Solo el segundo se sabotea.
+    let llamadasUpdate = 0
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => {
+      const q: any = fromOriginal(tabla)
+      if (tabla === "farming_direcciones") {
+        const updateOriginal = q.update
+        q.update = (payload: any) => {
+          llamadasUpdate++
+          const encadenado = updateOriginal(payload)
+          if (llamadasUpdate === 2) {
+            encadenado.then = (resolve: any) =>
+              resolve({ data: null, error: { message: "boom, también se cayó la reversión" } })
+          }
+          return encadenado
+        }
+      }
+      return q
+    }) as typeof base.from
+
+    const r = await mover(D_MIA, movimientoValido)
+    const d = await r.json()
+    expect(r.status).toBe(500)
+    expect(d.error).not.toBe("No pudimos anotar el movimiento, así que dejamos la tarjeta donde estaba.")
+    expect(d.error).toMatch(/tampoco/i)
   })
 
   // «Pasé otra carta» sin cambiar de columna: se permite y se anota igual.
@@ -277,5 +326,30 @@ describe("POST /api/farming/direcciones/[id]/mover", () => {
     expect(fila.zona_id).toBe(Z_MIA)
     expect(fila.agency_id).toBe(AGENCIA)
     expect(fila.unidades_totales).toBeNull()
+  })
+})
+
+// La prueba de arriba (`contacto.fecha === hoyEnBuenosAires()`) calcula el valor esperado con
+// la MISMA fórmula que el código de producción usa: si alguien reemplazara la línea de
+// producción por `new Date().toISOString().slice(0, 10)` (el bug de UTC que el brief nombra),
+// esa prueba seguiría pasando de 00:00 a 21:00 hora local — solo fallaría de noche. Acá se fija
+// un instante conocido, de madrugada UTC / noche en Buenos Aires, para que la diferencia entre
+// las dos fórmulas sea inevitable.
+describe("POST /api/farming/direcciones/[id]/mover: la fecha es la de Buenos Aires, no la de UTC", () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("una visita a las 22:30 de Buenos Aires se anota el día que fue, no el de UTC", async () => {
+    // 2026-09-21T01:30:00Z es, en America/Argentina/Buenos_Aires (UTC-3), 2026-09-20 22:30.
+    // current_date/toISOString() en UTC daría "2026-09-21": el día siguiente al real.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-09-21T01:30:00Z"))
+
+    const r = await mover(D_MIA, movimientoValido)
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.contacto.fecha).toBe("2026-09-20")
+    expect(base.tablas.farming_contactos[0].fecha).toBe("2026-09-20")
   })
 })

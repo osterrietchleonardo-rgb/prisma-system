@@ -82,6 +82,22 @@ describe("validarMovimiento", () => {
   it("junta todos los problemas, no corta en el primero", () => {
     expect(validarMovimiento({}).length).toBeGreaterThan(2)
   })
+
+  // farming_contactos.cartas_entregadas es smallint (tope 32767 en Postgres). Sin este techo,
+  // un número absurdo pasa acá y recién explota en el INSERT con un 22003 — la tarjeta ya se
+  // movió y la compensación se dispara por un dato mal tipeado, no por una falla real.
+  it("cartas_entregadas en el límite del smallint (32767) se acepta", () => {
+    expect(validarMovimiento({ ...ok, cartas_entregadas: 32767 })).toEqual([])
+  })
+
+  it("cartas_entregadas más allá del smallint (32768) se rechaza", () => {
+    const e = validarMovimiento({ ...ok, cartas_entregadas: 32768 })
+    expect(e).toHaveLength(1)
+  })
+
+  it("cartas_entregadas absurdo (999999) se rechaza, no llega nunca a la base", () => {
+    expect(validarMovimiento({ ...ok, cartas_entregadas: 999999 })).toHaveLength(1)
+  })
 })
 
 describe("calcularIndicadores", () => {
