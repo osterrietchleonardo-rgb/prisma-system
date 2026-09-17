@@ -23,6 +23,7 @@ import { ETAPAS, TIPOS } from "@/lib/farming/direcciones"
 import { fechaCorta, fechaDeInstante } from "@/lib/farming/fechas"
 import type { FilaDireccion, RespuestaDirecciones, ZonaFarming } from "@/lib/farming/tipos"
 import { DireccionDialog } from "./direccion-dialog"
+import { IndicadoresFarming } from "./indicadores"
 import { Propietarios } from "./propietarios"
 import { Tablero } from "./tablero"
 
@@ -340,6 +341,13 @@ export function Relevamiento({ zonas }: { zonas: ZonaFarming[] }) {
           <Plus className="h-4 w-4" /> agregar dirección
         </Button>
       </div>
+
+      {/* Los nueve indicadores del método: arriba de la solapa y visibles en las DOS vistas
+          (lista y tablero), nunca adentro de una sola — son el reporte, no un adorno de una
+          pantalla en particular. `null` mientras `datos` no llegó (cargando o la carga falló):
+          ahí la fila de arriba ya dice «Buscando…» o el error, y acá el marco se dibuja con
+          guiones en vez de arriesgar un cero que no es el número real. */}
+      <IndicadoresFarming indicadores={datos?.indicadores ?? null} />
 
       {/* LÍNEA VISIBLE, nunca un globito: en el celular no se abren, y esto es justo lo que hay
           que entender antes de tocar un botón apagado. */}
