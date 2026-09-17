@@ -486,7 +486,7 @@ async function bajar(url, archivo) {
 
 fs.mkdirSync(DESTINO, { recursive: true });
 for (const [smp, [lng, lat]] of Object.entries(PARCELAS)) {
-  const sm = smp.slice(0, 7);
+  const sm = smp.slice(0, smp.lastIndexOf("-")); // la manzana puede tener letra: 042-077A
   const t = tesela(lng, lat);
   console.log(smp, `tesela ${t.z}/${t.x}/${t.y}`);
   for (const capa of CAPAS) {
@@ -2197,7 +2197,7 @@ async function traerDelGcba(smp: string, gcba: ClienteGcba): Promise<CacheParcel
   const catastro = await gcba.parcela(smp);
   const geomLote = catastro ? await gcba.geometriaLote(smp) : null;
   if (!catastro || !geomLote) throw new ParcelaNoEncontrada();
-  const sm = smp.slice(0, 7);
+  const sm = smp.slice(0, smp.lastIndexOf("-")); // la manzana puede tener letra: 042-077A
   const bbox = bboxDe(geomLote);
   const [geomManzana, volumenes, manzanaTipo, esquinaOficial] = await Promise.all([
     gcba.geometriaManzana(sm), gcba.volumenes(smp, bbox), gcba.manzanaTipo(sm, bbox), gcba.esquinaOficial(smp, bbox),
@@ -3292,7 +3292,7 @@ const gcba = crearClienteGcba();
 const filas = []; let fallas = 0;
 
 for (const smp of PARCELAS) {
-  const lote = await gcba.geometriaLote(smp); const manzana = await gcba.geometriaManzana(smp.slice(0, 7));
+  const lote = await gcba.geometriaLote(smp); const manzana = await gcba.geometriaManzana(smp.slice(0, smp.lastIndexOf("-")));
   if (!lote) { filas.push(`| ${smp} | — | sin lote en catastro |`); continue; }
   const vol = await gcba.volumenes(smp, bboxDe(lote));
   const e = calcularEdificabilidadOficial(vol, lote);
