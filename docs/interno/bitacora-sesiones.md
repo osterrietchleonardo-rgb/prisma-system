@@ -16,6 +16,346 @@
 
 ---
 
+## 2026-09-16 — ACM: el link ya no puede abrir direcciones internas, y el barrio de los links
+
+**Link seguro (pedido de Leonardo, con el requisito "si el ataque no falla, no está hecho").**
+`extractFromUrl` abría cualquier `http(s)` con `redirect:"follow"` desde el 25-jun: con sesión se
+podía hacer que el servidor abriera `169.254.169.254`, `127.0.0.1:3000` o un link que redirigía
+adentro. Decisión: cualquier host público, nada interno. `lib/acm/url-segura.ts` (detalle en
+TECNICO §10.6): forma del link, DNS (todas públicas) y control AL CONECTAR, en cada salto.
+
+- **Por qué no alcanzaba con validar y después `fetch`:** el `fetch` global de Node no deja
+  controlar la IP al conectar, y un DNS que responde público y después interno se lo saltea. Por
+  eso `node:http(s)` con `lookup` propio. La prueba del DNS cambiante lo demuestra (2 consultas,
+  0 pedidos al servidor interno).
+- **Verificación:** ataques en pruebas + servidor real en 127.0.0.1 que cuenta pedidos (0, con
+  control que prueba que responde); 10 mutantes muertos, incluido reponer el `fetch` original;
+  internet real (redirectores de httpbin hacia 169.254.169.254 y 127.0.0.1, `localtest.me`)
+  rechazados; navegador: el link de metadatos muestra "Ese link no se puede abrir…", Argenprop
+  carga igual. 2.340 pruebas.
+- **Abierto:** el navegador del extractor de EasyPanel sigue redirecciones que haga la página,
+  dentro de la red de n8n. Ya no recibe links internos; cerrarlo del todo es otro cambio + redeploy.
+
+**Barrio de los links.** Argenprop y Zonaprop ponen la ciudad en `addressLocality` y el barrio
+en `addressRegion`; Tier 1 se quedaba con "CABA, Argentina". `elegirBarrio` (puerto de la regla
+del extractor con navegador). Navegador: "Desde un link" da "Palermo Chico" + "Barrio reconocido".
+4 mutantes muertos.
+
+**Hecho también hoy (con OK):** redeploy del extractor en EasyPanel (`98ae1df`, Argenprop con 5
+fotos) y las 2 sugerencias de Carolina Etcheverry resueltas en admin-vakdor (las otras 3 ya las
+había marcado Leonardo). Datos de prueba en PRISMAIA - VAKDOR: ACM `1bd60870`, `c1fe5f5d`, ficha
+`lTb19sULahAu` (sin borrar).
+
+**Trampa:** `git stash list` en un worktree muestra los stash de TODOS (hay uno "bitacora en
+progreso, no es mia"). No tocarlos.
+
+---
+
+## 2026-09-16 — Sofía: cuando derivaba, el cliente no recibía ningún mensaje
+
+**Qué pasaba:** `/api/n8n/reply` descarta toda respuesta si el bot está apagado (existe desde abril
+para no pisar a un asesor que toma la charla a mano). Pero `Gestion_Handoff` apaga el bot EN EL MEDIO
+del turno de Sofía, antes de que salga su mensaje ("te conecto con el equipo / te derivo con
+[asesor]"), y ese mensaje se descartaba: *"Bot pausado: respuesta descartada — el agente humano tomó
+control"*. Visto con el primer cliente real atendido por luna (Elian, colega, 16-sep 15:40).
+Confirmado en 4 ejecuciones del 16-sep (Elian 15539, Mariana 15496, Ines 15504, Julia 15525). En 30
+días, ~76 de 109 derivaciones sin mensaje al cliente (medición por palabras, aproximada). Casos que
+lo muestran: Paula (15-sep) "¿Se comunica un asesor conmigo?" sin respuesta; juan_ogo (9-sep) "No
+recibí respuesta".
+
+**Arreglo (rama `fix/derivacion-mensaje-al-cliente`):** `lib/whatsapp/derivacion-propia.ts`. Con el bot
+apagado, el mensaje pasa SOLO si hay una marca "⚠️ Handoff activado" (la escribe únicamente el
+subflujo de n8n; el botón del asesor apaga sin marca) de los últimos 5 minutos, y después de ella no
+escribió ni un asesor (`human`) ni el cliente (`lead`). Ante cualquier duda, o si la consulta falla,
+se sigue descartando. El bot queda apagado: la ruta no lo toca.
+
+**Decisión:** Leonardo propuso mover el apagado al final del flujo de n8n (mensaje primero, apagado
+después). Se descartó con datos: el mensaje sale 16-20 s después de derivar, así que abre una ventana
+en la que Sofía contestaría de nuevo, y si el envío falla el bot queda prendido (lo que le pasó a
+Sonia). Se eligió el arreglo en la app; Leonardo delegó la decisión.
+
+**Verificación:**
+- Prueba de la ruta con la derivación: FALLÓ con el código anterior y pasa con el arreglo. Las del
+  botón del asesor, el cliente que vuelve a escribir y el envío normal pasan en los dos.
+- 9 pruebas de la regla (bordes de 5 minutos, fecha rota, marca de otro texto).
+- Casos reales en el segundo exacto del envío: Elian, Mariana, Ines y Julia pasan de "descartado" a
+  "se envía"; Sonia a las 09:31 (turno posterior a su derivación) se descarta.
+- Bytes de la marca idénticos en los 242 mensajes guardados desde abril.
+- Suite completa: 125 archivos, 2.275 pruebas, 0 fallas. Tipos sin errores; los 2 avisos de lint de
+  la ruta ya estaban en `main` (`prefer-const` en `evoPayload`/`metaPayload`).
+
+**Pendiente:** ver la primera derivación real después del deploy. Sigue abierto aparte: Sonia (16-sep
+08:59) tuvo la marca de derivación y el bot quedó prendido 30 min.
+
+---
+
+## 2026-09-15/16 — Sofía: dejar de preguntar lo que la ficha del link ya contesta (aplicado en n8n)
+
+**De dónde salió:** sugerencia del asesor Eric Zambrana (Central), `system_feedback`
+`143c4b25-90eb-4459-a5ea-67e1c1960605`, 15-sep 12:30. No traía link a la charla; el caso se
+encontró buscando: **Emilio, 14-sep, `997786fa`**, depto de 1.470.000 USD en Puerto Madero.
+
+**El diagnóstico, que cambió el arreglo:** el bot NO desobedeció el prompt, lo cumplió.
+`metricas` se llena con lo que el cliente **teclea**, nunca con la propiedad por la que entró.
+Emilio nunca escribió "Puerto Madero" → `zona` y `barrio_consultado` en `null` → "Zona" era el
+**punto 1** de FALTA DEL MÍNIMO → el prompt dice "tu próxima pregunta es la PRIMERA de esa
+lista". Por eso el arreglo va en tres nodos, no solo en el prompt.
+
+**Medido contra producción (30 días, 465 conversaciones que arrancan con un link)**
+
+- "¿en qué zona?" tras entrar por link: **26**; ambientes 4; compra/alquiler 3.
+- Cerró con "¿en qué presupuesto te manejás?": **272 (61%)**. Ofreció reemplazar la propiedad
+  del link: **29**. Propiedades de ≥500k USD: 7, y las 4 que se leyeron fallaron igual.
+- `barrio_consultado` con dato y `zona` vacía: **80 de 516** (`Armar_Memoria` solo miraba
+  `zona`, aunque `calificacion_completitud` ya los contaba juntos).
+- Repreguntó el **nombre** ya dado: 8 conversaciones, siempre entre 0,3 y 2,4 min después
+  (una, dos veces en 18 s). Repreguntó el **presupuesto** tras una respuesta numérica: 18.
+  La regla ya existía (ANTI-REPETICIÓN nº 7) y se incumplió igual: patrón 1.
+
+**Qué se aplicó** (16-sep 00:38, `scratch/aplicar-prompt-ficha-obvia.mjs --apply`, 17 parches)
+
+- `Agente IA CEO` (15): sección nueva LO QUE LA PROPIEDAD YA CONTESTA (operación, tipo, zona y
+  ambientes resueltos por la propiedad, con su bloque ESTO NO QUEDA CONGELADO) · la memoria va
+  un turno atrasada y el historial le gana · la respuesta a lo que preguntó va ANTES de la
+  ficha · el cierre deja de ser el presupuesto · se omite la línea `Ficha completa:` cuando es
+  la propiedad que él trajo · el presupuesto nunca se usa contra esa propiedad · handoff por
+  conducta (pregunta si sos persona → ofrecerle el asesor en ese mismo mensaje; permuta,
+  financiación, uso para un evento, consulta de empresa → derivar sin calificar) · prohibido
+  hablarle de "ficha interna", "el registro", "el campo estructurado".
+- `Armar_Memoria`: Zona resuelta con `barrio_consultado || zona`.
+- `Analizar_Conversacion1`: regla 27 — la propiedad consultada llena barrio, operación, tipo y
+  ambientes; gana siempre lo que dijo el lead, y lo más nuevo.
+
+**Decisiones de Leonardo:** el presupuesto deja de ser la pregunta de cierre · el "ticket alto"
+se dispara por **conducta del cliente, sin umbral de precio** (7 casos en 30 días no justifican
+una rama por número que el bot solo conoce después de buscar) · alcance: prompt + los dos
+nodos de sistema.
+
+**Verificación**
+
+- `Armar_Memoria` corrido contra **517 filas reales**: 0 datos perdidos; conversaciones con
+  "Zona" pendiente 142 → 62. La primera corrida dio "80 perdidos" y **era un error del test**:
+  al salir Zona la lista se renumera y se comparaba con el número adelante.
+- 17 anclas únicas; delta de expresiones declarado; 89 nodos y conexiones intactos; relectura
+  posterior independiente, no la del script que escribió.
+- **Tres contradicciones propias cazadas al releer** (patrón 4): "no se los preguntes NUNCA"
+  con su excepción quince renglones abajo · "LA ÚNICA EXCEPCIÓN" cuando pasaron a ser dos ·
+  el presupuesto repreguntable a los 55 s.
+
+**Costo:** el bloque dinámico sube 2.553 → 2.807 chars (~77 tokens por turno; ~3.700 mensajes
+de clientes en 30 días). Lo demás es estático y cachea.
+
+**Línea de base:** Christopher (`207a11df`) terminó 00:32:49, seis minutos ANTES de aplicar,
+y muestra los dos síntomas (mandó `Ficha completa:` de la propiedad del link y cerró pidiendo
+el presupuesto).
+
+**Primera lectura en tráfico real (16-sep, 11 h después, 4 conversaciones nuevas, todas por
+link; Ines derivó sola por ser colega).** Poca muestra: tendencia, no prueba.
+
+- Funcionó, visto en las ejecuciones: el extractor llenó barrio/operación/tipo/ambientes
+  desde el link en **4 de 4** (Tania solo escribió "me gustaría ver este departamento" y quedó
+  San Telmo/compra/depto/1). Zona preguntada 0, reemplazo ofrecido 0, desajuste marcado 0.
+  **Mariana** (`599ff9db`, 550.000 USD): respuesta primero ("sí, figura como apta crédito"),
+  cierre en NIVEL 2 (crédito), **salteó "Ambientes" aunque la lista lo pedía** (exec 15480),
+  y derivó a los 57 s cuando preguntó si el precio se negociaba.
+- A medias: omitir `Ficha completa:` se cumplió 1 de 2 (Viki exec 15514 sí; Mariana 15480
+  no, la escribió el agente mismo).
+- **Hallazgo grande, PREEXISTENTE:** el extractor anota como presupuesto el precio de la ficha.
+  Presupuesto = precio en 105 de 252 leads por link (30 días); en **74** el cliente no
+  escribió ni un número. Mariana es uno (550.000 = el chalet). El asesor recibe un dato falso
+  y el bot nunca pregunta el presupuesto. La regla 27 ya lo prohibía y el nano lo hizo igual:
+  no se arregla con texto, va un guard. **Propuesto, no aplicado.**
+- Preexistentes vistos en Viki (`d04559b5`): mostró un depto "Apto mascotas: No" a una clienta
+  con gato; `Formato_Mensajes` duplica fichas y **mete un `Video:` vacío que el agente no
+  escribió** (verificado comparando salida del agente vs Formato); la 3.ª pregunta de
+  presupuesto salió porque el mensaje con el número llegó con la ejecución ya en curso
+  (exec 15518 solo vio "Te cuento") — la ventana sin lock — y además pasó el máximo de 2.
+- Script para leer ejecuciones por conversación: `scratch/_ejecuciones-viki.mjs <conv> <desde> <hasta>`.
+
+**Presupuesto con cita — APLICADO 16-sep 12:48 (AR)** (`scratch/aplicar-presupuesto-con-cita.mjs`)
+
+- Extractor: el presupuesto solo existe si el lead lo dio; campo nuevo `presupuesto_cita` (textual).
+  Nodo `Execute a SQL query`: guarda el presupuesto solo si la cita está en lo que el lead escribió
+  o dijo por audio (`n8n_chat_histories` + `wa_messages`), no es pregunta, y trae el número
+  (entero/miles/millones) o lo acepta con palabras. Si la nueva no vale, conserva la guardada que
+  sí; los viejos sin cita se limpian solos en el próximo mensaje.
+- Sofía: el **rango de presupuesto se pregunta temprano** (la pregunta siguiente a la ficha), sin
+  anclarlo en el precio del link (pedido de Leonardo; el parche del 15 decía "anotalo como
+  referencia" y "va al final"). Repetidas se controlan por enlace Y dirección.
+- Diseños descartados con datos: lista de palabras v1 borraba 5 de 14 presupuestos reales; v2
+  dejaba pasar a Mariana ("¿el valor es final?").
+- Verificación: modelo real sobre 18 conversaciones × 2 corridas → inventados 4/10 → 0/10, reales
+  7/7 (incl. audio). SQL exacto sobre tabla temporal: 14/14 con chequeo exacto de claves. 6,6 ms
+  por consulta (`n8n_chat_histories` sin índice por `session_id`, 18k filas: índice opcional).
+- **Custodia:** el primer `--apply` abortó: a las 12:43 se cambió el respaldo del agente de Sonnet a
+  DeepSeek (el prompt quedó idéntico). A las 12:47:39 se revirtió. Mi escritura (12:48:14) tomó ese
+  estado; no se borró nada ajeno (tres backups en `scratch/n8n-backups/PRISMA-2026-09-16-*`).
+- **Trampas propias:** pasé "corrida1" por argv a un script que importa `sql-produccion.mjs` (lo
+  ejecuta como SQL; error de sintaxis, nada escrito). Python metió retrocesos `\x08` por `\b`.
+- **SIN TRÁFICO TODAVÍA:** 0 ejecuciones después de aplicar. Primer control: que el nodo SQL no
+  devuelva error (si falla, falla en silencio y la ficha deja de actualizarse). A las 13:21 se
+  comprobó que tampoco entraron mensajes de clientes a `wa_messages`: no hubo nada sin procesar.
+
+**DeepSeek y luna (16-sep, tarde).** DeepSeek descartado para Sofía por datos (política: datos en
+China; términos de API: ley china y consentimiento de cada usuario final); ahorro vs luna ~US$5/mes.
+Gasto real OpenAI 30 días US$77,79 (mini US$61,63). Comparación luna vs mini con turnos reales:
+luna 0 fallas de reglas vs mini 6 y 9; luna peor en avisar antes de tiempo y en no buscar la
+propiedad sin nombre. Detalle en la memoria `modelos-precios-y-datos-2026-09` y en
+`scratch/comparar-modelos/`. Hallazgo: propiedad del link no encontrada (57%) presentada como si
+fuera la del link (Claudia).
+
+**APLICADO 16-sep 14:10 (AR), con OK de Leonardo:**
+1. Prompt "el nombre no frena la propiedad" (`scratch/aplicar-prompt-nombre-no-frena.mjs`): si al
+   saludo contestan sin nombre, se busca la propiedad en ese turno. Banco: Tania no buscada luna 3/3
+   → 0/3, mini 2/3 → 0/3; saludo inicial 12/12 sin búsqueda.
+2. **Sofía pasa a `gpt-5.6-luna`** (`scratch/aplicar-modelo-luna.mjs`; volver:
+   `--volver --apply`). Segunda ronda con el prompt nuevo, leída a mano: luna 1 falla real en 60
+   turnos, mini 15. Opciones (8000, medium) y respaldo Claude Sonnet sin cambios. Luna no tiene
+   versión con fecha.
+- Verificación independiente del flujo vivo: 10/10 OK. **Sin tráfico real todavía** (ningún mensaje
+  de cliente desde 12:29). Vigilante armado para la primera ejecución.
+- Pendientes que NO se tocaron: Claudia (propiedad del link no encontrada presentada igual); Sonia
+  colega no detectada; Sofía siguió contestando 30 min después de "Handoff activado" (16-sep 08:59).
+- **Primer tráfico real con luna (15:34-15:40):** Elian RRE, colega. Saludo correcto, extractor sin
+  presupuesto inventado, SQL con cita ok (150 y 144 ms). Segundo turno: buscó Vedia al 4800 (92%),
+  detectó colega y derivó a Micaela sin calificar. 0 errores. El silencio de 12:29 a 15:34 fue real
+  (Meta conectado, suscripción ok, código de entrada sin cambios).
+- **BUG PREEXISTENTE ENCONTRADO:** el mensaje de derivación de Sofía se descarta en
+  `/api/n8n/reply` porque `Gestion_Handoff` ya apagó el bot ("Bot pausado: respuesta descartada").
+  Elian no recibió respuesta. Confirmado en 4 ejecuciones; en 30 días ~76 de 109 derivaciones sin
+  mensaje. Detalle y arreglo propuesto en la memoria `derivacion-sin-mensaje-al-cliente`. SIN tocar.
+
+---
+
+## 2026-09-16 — ACM: cuatro pedidos de los asesores (link, Laundry, antigüedad, sumar por link)
+
+**De dónde salió:** `system_feedback` de Central. Carolina Etcheverry (16-sep, `a251b9b4` link de
+los comparables y `adc8c2d4` Laundry), Carolina Grossi (28-ago, `0f151722` antigüedad) y Eric
+Zambrana (31-ago, `aa44c66e`, segunda mitad: sumar comparables por link). La primera mitad de
+Eric y la de Maximiliano (`353bbb7e`, zona dibujada) ya estaban hechas desde el 8-sep.
+
+**Lo que había de verdad detrás de cada uno**
+
+- Link: existía, al fondo del checklist desplegado. No era un error, era diseño.
+- Antigüedad: el campo del formulario existe desde marzo. Grossi armó una ficha
+  (`DQMs3ltJsXya`) 9 minutos antes de escribir: lo que faltaba era verla EN LA FICHA.
+- Laundry: "Laundry" (edificio) y "Lavadero" (unidad) son datos distintos en la red: solo
+  3.623 de 30.173 traen los dos. Token `laundry(?! ?room)`; exacto 10.387 contra `'Laundry'`.
+
+**Qué se hizo** (commit `47baa76`; detalle en TECNICO §10.6)
+
+- "Ver publicación" a la vista (44 px), antigüedad en tarjeta, hoja y portada.
+- `POST /api/acm/comparable-link`: Zonaprop se busca en `mercado_avisos` por id (el número del
+  aviso es el id); otro portal va por el extractor pidiendo `con_html`. `% = puntaje-link.ts`.
+- Fotos del propio aviso (`fotos-aviso.ts`), probadas contra páginas reales de los tres portales.
+
+**Verificación**
+
+- Paridad del % contra `acm_match_roomix` real: 305 avisos de 8 ACM, 305 iguales. La primera
+  corrida dio 303: el 66,5 en coma flotante redondeaba a 66 (Postgres dice 67).
+- 12 errores metidos a propósito, los 12 hicieron fallar su prueba. 2.262 pruebas en verde.
+- Navegador con PRISMAIA - VAKDOR: escritorio, celular emulado (390×844, touch) y tema claro;
+  ficha medida en modo impresión (cada hoja 1123 px, pie adentro).
+
+**Errores propios cazados probando:** (1) el servidor guardaba un aviso que la búsqueda ya
+había traído aunque la pantalla avisara "ya está" → duplicado al reabrir; ahora decide el
+servidor. (2) "CABA, Argentina" contaba como otro barrio (zona 0); no saber no es ser otro.
+(3) Las etiquetas pisaban "COMPARABLE" en 390 px (preexistente con "apto crédito").
+**Trampa:** `git checkout --` no restaura un archivo sin trackear; un mutante quedó puesto hasta
+que el grep lo mostró. Restaurar mutantes desde una copia, nunca con git.
+
+**Pendiente**
+
+- **Redeploy del extractor en EasyPanel** (con OK): sin eso, fuera de la red no hay fotos
+  cuando Tier 1 está bloqueado (en Vercel, casi siempre).
+- Argenprop por Tier 1 devuelve barrio "CABA, Argentina" (el JSON-LD no trae el barrio).
+- Marcar las 4 sugerencias como resueltas en admin-vakdor (con OK).
+- Datos de prueba en PRISMAIA - VAKDOR: `acm_searches` `1bd60870` y ficha `lTb19sULahAu`.
+
+## 2026-09-16 — El gasto de Apify entra en US$100, las bajas vuelven a marcarse, y apareció el sitemap de ZonaProp
+
+**De dónde salió:** Leonardo pidió analizar un informe de fuentes de datos para el CMA que le
+generó Z.ai (`Downloads/informe_fuentes_datos_cma_argentina (1).pdf`, 43 págs). De ahí salió todo
+lo demás. Detalle completo y verificaciones en la memoria `remax-api-publica-y-informe-zai.md`.
+
+**Lo del informe, verificado en vivo (15-sep)**
+
+- **RE/MAX tiene API pública que funciona** (`api-ar.redremax.com`, sin token ni proxy): 66.693
+  avisos en venta hoy. Filtro por ciudad que el informe no trae: `like=geoLabel:La Plata` → 2.963.
+- **FALSO lo central del informe:** el "cruce exacto" entre el código de anunciante de ZonaProp y
+  el `internalId` de RE/MAX no existe: **0 de 40** (con control positivo y negativo). Pares
+  idénticos confirmados tienen códigos que no se corresponden (`421141094-1438` ⇄ `AR.42.136.94.841.V24`).
+- CABA: de 16.896 avisos de RE/MAX, 55% ya están en la base y 29% no tienen candidato; lo "nuevo"
+  es casi todo casas/PH/terrenos/locales, **los tipos que no cargamos de ZonaProp** (el portal tiene
+  24.800 en CABA y nosotros ~2.450). Mercado Libre: de 31 cruzables, 29 ya los teníamos; su API da
+  403 para buscar avisos ajenos con dos apps distintas. Benchmark oficial de CABA: la serie termina
+  en 2019. Argenprop bloquea (202 vacío) a los pocos pedidos.
+
+**Lo que se arregló** (rama `mercado-presupuesto`, worktree propio, commit `3ad77cc`)
+
+Leonardo puso el límite: **US$100/mes de Apify**, sin saltar al plan de US$200. El régimen daba ~120.
+
+- **Dos turnos parejos** (33.458 y 33.454 avisos): cada mes se relee media ciudad, todo CABA al día
+  cada 2 meses. Eligió esto sobre "7 barrios del cliente mensual + resto cada 3": no quería barrios
+  sin actualizar. Sale ~US$79/mes.
+- El workflow de refresco ya no lleva las 48 zonas escritas: se las pide a `mercado-sync/plan.mjs`
+  (con 29 tests) vía `matriz.mjs` y `fromJSON`.
+- **El descubrimiento pasa a las 00:30 AR** (era 7:00): la ventana incluye "lo que va de hoy" y eso
+  se repaga al día siguiente — medido el 8-sep, 315 avisos (~US$10/mes). La ventana ahora se calcula
+  (piso 2, techo 3 si faltó una corrida).
+- **Guardia de presupuesto** en el descubrimiento (tope 90) y refresco bajado a 70.
+- **La verificación de bajas estaba rota en 41 de 48 zonas** (mapa de 7 barrios escrito a mano): por
+  eso 70.129 avisos "activos" y 0 caídos. Ahora sale de la base, más un cajón `otros-sin-zona` con
+  los 608 avisos de barrios que ZonaProp escribe fuera de las 48 zonas (Barrio Norte, Once, Congreso).
+
+**Hallazgo grande, a medio probar: el sitemap de ZonaProp**
+
+`https://www.zonaprop.com.ar/sitemaps_https.xml` lista avisos **uno por uno con `lastmod`**, gratis
+y sin actor. Bajado: 48.785 avisos con fechas de los últimos 8 días; de 300 cruzados con la base, 26
+estaban publicados hace más de un mes y figuran modificados esta semana. **Si la fecha es confiable,
+el refresco pasa de US$67 a ~US$1,40** (releer solo lo que cambió) y se puede refrescar todo CABA
+todas las semanas. Dos avisos: **no es el censo completo** (~100.000 de ~700.000 → la ausencia NO
+prueba una baja) y el portal tira 403 si se le piden muchas páginas seguidas.
+
+**Pendiente, con fecha: 30-sep**, cuando se libere el ciclo de Apify (hoy la cuenta está en
+US$102,43 de 100 y el descubrimiento está frenado desde el 14):
+1. Releer 200 avisos con `lastmod` nuevo y 200 con `lastmod` viejo (US$0,40) → ¿la fecha marca
+   cambios de verdad?
+2. Releer 500 avisos de un barrio (US$0,50) → ¿cuántos cambian de precio por mes sin republicarse?
+   De eso depende si el refresco cada 2 meses alcanza o sobra.
+3. Bajar el segundo archivo del sitemap (`sitemap_prop_https_2`), que hoy dio 403.
+4. **Argenprop, muestra de 500 avisos (US$0,50)** con `igolaizola/argenprop-scraper`, 2-3 barrios,
+   cruzada contra la base por dirección + precio → **cuántos avisos son únicos**. CABA entero son
+   102.843 (≈US$103 de una vez). El actor filtra por ubicación, radio en km, `advertiserTypes`
+   (dueño directo) y `sortBy: newest`, así que permitiría un descubrimiento diario barato.
+5. **Mercado Libre, muestra de 500 avisos (US$2)** con `gio21/mercadolibre-inmuebles-scraper`
+   (US$4/1.000, cuatro veces ZonaProp) → confirmar con muestra grande el 94% de repetición que
+   dio la muestra chica (29 de 31 ya estaban en la base).
+
+Las cinco juntas cuestan menos de US$3,50 y cada una decide un camino. **Sumar un portal recién se
+encara si la 4 da volumen único**: exige clave nueva en `mercado_avisos` (hoy es el postingId de
+ZonaProp), capa "estos avisos son el mismo inmueble" por geo+precio+m² (los códigos NO cruzan entre
+portales, medido 0/40) y geocodificar direcciones, porque ni Argenprop ni Mercado Libre dan
+coordenadas.
+
+**API de Mercado Libre: CERRADA, no insistir.** Tres apps propias distintas (la última con unidad
+VIS y permisos mínimos) dan lo mismo: el token sirve (`/users/me`, `/categories`, `/sites/MLA` y
+`/items/{id}/description` responden 200) pero `/sites/MLA/search` da 403, `/items/{id}` da 403 y
+`/users/{id}/items/search` responde textual **"Searching another user items is restricted."** La
+doc oficial (10/09/2026) ya no documenta la búsqueda por sitio, y hay decenas de desarrolladores
+reportando lo mismo en 2026. El cambio es de abril-2025: solo se accede a lo del usuario que
+autoriza la app. Único uso que queda: que un cliente nuestro autorice la app para bajar SUS avisos.
+
+**Sin resolver, de Leonardo:** regenerar los Client Secret de las dos apps de Mercado Libre
+(`2055069549619410` y `5235611298360779`), que quedaron expuestos en el chat, y dejar sus permisos
+en "Sin acceso" (la primera tenía escritura sobre publicaciones, facturas y órdenes).
+
+**Falta probar de verdad:** la matriz por `fromJSON` solo se prueba corriendo el workflow en GitHub.
+Al subir la rama, dispararlo a mano una vez y mirar el job `plan`, que imprime en castellano qué
+zonas le tocan al mes. Si falla, falla antes de gastar.
+
+---
+
 ## 2026-09-16 — Farming etapa 3-A: la caminata (direcciones y propietarios)
 
 **Qué se construyó** (rama `feat/farming-relevamiento`, worktree `PRISMA-SYSTEM-farming2`): lo que

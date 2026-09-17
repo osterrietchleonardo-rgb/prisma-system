@@ -30,10 +30,15 @@ export const HOSTS_ROOMIX = [/^cdn\.roomix\.ai$/];
 /** CDN real de fotos de `mercado_avisos` (ZonaProp). Verificado contra producción el
  *  2-sep-2026: los 20.407 avisos con foto usan un único host, imgar.zonapropcdn.com. */
 export const HOSTS_MERCADO = [/(^|\.)zonapropcdn\.com$/];
+/** Donde sirven las fotos los otros dos portales, para los comparables que el asesor suma
+ *  pegando un link (ver `lib/acm/fotos-aviso.ts`). Verificado contra avisos reales el
+ *  16-sep-2026: Argenprop las sirve desde su propio dominio (`/static-content/`) y
+ *  MercadoLibre desde `http2.mlstatic.com`. Zonaprop ya está en `HOSTS_MERCADO`. */
+export const HOSTS_PORTALES = [/^www\.argenprop\.com$/, /^http2\.mlstatic\.com$/];
 /** La red completa: toda foto que no es de la cartera propia sale por nuestro proxy
- *  (`RUTA_FOTO_RED`), por el mismo motivo en las dos fuentes — que el navegador del asesor
+ *  (`RUTA_FOTO_RED`), por el mismo motivo en todas las fuentes — que el navegador del asesor
  *  no deje su `Referer` escrito en el CDN de un tercero. */
-export const HOSTS_RED = [...HOSTS_ROOMIX, ...HOSTS_MERCADO];
+export const HOSTS_RED = [...HOSTS_ROOMIX, ...HOSTS_MERCADO, ...HOSTS_PORTALES];
 
 /** Primeras `n` URLs de `images` que pasan la allowlist de hosts dada, en el orden en que están
  *  guardadas (sin curar — política validada en la ronda de holdout de San Telmo). */

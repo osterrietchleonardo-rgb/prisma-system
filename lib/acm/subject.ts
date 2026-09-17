@@ -152,6 +152,9 @@ const AMENITY_TOKENS: Record<keyof Amenidades, string> = {
   seguridad_24hs: "segurid|vigilan|security|24 hour|24hs",
   jardin_privado: "jard|garden",
   terraza_privada: "terraz|terrace",
+  // El laundry del edificio. "Laundry room" es como Tokko traduce el lavadero de la unidad,
+  // que es otra cosa: queda afuera. La misma expresión la evalúa Postgres con ~* (admite (?!).
+  laundry: "laundry(?! ?room)",
 };
 const AMENITY_LABEL: Record<keyof Amenidades, string> = {
   cochera_cubierta: "Cochera cubierta",
@@ -163,6 +166,7 @@ const AMENITY_LABEL: Record<keyof Amenidades, string> = {
   seguridad_24hs: "Seguridad 24hs",
   jardin_privado: "Jardín privado",
   terraza_privada: "Terraza privada",
+  laundry: "Laundry",
 };
 
 export function amenityTokens(a?: Amenidades): string[] {

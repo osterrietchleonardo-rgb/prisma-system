@@ -565,7 +565,7 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 **Cómo usarlo paso a paso:**
 1. **Elegí la propiedad a analizar** de una de estas 3 formas:
-   - **Cargar a mano:** completás el formulario (tipo, zona, m², ambientes, baños, amenities…).
+   - **Cargar a mano:** completás el formulario (tipo, zona, m², ambientes, baños, amenities…). Entre las amenities está **Laundry**: es el laundry **del edificio**, no el lavadero del departamento.
    - **Desde la cartera:** abrís el selector y **escribís para buscar** (por título, dirección o zona) entre las propiedades de tu agencia; elegís una y se completa sola. Tener buscador ayuda cuando son muchas propiedades.
    - **Desde un link:** pegás el link de un aviso (MercadoLibre, ZonaProp, Argenprop…) y apretás **Analizar**: trae los datos automáticamente. Si el portal bloquea la lectura o tarda demasiado, te avisa con un mensaje claro y completás a mano.
 
@@ -573,7 +573,14 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 > 📸 **Fotos de la propiedad (opcional).** Antes de buscar comparables podés adjuntar **hasta 4 fotos** de la propiedad y, si querés, decirle a la IA en qué fijarse (por ejemplo "estado de la cocina y del jardín"). Al tocar **"Analizar fotos con IA"**, Gemini te devuelve una **descripción escrita a partir de lo que ve** — no inventa nada ni oculta lo que está deteriorado, pero lo dice sin castigar la propiedad (por ejemplo, "cocina original, con posibilidad de actualización"). Esa descripción **es tuya**: la podés editar o reescribir del todo antes de seguir, y una casilla te deja elegir si va a la ficha del cliente o se queda solo para afinar la búsqueda. **El análisis se hace una sola vez** (no hay botón para repetirlo): una vez que la IA escribió la descripción, las fotos quedan fijas y el botón de analizar desaparece. Si querés rehacerlo con otras fotos, cambiá de forma de carga (manual / cartera / link) — eso limpia el formulario y arranca de cero. Ojo: si el análisis **falla** (se cayó internet o la IA no respondió), eso no cuenta como analizado y podés reintentar sin perder nada. Las fotos **no se guardan en ningún lado**: se usan para el análisis y se descartan. Tener esta descripción también **ayuda a encontrar mejores comparables**, porque el sistema empieza a comparar también por lo que se ve en las fotos, no solo por m²/ambientes/zona. Si elegiste la propiedad **desde la cartera**, no hace falta que busques las fotos en tu dispositivo: te aparece una **grilla con las fotos que esa propiedad ya tiene cargadas** y tildás hasta 4 con un toque (podés combinarlas con fotos subidas a mano; el tope de 4 es entre las dos). En carga a mano o por link, seguís subiendo las fotos vos, como antes. Después de analizar, también ves **cómo calificó la IA el estado de conservación y la luminosidad de tu propiedad** — corregilo con un toque si no estás de acuerdo; esa corrección es la base contra la que se comparan después las fotos de cada comparable (ver más abajo).
 2. Elegí la **operación** (Venta / Alquiler) y apretá **Buscar comparables**.
-3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**.
+3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**. Cada tarjeta muestra también la **antigüedad** (cuando el aviso la informa) y abajo tiene dos botones: **"Ver publicación"**, que abre el aviso original en otra pestaña, y **"Ver checklist"**.
+
+> 🔗 **¿Tenés un aviso que querés usar y no apareció?** Arriba de los resultados hay un cuadro para **pegar el link** de un aviso de **Zonaprop, Argenprop o MercadoLibre**. Tocás **"Sumar"** y el aviso entra en un bloque nuevo, **"Sumados por link"**, con sus datos, sus fotos, su antigüedad y su **% de comparabilidad** calculado igual que el resto. Lo podés elegir para la ficha del cliente como cualquier otro comparable, y queda **guardado en ese ACM** (lo ves al reabrirlo desde Mis ACM). Si te equivocaste, lo sacás con el **tacho** de la tarjeta.
+> - Si el aviso **ya estaba en la lista**, no lo repite: te avisa en qué bloque está y con qué %.
+> - Algunos portales tardan en dejarse leer: puede demorar **hasta 40 segundos**. Si no deja ver los datos, te avisa y no suma nada.
+> - Si el portal no deja leer el precio, la superficie o las fotos, igual lo suma y **te dice qué le faltó**.
+> - Si el aviso es de **otro barrio**, el % lo refleja (baja). Que lo hayas elegido vos no lo convierte en un comparable del mismo barrio.
+> 💰 Sumar un aviso por link **no consume créditos**.
 
 > 💡 El **tipo** y la **operación** son filtros estrictos. El **barrio, por defecto, se compara solo contra el mismo barrio y sus sub-barrios** (si tu propiedad es de Belgrano, un Belgrano R o un Belgrano Chico entran normalmente). Los **barrios limítrofes** (Núñez, Colegiales, Saavedra si tu propiedad es de Belgrano) **no entran salvo que vos lo pidas**: hay una casilla **"Incluir barrios linderos"** arriba del botón de buscar. Es así a propósito — un comparable de otro barrio puede tener el precio correcto, pero si tu cliente lo ve en su propia tasación, deja de confiar en el informe aunque el número esté bien. Si tildás la casilla, esos comparables **sí aparecen, marcados con un chip "lindero"** para que sepas cuáles son y decidas si los mostrás. No le molestan los acentos (Nuñez = Núñez).
 
@@ -598,6 +605,7 @@ Arriba de todo tenés dos solapas: **Nuevo ACM** y **Mis ACM**.
 
 - **Tocá cualquier fila** y volvés a la **misma pantalla de resultados**, tal como quedó ese día.
 - Si de ese ACM armaste una **ficha para el cliente**, la fila te muestra el botón **"Ficha"** para abrir el link directo.
+- Los avisos que **sumaste pegando el link** también quedan guardados ahí.
 - Si armás **otra ficha** desde el mismo ACM (por ejemplo con otros comparables), te queda **una fila por cada ficha**, así no perdés ninguna.
 - Podés **borrar** un ACM del historial con el tacho. Ojo: si ya compartiste la ficha con el cliente, **el link sigue funcionando**.
 
