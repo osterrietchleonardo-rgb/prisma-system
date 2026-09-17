@@ -69,6 +69,23 @@ function enOrden(filas: FilaDireccion[]): FilaDireccion[] {
  * igual en la columna, en la sombra que sigue al dedo (`DragOverlay`) y en una zona archivada,
  * donde no hay nada que arrastrar.
  */
+/** La calle, la altura y la línea de abajo. Sale aparte para que el título pueda ser un botón
+ *  (cuando hay algo que arrastrar) o texto pelado (en una zona archivada) sin duplicarlo. */
+function TituloTarjeta({ d }: { d: FilaDireccion }) {
+  return (
+    <>
+      <p className="font-medium leading-tight">{d.calle} {d.altura ?? ""}</p>
+      <p className="text-xs text-muted-foreground">
+        {[
+          etiquetaTipo(d.tipo),
+          d.unidades_totales ? `${d.unidades_totales} ${d.unidades_totales === 1 ? "unidad" : "unidades"}` : null,
+          d.tramo,
+        ].filter(Boolean).join(" · ")}
+      </p>
+    </>
+  )
+}
+
 function CuerpoTarjeta({
   d,
   hoy,
@@ -107,21 +124,22 @@ function CuerpoTarjeta({
           toque a quien navega sin mouse, sin forma de elegir una sola. Separados, un asesor con
           teclado puede mover la tarjeta (acá) o abrir su historial (el botón de abajo), nunca
           las dos a la fuerza. */}
-      <button
-        type="button"
-        className="w-full min-h-[44px] text-left"
-        aria-label={`Mover ${d.calle} ${d.altura ?? ""}: arrastrá, o usá "Mover a…" más abajo`}
-        {...(manija ?? {})}
-      >
-        <p className="font-medium leading-tight">{d.calle} {d.altura ?? ""}</p>
-        <p className="text-xs text-muted-foreground">
-          {[
-            etiquetaTipo(d.tipo),
-            d.unidades_totales ? `${d.unidades_totales} ${d.unidades_totales === 1 ? "unidad" : "unidades"}` : null,
-            d.tramo,
-          ].filter(Boolean).join(" · ")}
-        </p>
-      </button>
+      {/* Sin manija (zona archivada) el título NO es un botón: un `<button>` que no hace nada
+          igual se para con el tabulador y promete una acción que no existe. Ahí es texto. */}
+      {manija ? (
+        <button
+          type="button"
+          className="w-full min-h-[44px] text-left"
+          aria-label={`Mover ${d.calle} ${d.altura ?? ""}: arrastrá, o usá "Mover a…" más abajo`}
+          {...manija}
+        >
+          <TituloTarjeta d={d} />
+        </button>
+      ) : (
+        <div className="w-full min-h-[44px] text-left">
+          <TituloTarjeta d={d} />
+        </div>
+      )}
 
       {/* La próxima acción con su fecha, como LÍNEA VISIBLE: es lo que hay que leer de un
           vistazo antes de volver a esa puerta. Y «vencida» va con PALABRA, no solo con color:
