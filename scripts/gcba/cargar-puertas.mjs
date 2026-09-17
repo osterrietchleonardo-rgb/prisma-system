@@ -31,7 +31,10 @@ const prueba = puertas.find((p) => p.calle_clave === calleClave("CABILDO AV.") &
 if (prueba?.smp !== "039-097-008b") { console.error("  X Cabildo 2040 no resuelve a 039-097-008b en el CSV:", JSON.stringify(prueba)); process.exit(1); }
 console.log(`[puertas] ${puertas.length} puertas de ${data.length} frentes · esquinas: ${puertas.filter((p) => p.es_esquina).length}`);
 if (DRY) { console.log("[puertas] DRY RUN: nada escrito."); process.exit(0); }
-// Recarga completa: se vacía y se vuelve a cargar (no hay clave natural estable).
-await sb("gcba_puertas?id=gt.0", { method: "DELETE" });
-await subirEnTandas(sb, "gcba_puertas", "id", puertas, 1000);
+// Recarga SIN ventana vacía: primero entran todas las puertas nuevas con la marca de esta corrida
+// y recién después se borran las de corridas anteriores. Si la subida falla a mitad, quedan las
+// viejas intactas y las nuevas parciales se limpian en la próxima corrida.
+const lote = new Date().toISOString();
+await subirEnTandas(sb, "gcba_puertas", "id", puertas.map((p) => ({ ...p, lote_carga: lote })), 1000);
+await sb(`gcba_puertas?lote_carga=neq.${encodeURIComponent(lote)}`, { method: "DELETE" });
 console.log("[puertas] listo. Correr --verificar.");

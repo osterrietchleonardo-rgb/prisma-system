@@ -7,7 +7,7 @@ import Papa from "papaparse";
 import { DRY, bajarTexto, clienteRest, leerEnv, recursoCkan, subirEnTandas } from "./comun.mjs";
 import { filaCurDesdeCsv } from "../../lib/prefactibilidad/filas-cur.ts";
 
-const FILAS_ESPERADAS = 318128;
+const FILAS_ESPERADAS = 318127; // filas de datos (el archivo tiene 318.128 líneas con la cabecera)
 const COLUMNAS = ["gid", "smp", "seccion", "manzana", "parcela", "uni_edif_1", "uni_edif_2", "uni_edif_3", "uni_edif_4", "tipo_mza", "catalogado", "barrio", "comuna", "plano_l", "dist_1_grp", "dist_1_esp", "dist_cpu_1", "fot_em_1", "alicuota", "inc_uva_21"];
 const VERIFICAR = process.argv.includes("--verificar");
 

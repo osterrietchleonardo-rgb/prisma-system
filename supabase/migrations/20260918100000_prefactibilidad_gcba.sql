@@ -39,11 +39,13 @@ create table if not exists public.gcba_puertas (
   altura        integer not null,
   smp           text not null,
   es_esquina    boolean not null default false,
-  tiene_ochava  boolean not null default false
+  tiene_ochava  boolean not null default false,
+  lote_carga    text not null                  -- marca de la corrida que la cargó; permite recargar sin ventana vacía
 );
 comment on table public.gcba_puertas is 'Una fila por puerta, del dataset frentes-parcelas del GCBA. calle_clave iguala USIG y catastro.';
 create index if not exists gcba_puertas_clave_idx on public.gcba_puertas (calle_clave, altura);
 create index if not exists gcba_puertas_smp_idx on public.gcba_puertas (smp);
+create index if not exists gcba_puertas_lote_idx on public.gcba_puertas (lote_carga);
 
 create table if not exists public.gcba_parcela_cache (
   smp            text primary key,
