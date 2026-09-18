@@ -8,7 +8,7 @@ const PARTICULAS = new Set(["AV", "AVDA", "GRAL", "DR", "DRA", "PTE", "ING", "TT
 const PREPOSICIONES = new Set(["DE", "DEL", "LA", "LAS", "LOS", "Y", "E"]);
 
 export function calleClave(nombre: string): string {
-  const base = nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[.,]/g, " ").replace(/\s+/g, " ").trim();
+  const base = nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[.,]/g, " ").replace(/\s+/g, " ").trim();
   const palabras = base.split(" ").filter(Boolean);
   const principales = palabras.filter((p) => !PARTICULAS.has(p) && !PREPOSICIONES.has(p));
   return principales.sort().join(" ");
