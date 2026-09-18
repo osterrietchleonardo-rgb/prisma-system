@@ -3138,10 +3138,11 @@ git commit -m "feat(prefactibilidad): la pantalla — buscador oficial, lote en 
 **Files:**
 - Create: `app/prefactibilidad/[token]/page.tsx`
 - Create: `app/prefactibilidad/[token]/PrintButton.tsx` (copiar `app/ficha-acm/[token]/PrintButton.tsx` cambiando el título del share por "Prefactibilidad")
+- Modify: `lib/prefactibilidad/criollo.ts` (agrega `export const LEYENDA`), `app/asesor/prefactibilidad/components/ficha-lote.tsx` (importa `LEYENDA` de criollo y la re-exporta)
 - Test: `lib/prefactibilidad/ficha-publica.test.ts` (guardia de texto: leyenda, `robots noindex`, `@media print`, sin sesión)
 
 **Interfaces:**
-- Consumes: `createAdminClient`, `planoSvg`, `describirUnidad`, `describirPlanta`, `m2`, `usd`, `requiereEstudio`, `LEYENDA` (Task 16), `logoParaDestino` (`@/lib/marketing-ia/logo-variante`), `agencies.marketing_ai_config` (brand_colors, logo, legal_notice) y `profiles` del autor.
+- Consumes: `createAdminClient`, `planoSvg`, `describirUnidad`, `describirPlanta`, `m2`, `usd`, `requiereEstudio`, `LEYENDA` (se MUEVE a `lib/prefactibilidad/criollo.ts` en esta tarea; `ficha-lote.tsx` la importa desde ahí y la re-exporta), `logoParaDestino` (`@/lib/marketing-ia/logo-variante`), `agencies.marketing_ai_config` (brand_colors, logo, legal_notice) y `profiles` del autor.
 
 - [ ] **Step 1: Test que falla**
 
@@ -3187,7 +3188,7 @@ import { logoParaDestino } from "@/lib/marketing-ia/logo-variante";
 import { planoSvg } from "@/lib/prefactibilidad/plano-svg";
 import { describirPlanta, describirUnidad, m2, usd } from "@/lib/prefactibilidad/criollo";
 import { requiereEstudio } from "@/lib/prefactibilidad/avisos";
-import { LEYENDA } from "@/app/asesor/prefactibilidad/components/ficha-lote";
+import { LEYENDA } from "@/lib/prefactibilidad/criollo"; // vive en lib: un export de un módulo "use client" llega al servidor como referencia, no como string
 import type { Prefactibilidad } from "@/lib/prefactibilidad/tipos";
 import PrintButton from "./PrintButton";
 
