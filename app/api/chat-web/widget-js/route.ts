@@ -45,7 +45,13 @@ export async function GET(req: Request) {
     tema: "claro",
   })
 
-  const origen = process.env.NEXT_PUBLIC_APP_URL ?? "https://prisma.vakdor.com"
+  // La dirección sale del PROPIO pedido, no de una variable: así el script funciona igual en la
+  // máquina, en una copia de prueba y en producción, sin que nadie tenga que acordarse de
+  // cambiar nada. (17/9: con la variable, el chat abierto en local apuntaba a producción.)
+  const url = new URL(req.url)
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? url.host
+  const protocolo = req.headers.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")
+  const origen = `${protocolo}://${host}`
   const js = `(function(){
   if (window.__prismaChat) return; window.__prismaChat = true;
   var ORIGEN = ${JSON.stringify(origen)}, W = ${JSON.stringify(widget.id)};

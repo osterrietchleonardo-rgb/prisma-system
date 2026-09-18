@@ -33,6 +33,12 @@ describe("cspDeLaVentana: solo el sitio de esa agencia puede mostrarla", () => {
   it("sin dominios, no la puede enmarcar nadie", () => {
     expect(cspDeLaVentana([])).toContain("frame-ancestors 'none'")
   })
+  it("localhost entra SOLO si alguien lo puso a mano, para probar en la máquina", () => {
+    const csp = cspDeLaVentana(["localhost:3000", "central.com"])
+    expect(csp).toContain("http://localhost:3000")
+    expect(csp).toContain("https://central.com")
+  })
+
   it("un dominio raro no se cuela en la cabecera", () => {
     const csp = cspDeLaVentana(["central.com", "javascript:alert(1)", "otro.com;script-src *"])
     expect(csp).toContain("https://central.com")

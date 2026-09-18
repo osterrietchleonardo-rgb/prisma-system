@@ -26,10 +26,16 @@ function esc(s: unknown): string {
   )
 }
 
-/** Un dominio que se pueda poner en una cabecera sin abrir la puerta a otra cosa. */
-function dominioLimpio(d: string): string | null {
+/**
+ * Un dominio que se pueda poner en una cabecera sin abrir la puerta a otra cosa.
+ * `localhost` (con o sin puerto) entra para poder probar el chat en la máquina antes de
+ * publicarlo: solo llega acá si alguien lo puso a mano en los dominios del widget, porque el
+ * formulario no lo acepta (una dirección de sitio necesita un punto y una terminación).
+ */
+function dominioLimpio(d: string): { host: string; esLocal: boolean } | null {
   const limpio = String(d ?? "").trim().toLowerCase()
-  return /^[a-z0-9.-]+\.[a-z]{2,}$/.test(limpio) ? limpio : null
+  if (/^localhost(:\d{2,5})?$/.test(limpio)) return { host: limpio, esLocal: true }
+  return /^[a-z0-9.-]+\.[a-z]{2,}$/.test(limpio) ? { host: limpio, esLocal: false } : null
 }
 
 /**
@@ -38,8 +44,12 @@ function dominioLimpio(d: string): string | null {
  * ella.
  */
 export function cspDeLaVentana(dominios: string[]): string {
-  const limpios = dominios.map(dominioLimpio).filter((d): d is string => Boolean(d))
-  const ancestros = limpios.length ? limpios.map((d) => `https://${d}`).join(" ") : "'none'"
+  const limpios = dominios
+    .map(dominioLimpio)
+    .filter((d): d is { host: string; esLocal: boolean } => Boolean(d))
+  const ancestros = limpios.length
+    ? limpios.map((d) => `${d.esLocal ? "http" : "https"}://${d.host}`).join(" ")
+    : "'none'"
   return [
     "default-src 'self'",
     // El HTML trae su propio script y su propio estilo, por eso el 'unsafe-inline'. No carga

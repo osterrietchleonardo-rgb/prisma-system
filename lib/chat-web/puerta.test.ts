@@ -33,6 +33,17 @@ describe("revisarOrigen: solo desde la web de la agencia", () => {
     expect(revisarOrigen("", widget.dominios)).toBe(false)
     expect(revisarOrigen("no es una url", widget.dominios)).toBe(false)
   })
+  // 17/9, visto en el navegador: con "localhost:3000" en los dominios, el chat daba 403 porque
+  // se comparaba solo el nombre (localhost) contra el nombre con puerto. En produccion no se
+  // nota —los dominios no llevan puerto— y hace que sea imposible probarlo en la maquina.
+  it("cuando el dominio guardado lleva puerto, se compara con el puerto", () => {
+    expect(revisarOrigen("http://localhost:3000", ["localhost:3000"])).toBe(true)
+    expect(revisarOrigen("http://localhost:3001", ["localhost:3000"])).toBe(false)
+    // y al reves: un dominio sin puerto sigue andando igual
+    expect(revisarOrigen("https://central.com", ["central.com"])).toBe(true)
+    expect(revisarOrigen("https://central.com:8443", ["central.com"])).toBe(true)
+  })
+
   it("sin dominios configurados, no atiende a nadie", () => {
     expect(revisarOrigen("https://central.com", [])).toBe(false)
   })

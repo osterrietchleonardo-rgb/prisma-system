@@ -46,13 +46,16 @@ export type Atencion =
  */
 export function revisarOrigen(origin: string | null | undefined, dominios: string[]): boolean {
   if (!origin || !dominios.length) return false
-  let host: string
+  let u: URL
   try {
-    host = new URL(origin).hostname.toLowerCase()
+    u = new URL(origin)
   } catch {
     return false
   }
-  return dominios.map((d) => d.toLowerCase()).includes(host)
+  const permitidos = dominios.map((d) => d.toLowerCase())
+  // Se acepta por nombre (central.com) o por nombre con puerto (localhost:3000): lo segundo es
+  // lo que hace falta para poder probar el chat en la máquina antes de publicarlo.
+  return permitidos.includes(u.hostname.toLowerCase()) || permitidos.includes(u.host.toLowerCase())
 }
 
 function salida(whatsapp: string | null): string {
