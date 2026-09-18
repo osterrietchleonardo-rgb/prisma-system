@@ -274,23 +274,105 @@ async function resolverPorDefecto(host: string): Promise<string[]> {
   return direcciones.map((d) => d.address)
 }
 
+/** Cuántas redirecciones seguidas se aceptan antes de dar la dirección por perdida. */
+const MAX_SALTOS = 4
+
+/**
+ * El guardia que viaja con el rastreo: qué dominios se pueden abrir y a qué IP resuelve cada
+ * nombre. Las respuestas del DNS se recuerdan para no preguntar lo mismo 60 veces.
+ */
+interface Guardia {
+  dominios: string[]
+  resolver: (host: string) => Promise<string[]>
+  resueltos: Map<string, boolean>
+}
+
+/** ¿Esta dirección es del sitio del director, y por http(s)? */
+function esDelSitio(entrada: string, dominios: string[]): URL | null {
+  let u: URL
+  try {
+    u = new URL(entrada)
+  } catch {
+    return null
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null
+  if (!dominios.includes(u.hostname.toLowerCase())) return null
+  return u
+}
+
+async function hostSeguro(host: string, guardia: Guardia): Promise<boolean> {
+  const recordado = guardia.resueltos.get(host)
+  if (recordado !== undefined) return recordado
+  let seguro = false
+  try {
+    const ips = await guardia.resolver(host)
+    seguro = ips.length > 0 && !ips.some(esIpInterna)
+  } catch {
+    seguro = false
+  }
+  guardia.resueltos.set(host, seguro)
+  return seguro
+}
+
+/**
+ * Pide una dirección SIN dejar que una redirección se lleve el rastreo a otro lado.
+ *
+ * El nombre del sitio se revisa al empezar, pero eso no alcanza: un sitio puede contestar
+ * "andá a 169.254.169.254" (los metadatos de la nube) o a cualquier máquina de nuestra red, y
+ * un fetch normal la sigue solo. Por eso acá las redirecciones se resuelven a mano: cada salto
+ * vuelve a pasar por el mismo control que la primera dirección, dominio y dirección IP.
+ */
+async function pedir(
+  url: string,
+  fetchFn: typeof fetch,
+  limites: LimitesRastreo,
+  guardia: Guardia,
+  cabeceras?: Record<string, string>
+): Promise<Response | null> {
+  let actual = url
+  for (let salto = 0; salto <= MAX_SALTOS; salto++) {
+    const u = esDelSitio(actual, guardia.dominios)
+    if (!u) return null
+    if (!(await hostSeguro(u.hostname, guardia))) return null
+
+    let res: Response
+    try {
+      res = await fetchFn(actual, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(limites.maxMsPagina),
+        ...(cabeceras ? { headers: cabeceras } : {}),
+      })
+    } catch {
+      return null
+    }
+
+    const esRedireccion = res.status >= 300 && res.status < 400
+    if (!esRedireccion) return res
+
+    const destino = res.headers?.get?.("location")
+    if (!destino) return null
+    try {
+      actual = new URL(destino, actual).toString()
+    } catch {
+      return null
+    }
+  }
+  // Demasiados saltos: o es una vuelta sin fin, o alguien nos está paseando.
+  return null
+}
+
 /** Lee una página. Devuelve null si no es HTML, si pesa de más o si no contesta. */
 async function leerPagina(
   url: string,
   fetchFn: typeof fetch,
-  limites: LimitesRastreo
+  limites: LimitesRastreo,
+  guardia: Guardia
 ): Promise<{ titulo: string; texto: string } | null> {
-  let res: Response
-  try {
-    res = await fetchFn(url, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(limites.maxMsPagina),
-      headers: { "user-agent": "PRISMA-ChatWeb/1.0 (+https://prisma.vakdor.com)", accept: "text/html,application/xhtml+xml,application/xml" },
-    })
-  } catch {
-    return null
-  }
-  if (!res.ok) return null
+  const res = await pedir(url, fetchFn, limites, guardia, {
+    "user-agent": "PRISMA-ChatWeb/1.0 (+https://prisma.vakdor.com)",
+    accept: "text/html,application/xhtml+xml,application/xml",
+  })
+  if (!res || !res.ok) return null
   const tipo = res.headers?.get?.("content-type") ?? ""
   if (tipo && !/(text\/html|application\/xhtml|text\/plain|xml)/i.test(tipo)) return null
   const largo = Number(res.headers?.get?.("content-length") ?? 0)
@@ -320,12 +402,9 @@ export async function rastrearSitio(opts: OpcionesRastreo): Promise<ResultadoRas
   if (!sitio) return vacio("sitio_invalido")
 
   // El nombre se resuelve ANTES de pedir nada: si apunta adentro, no se abre ni la home.
-  try {
-    const ips = await resolver(new URL(sitio.origen).hostname)
-    if (!ips.length || ips.some(esIpInterna)) return vacio("interna")
-  } catch {
-    return vacio("interna")
-  }
+  const guardia: Guardia = { dominios: sitio.dominios, resolver, resueltos: new Map() }
+  const hostDelSitio = new URL(sitio.origen).hostname
+  if (!(await hostSeguro(hostDelSitio, guardia))) return vacio("interna")
 
   const arranque = ahora()
   const sinTiempo = () => ahora() - arranque > limites.maxMsTotal
@@ -345,7 +424,7 @@ export async function rastrearSitio(opts: OpcionesRastreo): Promise<ResultadoRas
   const yaCandidata = new Set<string>()
   let desdeSitemap = false
   const sitemapRaiz = `${sitio.origen}sitemap.xml`
-  const primerSitemap = await leerPagina(sitemapRaiz, fetchFn, limites)
+  const primerSitemap = await leerPagina(sitemapRaiz, fetchFn, limites, guardia)
   if (primerSitemap) {
     const porVer = [sitemapRaiz]
     const yaVistos = new Set<string>()
@@ -357,8 +436,8 @@ export async function rastrearSitio(opts: OpcionesRastreo): Promise<ResultadoRas
       if (!revision.ok && actual !== sitemapRaiz) continue
       let xml: string | null = null
       try {
-        const res = await fetchFn(actual, { signal: AbortSignal.timeout(limites.maxMsPagina) })
-        if (res.ok) xml = await res.text()
+        const res = await pedir(actual, fetchFn, limites, guardia)
+        if (res?.ok) xml = await res.text()
       } catch {
         xml = null
       }
@@ -392,13 +471,13 @@ export async function rastrearSitio(opts: OpcionesRastreo): Promise<ResultadoRas
       const { url, nivel } = porVer.shift()!
       if (vistas.has(url)) continue
       vistas.add(url)
-      const leida = await leerPagina(url, fetchFn, limites)
+      const leida = await leerPagina(url, fetchFn, limites, guardia)
       if (!leida) continue
       huboRespuesta = true
       guardar(url, leida)
       if (vistas.size >= limites.maxPaginas) { truncado = porVer.length > 0; break }
       if (nivel >= 2) continue
-      for (const link of linksDeHtml(leida.texto ? await paginaCruda(url, fetchFn, limites) : "", url)) {
+      for (const link of linksDeHtml(leida.texto ? await paginaCruda(url, fetchFn, limites, guardia) : "", url)) {
         if (revisarUrl(link, sitio.dominios).ok && !vistas.has(link)) porVer.push({ url: link, nivel: nivel + 1 })
       }
     }
@@ -417,7 +496,7 @@ export async function rastrearSitio(opts: OpcionesRastreo): Promise<ResultadoRas
     if (sinTiempo()) { truncado = true; break }
     if (vistas.has(url)) continue
     vistas.add(url)
-    const leida = await leerPagina(url, fetchFn, limites)
+    const leida = await leerPagina(url, fetchFn, limites, guardia)
     if (!leida) continue
     huboRespuesta = true
     guardar(url, leida)
@@ -433,10 +512,15 @@ export async function rastrearSitio(opts: OpcionesRastreo): Promise<ResultadoRas
 }
 
 /** El HTML crudo de una página ya leída (para sacarle los links). */
-async function paginaCruda(url: string, fetchFn: typeof fetch, limites: LimitesRastreo): Promise<string> {
+async function paginaCruda(
+  url: string,
+  fetchFn: typeof fetch,
+  limites: LimitesRastreo,
+  guardia: Guardia
+): Promise<string> {
   try {
-    const res = await fetchFn(url, { signal: AbortSignal.timeout(limites.maxMsPagina) })
-    if (!res.ok) return ""
+    const res = await pedir(url, fetchFn, limites, guardia)
+    if (!res || !res.ok) return ""
     const html = await res.text()
     return html.length > limites.maxBytes ? html.slice(0, limites.maxBytes) : html
   } catch {

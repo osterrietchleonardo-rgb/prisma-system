@@ -289,3 +289,134 @@ describe("rastrearSitio", () => {
     expect(r.paginas.map((p) => p.orden)).toEqual(r.paginas.map((_, i) => i))
   })
 })
+
+/**
+ * REDIRECCIONES. El nombre del sitio se resuelve una sola vez, al principio; si después cada
+ * página se pide siguiendo redirecciones a ciegas, alcanza con que el sitio conteste "andá a
+ * 169.254.169.254" para que el rastreo entre a la red de adentro y guarde lo que encuentre.
+ *
+ * El fetch de mentira imita al de verdad: con "follow" sigue la redirección solo; con "manual"
+ * devuelve el 302 y deja que decidamos nosotros. Sin eso, la prueba no probaría nada.
+ */
+function fetchQueRedirige(
+  sitio: Record<string, { redirigeA?: string; html?: string }>,
+  pedidos: string[]
+) {
+  const responder = async (u: string | URL, init?: { redirect?: string }) => {
+    let url = String(u)
+    pedidos.push(url)
+    for (let salto = 0; salto < 10; salto++) {
+      const pagina = sitio[url]
+      if (!pagina) return { ok: false, status: 404, headers: new Headers(), text: async () => "" }
+      if (!pagina.redirigeA) {
+        return {
+          ok: true,
+          status: 200,
+          headers: new Headers({
+            "content-type": url.includes("sitemap") ? "application/xml" : "text/html",
+          }),
+          text: async () => pagina.html ?? "",
+        }
+      }
+      if (init?.redirect === "manual") {
+        return {
+          ok: false,
+          status: 302,
+          headers: new Headers({ location: pagina.redirigeA }),
+          text: async () => "",
+        }
+      }
+      url = pagina.redirigeA
+      pedidos.push(url)
+    }
+    return { ok: false, status: 508, headers: new Headers(), text: async () => "" }
+  }
+  return responder as unknown as typeof fetch
+}
+
+describe("redirecciones: el rastreo no se deja llevar a otro lado", () => {
+  const sitemap = `<urlset><url><loc>https://vakdor.com/</loc></url></urlset>`
+
+  it("una redirección a la red interna NO se sigue (el ataque clásico a la nube)", async () => {
+    const pedidos: string[] = []
+    const adentro = "http://169.254.169.254/latest/meta-data/"
+    const fetchFn = fetchQueRedirige(
+      {
+        "https://vakdor.com/sitemap.xml": { html: sitemap },
+        "https://vakdor.com/": { redirigeA: adentro },
+        [adentro]: { html: "<html><head><title>metadatos</title></head><body>CLAVE-DE-LA-NUBE</body></html>" },
+      },
+      pedidos
+    )
+    const r = await rastrearSitio({ sitio: "vakdor.com", fetchFn, resolver: async () => ["190.2.3.4"] })
+    expect(pedidos).not.toContain(adentro)
+    expect(JSON.stringify(r.paginas)).not.toContain("CLAVE-DE-LA-NUBE")
+  })
+
+  it("una redirección a otro dominio NO se sigue, aunque sea de internet", async () => {
+    const pedidos: string[] = []
+    const afuera = "https://otro-sitio.com/privado"
+    const fetchFn = fetchQueRedirige(
+      {
+        "https://vakdor.com/sitemap.xml": { html: sitemap },
+        "https://vakdor.com/": { redirigeA: afuera },
+        [afuera]: { html: "<html><head><title>otro</title></head><body>TEXTO-AJENO</body></html>" },
+      },
+      pedidos
+    )
+    const r = await rastrearSitio({ sitio: "vakdor.com", fetchFn, resolver: async () => ["190.2.3.4"] })
+    expect(pedidos).not.toContain(afuera)
+    expect(JSON.stringify(r.paginas)).not.toContain("TEXTO-AJENO")
+  })
+
+  it("si el destino está en el mismo dominio pero apunta adentro, tampoco (nombre reapuntado)", async () => {
+    const pedidos: string[] = []
+    const disfrazada = "https://www.vakdor.com/interno"
+    const fetchFn = fetchQueRedirige(
+      {
+        "https://vakdor.com/sitemap.xml": { html: sitemap },
+        "https://vakdor.com/": { redirigeA: disfrazada },
+        [disfrazada]: { html: "<html><head><title>adentro</title></head><body>TEXTO-DE-ADENTRO</body></html>" },
+      },
+      pedidos
+    )
+    const r = await rastrearSitio({
+      sitio: "vakdor.com",
+      fetchFn,
+      resolver: async (host: string) => (host === "www.vakdor.com" ? ["127.0.0.1"] : ["190.2.3.4"]),
+    })
+    expect(pedidos).not.toContain(disfrazada)
+    expect(JSON.stringify(r.paginas)).not.toContain("TEXTO-DE-ADENTRO")
+  })
+
+  it("una redirección DENTRO del sitio se sigue: es lo que hace cualquier web normal", async () => {
+    const pedidos: string[] = []
+    const fetchFn = fetchQueRedirige(
+      {
+        "https://vakdor.com/sitemap.xml": { html: `<urlset><url><loc>https://vakdor.com/servicios</loc></url></urlset>` },
+        "https://vakdor.com/servicios": { redirigeA: "https://vakdor.com/servicios/" },
+        "https://vakdor.com/servicios/": { html: "<html><head><title>Servicios</title></head><body>Tasamos y vendemos.</body></html>" },
+      },
+      pedidos
+    )
+    const r = await rastrearSitio({ sitio: "vakdor.com", fetchFn, resolver: async () => ["190.2.3.4"] })
+    expect(r.paginas[0]?.texto).toContain("Tasamos y vendemos")
+  })
+
+  it("una cadena de redirecciones sin fin corta sola, no cuelga el rastreo", async () => {
+    const pedidos: string[] = []
+    const fetchFn = fetchQueRedirige(
+      {
+        "https://vakdor.com/sitemap.xml": { html: sitemap },
+        "https://vakdor.com/": { redirigeA: "https://vakdor.com/a" },
+        "https://vakdor.com/a": { redirigeA: "https://vakdor.com/b" },
+        "https://vakdor.com/b": { redirigeA: "https://vakdor.com/c" },
+        "https://vakdor.com/c": { redirigeA: "https://vakdor.com/a" },
+      },
+      pedidos
+    )
+    const r = await rastrearSitio({ sitio: "vakdor.com", fetchFn, resolver: async () => ["190.2.3.4"] })
+    expect(r.paginas).toHaveLength(0)
+    expect(pedidos.length).toBeLessThan(40)
+  })
+})
