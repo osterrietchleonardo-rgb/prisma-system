@@ -35,6 +35,14 @@
 // Las tres tablas comparten una sola función de acceso (farming_puede_ver_zona), así que un
 // ataque que entrara acá sería el mismo agujero en las tres.
 //
+// Etapa 3-B (el tablero): la migración de esta etapa es UN ÍNDICE — ninguna tabla nueva,
+// ninguna política nueva. Lo que sí estrena son tres escrituras, y las tres son la firma de
+// algo: `etapa`/`orden` (quién movió la tarjeta), `farming_contactos.user_id` (quién anotó el
+// contacto) y `farming_propietarios.tracking_log_id` (a quién se pasó al pipeline de Tracking).
+// Los ataques 41-43 las prueban con la zona YA compartida, que es el caso más permisivo: si B
+// no puede ahí, no puede en ningún lado. El de firmar un contacto como A es el que más importa:
+// un historial se lee como prueba de quién estuvo en esa puerta.
+//
 // La rama del director de farming_puede_ver_zona (agencia + rol, no dueño ni compartido) es
 // lógica nueva de esta migración — la política de farming_zonas no la cubre, es "toda la
 // agencia lee el contorno" sin mirar el rol — así que se prueba con un tercer usuario, DIR, que
@@ -440,6 +448,31 @@ try {
       .delete({ count: "exact" })
       .eq("id", contacto.id)
     espera("B (compartida) NO pudo borrar el contacto", !!eB25 || countB2Contacto === 0)
+
+    // ── Etapa 3-B: las tres escrituras que estrena el tablero. No hay tablas ni políticas
+    // nuevas (la migración 20260917180000 es un índice), pero sí hay tres columnas que recién
+    // ahora se escriben, y las tres son la firma de algo: quién movió la tarjeta, quién anotó
+    // el contacto y a quién se pasó al pipeline. Se prueban con la zona YA compartida, que es
+    // el caso más permisivo: si acá no se puede, en ningún otro lado tampoco.
+    console.log("ATAQUE 41: B (compartida) intenta MOVER la tarjeta de A (etapa/orden), que es la acción central del tablero")
+    const { error: eB26 } = await B.c
+      .from("farming_direcciones")
+      .update({ etapa: "captada", orden: 0 })
+      .eq("id", direccion.id)
+    espera("B (compartida) NO pudo mover la tarjeta de A", !!eB26)
+
+    console.log("ATAQUE 42: B (compartida) intenta anotar un contacto FIRMADO COMO A (historial a nombre de otro)")
+    const { error: eB27 } = await B.c
+      .from("farming_contactos")
+      .insert({ direccion_id: direccion.id, agency_id: perfilA.agency_id, user_id: A.uid, tipo: "otro", nota: "PWNED" })
+    espera("B (compartida) NO pudo firmar un contacto como A", !!eB27)
+
+    console.log("ATAQUE 43: B (compartida) intenta estampar un tracking_log_id en el propietario de A (meterlo en un pipeline ajeno)")
+    const { error: eB28 } = await B.c
+      .from("farming_propietarios")
+      .update({ tracking_log_id: "00000000-0000-0000-0000-000000000001" })
+      .eq("id", propietario.id)
+    espera("B (compartida) NO pudo estampar un tracking_log_id en el propietario de A", !!eB28)
   }
 
   console.log("Seed: se crea con service_role una marca de A en su propia zona (etapa 2, farming_avisos_marca)")
@@ -543,7 +576,7 @@ if (fallas.length) {
   // ataque pasó" — acá ningún ataque pasó, simplemente no se corrieron.
   const omitidos = []
   if (marcaOmitida) omitidos.push("4 ataques a farming_avisos_marca (falta 20260916120000_farming_avisos.sql)")
-  if (direccionesOmitida) omitidos.push("21 ataques + 3 controles positivos a farming_direcciones/farming_propietarios/farming_contactos, antes y después de compartir (falta 20260917120000_farming_direcciones.sql)")
+  if (direccionesOmitida) omitidos.push("24 ataques + 3 controles positivos a farming_direcciones/farming_propietarios/farming_contactos, antes y después de compartir, incluidas las tres escrituras que estrena el tablero de la etapa 3-B (falta 20260917120000_farming_direcciones.sql)")
   if (directorOmitido) omitidos.push("9 ataques + 3 controles positivos del bloque del director (faltan DIR_EMAIL/DIR_PASS, o esas credenciales no son de un director de la agencia de A)")
   console.log(`\n⚠ NO se corrieron: ${omitidos.join(" y ")}. Esto NO es un OK.`)
   process.exit(2)

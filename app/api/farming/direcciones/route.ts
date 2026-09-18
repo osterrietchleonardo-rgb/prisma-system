@@ -5,11 +5,11 @@
 // createAdminClient se saltea la RLS: el acceso a la zona se valida a mano, SIEMPRE, antes de
 // tocar farming_direcciones (en las dos operaciones).
 import { NextResponse } from "next/server"
-import { booleanPointInPolygon, point } from "@turf/turf"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { rechazoDeZona, responderError, zonaAccesible } from "@/lib/farming/servidor"
+import { calculaFueraDeZona, rechazoDeZona, responderError, zonaAccesible } from "@/lib/farming/servidor"
 import { normalizarDireccion, tieneAlturaComparable, validarDireccion } from "@/lib/farming/direcciones"
+import { calcularIndicadores, type FilaIndicadores } from "@/lib/farming/tablero"
 
 export const dynamic = "force-dynamic"
 
@@ -19,16 +19,6 @@ function avisoIdDe(v: unknown): number | null {
   if (v === null || v === undefined || String(v).trim() === "") return null
   const n = Number(v)
   return Number.isInteger(n) ? n : null
-}
-
-/** true si el punto cae afuera del polígono de la zona. Un geojson roto no bloquea el alta —el
- *  candado real ya pasó en zonaAccesible— así que se guarda como si no hubiera coordenadas. */
-function calculaFueraDeZona(lat: number, lng: number, geojson: unknown): boolean {
-  try {
-    return !booleanPointInPolygon(point([lng, lat]), geojson as any)
-  } catch {
-    return false
-  }
 }
 
 export async function GET(req: Request) {
@@ -63,11 +53,49 @@ export async function GET(req: Request) {
       .order("created_at", { ascending: true })
     if (error) throw error
 
+    const direcciones = data || []
+
+    // Los nueve indicadores del punto 8: «el tablero ES el reporte», no hay pantalla de carga
+    // de números. UNA sola consulta a farming_contactos, filtrada por las direcciones de ESTA
+    // zona (nunca la agencia entera, nunca una consulta por tarjeta) — el resto (agrupar por
+    // dirección, contar) lo hace calcularIndicadores en JS, que ya está probado solo.
+    //
+    // OJO SI TOCÁS ESTO: la migración de la etapa descartó a propósito un índice compuesto
+    // (direccion_id, tipo, etapa_hasta) porque esta consulta filtra SOLO por direccion_id y
+    // cuenta tipo/etapa_hasta en JavaScript — el índice (direccion_id, fecha desc) ya alcanza.
+    // Si algún día esta consulta empieza a filtrar por tipo o por etapa_hasta en SQL, esa
+    // decisión hay que revisarla de nuevo.
+    const idsDirecciones = direcciones.map((d: any) => d.id)
+    const { data: contactosData, error: eContactos } = idsDirecciones.length
+      ? await admin
+          .from("farming_contactos")
+          .select("direccion_id, tipo, etapa_hasta")
+          .in("direccion_id", idsDirecciones)
+          .eq("agency_id", agencyId)
+      : { data: [], error: null }
+    if (eContactos) throw eContactos
+
+    const contactosPorDireccion = new Map<string, { tipo: string; etapa_hasta: string | null }[]>()
+    for (const c of contactosData || []) {
+      const lista = contactosPorDireccion.get((c as any).direccion_id) ?? []
+      lista.push({ tipo: (c as any).tipo, etapa_hasta: (c as any).etapa_hasta })
+      contactosPorDireccion.set((c as any).direccion_id, lista)
+    }
+
+    const filasIndicadores: FilaIndicadores[] = direcciones.map((d: any) => ({
+      tramo: d.tramo,
+      etapa: d.etapa,
+      unidades_totales: d.unidades_totales,
+      encargado_nombre: d.encargado_nombre,
+      contactos: contactosPorDireccion.get(d.id) ?? [],
+    }))
+
     // `estado` viaja: la pantalla tiene que poder decir «esta zona está archivada» con el dato
     // del servidor y no solo con lo que le pasaron por props.
     return NextResponse.json({
       zona: { id: zona.id, nombre: zona.nombre, estado: zona.estado },
-      direcciones: data || [],
+      direcciones,
+      indicadores: calcularIndicadores(filasIndicadores),
     })
   } catch (e) {
     return responderError(e, "direcciones de la zona")

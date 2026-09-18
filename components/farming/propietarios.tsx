@@ -8,7 +8,7 @@
 // Lo único obligatorio es el nombre. El teléfono es un link `tel:`: el asesor está caminando y
 // tiene que poder llamar desde acá sin copiar nada a mano.
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Archive, Loader2, Pencil, Phone, Plus, Trash2 } from "lucide-react"
+import { Archive, ArrowRightCircle, Loader2, Pencil, Phone, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -20,6 +20,11 @@ import { VINCULOS, type Vinculo } from "@/lib/farming/direcciones"
 import type { FilaDireccion, PropietarioFarming } from "@/lib/farming/tipos"
 
 const etiquetaVinculo = (v: Vinculo) => VINCULOS.find((x) => x.clave === v)?.etiqueta ?? v
+
+/** ETAPA 3-B: los dos procesos que puede elegir el asesor al pasar a alguien al pipeline de
+ *  Tracking. Farming es captación (quien ofrece), así que son solo estos dos — nunca comprador
+ *  ni locatario — y el asesor SIEMPRE elige uno: el servidor no pone un default por él. */
+type ProcesoPipeline = "vendedor" | "locador"
 
 /** Los campos del formulario, para el alta y para la corrección: son los mismos. Todo string:
  *  lo que viene de la base puede ser null y un <input> con `value={null}` se vuelve
@@ -182,6 +187,11 @@ export function Propietarios({
   // notas y su historial, con un cartel que además avisaba que no se podía deshacer.
   const [editando, setEditando] = useState<{ id: string; campos: Campos } | null>(null)
 
+  // ETAPA 3-B: qué proceso eligió el asesor para cada persona (por default, vendedor —
+  // farming es captación), y quién tiene el pedido de "pasar a mi pipeline" en vuelo.
+  const [procesoElegido, setProcesoElegido] = useState<Record<string, ProcesoPipeline>>({})
+  const [pasando, setPasando] = useState<Record<string, boolean>>({})
+
   // Cuenta las cargas: si el asesor cierra esta tarjeta y abre otra con el GET todavía en
   // vuelo, la lista vieja no puede pintarse sobre la nueva. Mismo patrón que «A la venta en mi
   // zona».
@@ -274,6 +284,46 @@ export function Propietarios({
       setGente((prev) => prev.filter((x) => x.id !== p.id))
     } catch (e: any) {
       toast.error(e.message)
+    }
+  }
+
+  /**
+   * ETAPA 3-B: el botón que pasa a esta persona al pipeline de Tracking. NUNCA se dispara solo
+   * (spec): solo corre acá, cuando el asesor lo aprieta con el proceso ya elegido.
+   *
+   * Pega contra POST /api/farming/direcciones/[id]/propietarios/[pid]/tracking, que crea la
+   * actividad en Tracking (`savePerformanceLog`) y guarda su id en
+   * `farming_propietarios.tracking_log_id`.
+   */
+  const pasarAPipeline = async (p: PropietarioFarming) => {
+    if (!direccion) return
+    const proceso = procesoElegido[p.id] ?? "vendedor"
+    const mio = gen.current
+    setPasando((prev) => ({ ...prev, [p.id]: true }))
+    try {
+      const d = await pedir(`/api/farming/direcciones/${direccion.id}/propietarios/${p.id}/tracking`, {
+        method: "POST",
+        body: JSON.stringify({ proceso }),
+      })
+      if (gen.current !== mio) return
+      setGente((prev) => prev.map((x) => (x.id === p.id ? { ...x, tracking_log_id: d.tracking_log_id } : x)))
+      // El aviso NO es un error: la actividad ya se creó en Tracking, solo no se pudo dejar
+      // enlazada acá. Un error de verdad invitaría a apretar de nuevo y duplicarla.
+      if (d.aviso) toast.warning(d.aviso)
+      else toast.success("Pasó a tu pipeline de Tracking")
+    } catch (e: any) {
+      // 409: alguien (u otra pestaña) ya lo había pasado entre el último GET y este click, o la
+      // actividad existía aunque la tarjeta no la mostrara. No es un error del asesor: la
+      // persona QUEDA en el pipeline. Se refresca la lista para mostrar la línea real en vez de
+      // dejar el botón desactualizado, y se avisa sin cara de rojo.
+      if (e.status === 409) {
+        if (gen.current === mio) traer(direccion.id)
+        toast.warning(e.message)
+        return
+      }
+      toast.error(e.message)
+    } finally {
+      if (gen.current === mio) setPasando((prev) => ({ ...prev, [p.id]: false }))
     }
   }
 
@@ -391,13 +441,46 @@ export function Propietarios({
                         <Phone className="h-3.5 w-3.5" /> {p.telefono}
                       </a>
                     )}
+
+                    {/* ETAPA 3-B: pasar a esta persona al pipeline de Tracking. Solo si tiene
+                        teléfono (sin eso no hay con qué seguirla en Tracking), y nunca en una
+                        zona archivada: ahí no hay nada que el asesor pueda hacer, y el servidor
+                        lo rechazaría igual. Como LÍNEA VISIBLE cuando ya está enlazada: nunca
+                        un globito, porque en el celular no se abren.
+                        «del equipo», no «tuyo»: en una zona compartida la actividad puede ser de
+                        un colega que llegó primero, y ese colega es quien la ve en SU Tracking.
+                        Decir «tu pipeline» acá sería mentirle a este asesor sobre algo que ni
+                        siquiera le pertenece. */}
+                    {p.telefono && p.tracking_log_id && (
+                      <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-500">
+                        <ArrowRightCircle className="h-3.5 w-3.5" /> Ya está en el pipeline del equipo
+                      </p>
+                    )}
+                    {p.telefono && !p.tracking_log_id && !soloLectura && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Select
+                          value={procesoElegido[p.id] ?? "vendedor"}
+                          onValueChange={(v) => setProcesoElegido((prev) => ({ ...prev, [p.id]: v as ProcesoPipeline }))}
+                        >
+                          <SelectTrigger className="h-11 flex-1" aria-label={`Proceso de ${p.nombre} para Tracking`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="vendedor">Vendedor</SelectItem>
+                            <SelectItem value="locador">Locador</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          className="h-11 shrink-0 gap-1.5"
+                          disabled={!!pasando[p.id]}
+                          onClick={() => pasarAPipeline(p)}
+                        >
+                          {pasando[p.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ArrowRightCircle className="h-4 w-4" /> Pasar a mi pipeline</>}
+                        </Button>
+                      </div>
+                    )}
                   </>
                 )}
-
-                {/* ETAPA 3-B: acá va «→ pasarlo a mi pipeline», que crea el lead en Tracking y
-                    guarda el id en farming_propietarios.tracking_log_id (el PATCH de esta
-                    pantalla NO toca esa columna). Manda proceso: "vendedor" por defecto —
-                    farming es captación— y deja elegir «locador». */}
               </li>
             ))}
           </ul>
