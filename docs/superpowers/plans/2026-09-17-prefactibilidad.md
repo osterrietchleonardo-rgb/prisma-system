@@ -3374,3 +3374,14 @@ git commit -m "test(prefactibilidad): validación de 20 parcelas contra TodoProp
 git add docs/interno/bitacora-sesiones.md docs/compartible/estandarizada/FUNCIONAL-ASESOR-PRISMA.md docs/compartible/estandarizada/FUNCIONAL-DIRECTOR-PRISMA.md
 git commit -m "docs(prefactibilidad): bitácora y guías funcionales"
 ```
+
+---
+
+### Task 19a (agregada el 18-sep, hallazgo de producción): la clave de calle no depende del orden ni de las partículas
+
+Ver `.superpowers/sdd/2026-09-17-prefactibilidad/task-19a-brief.md` (copiado acá en resumen): USIG devuelve
+"ROOSEVELT FRANKLIN D." y frentes "AV. FRANKLIN D. ROOSEVELT"; medido sobre 40 puertas al azar de producción,
+la clave actual resolvía 27. La clave pasa a palabras ordenadas sin partículas ni preposiciones; si dos
+calles distintas comparten clave, el route de analizar desempata por la distancia entre el punto de USIG
+(`lat`/`lng`, que el módulo ahora manda) y el centroide de cada parcela candidata. Después del commit, el
+controlador recarga `gcba_puertas` con el cargador aprobado.
