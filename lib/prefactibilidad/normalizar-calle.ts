@@ -1,14 +1,17 @@
-// La puerta "calle + número" se traduce a parcela con el dataset de frentes del GCBA. USIG dice
-// "CABILDO AV." y frentes "AV. CABILDO": la clave común saca puntos y tildes y manda las
-// partículas al final. num_dom trae varias puertas pegadas por punto ("3939.3943").
+// La puerta "calle + número" se traduce a parcela con el dataset de frentes del GCBA. USIG trae
+// los nombres de persona "apellido nombre" y a veces sin partícula ("ROOSEVELT FRANKLIN D.");
+// frentes los trae al derecho y con partícula ("AV. FRANKLIN D. ROOSEVELT"). La clave común saca
+// puntos y tildes, saca partículas y preposiciones, y ordena las palabras alfabéticamente: así no
+// importa el orden ("apellido nombre" vs. "nombre apellido") ni si falta la partícula.
+// num_dom trae varias puertas pegadas por punto ("3939.3943").
 const PARTICULAS = new Set(["AV", "AVDA", "GRAL", "DR", "DRA", "PTE", "ING", "TTE", "CNEL", "PJE", "PSJE", "DIAG", "CMTE", "ALTE", "BRIG", "MTRO", "PROF", "SGTO", "CAP", "MCAL"]);
+const PREPOSICIONES = new Set(["DE", "DEL", "LA", "LAS", "LOS", "Y", "E"]);
 
 export function calleClave(nombre: string): string {
   const base = nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[.,]/g, " ").replace(/\s+/g, " ").trim();
   const palabras = base.split(" ").filter(Boolean);
-  const principales = palabras.filter((p) => !PARTICULAS.has(p));
-  const particulas = palabras.filter((p) => PARTICULAS.has(p)).sort();
-  return [...principales, ...particulas].join(" ");
+  const principales = palabras.filter((p) => !PARTICULAS.has(p) && !PREPOSICIONES.has(p));
+  return principales.sort().join(" ");
 }
 
 export function abrirPuertas(numDom: string): number[] {

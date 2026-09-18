@@ -67,7 +67,7 @@ export interface FilaCur {
 }
 
 export interface Aviso {
-  clave: "esquina" | "atipica" | "area_especial" | "catalogado" | "dos_alturas" | "ph_consolidado" | "plano_limite_raro" | "sin_envolvente" | "sin_dato_codigo";
+  clave: "esquina" | "atipica" | "area_especial" | "catalogado" | "dos_alturas" | "ph_consolidado" | "plano_limite_raro" | "sin_envolvente" | "sin_dato_codigo" | "puerta_ambigua";
   texto: string;
   /** true = exige la leyenda "requiere estudio profesional" arriba del bloque. */
   fuerte: boolean;

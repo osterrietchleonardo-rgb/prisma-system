@@ -23,7 +23,7 @@ export function PrefactibilidadModule({ esDirector = false }: { esDirector?: boo
   const analizar = useCallback(async (d: DireccionUsig) => {
     setPin({ lat: d.lat, lng: d.lng }); setP(null); setIdGuardada(null); setLink(null); setError(null); setCargando(true);
     try {
-      const r = await fetch("/api/prefactibilidad/analizar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ calle: d.calle, altura: d.altura, direccion: d.direccion }) });
+      const r = await fetch("/api/prefactibilidad/analizar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ calle: d.calle, altura: d.altura, direccion: d.direccion, lat: d.lat, lng: d.lng }) });
       const j = await r.json();
       if (!r.ok) { setError(j.error || "No se pudo analizar."); return; }
       setP(j.prefactibilidad);
