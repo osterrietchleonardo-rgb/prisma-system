@@ -97,6 +97,12 @@ describe("el tono: es una operación de mucho dinero, no un chat informal (Leona
     for (const muletilla of ["che", "uy", "je", "jaja", "posta"])
       expect(PROMPT_WEB.toLowerCase(), muletilla).toContain(`"${muletilla}"`)
   })
+  it("no habla de si mismo: el visitante no tiene por que enterarse de como esta armado", () => {
+    expect(PROMPT_WEB).toContain("mi alcance")
+    expect(PROMPT_WEB).toContain("no estoy programado para")
+    expect(PROMPT_WEB).toContain("NUNCA hables de vos mismo")
+  })
+
   it("pide una idea por mensaje, que es lo que hace que parezca una persona", () => {
     expect(PROMPT_WEB).toContain("Una idea por mensaje")
     expect(PROMPT_WEB).toContain("punto y aparte")
