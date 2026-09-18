@@ -16,6 +16,60 @@
 
 ---
 
+## 2026-09-18 — Prefactibilidad: cualquier dirección de CABA → lote oficial, cuánto se puede construir y cuánto vale la tierra
+
+**Qué se construyó (rama `feat/prefactibilidad`, worktree propio, 19 tareas + 19a + 19b por
+subagent-driven-development; spec `docs/superpowers/specs/2026-09-12-prefactibilidad-design.md`,
+plan `docs/superpowers/plans/2026-09-17-prefactibilidad.md`).** Página **Propiedades →
+Prefactibilidad** para asesor y director: el buscador usa el normalizador de direcciones del GCBA
+(USIG), la puerta se resuelve contra el CSV de frentes cargado en `gcba_puertas`, el contorno del
+lote y la manzana vienen de epok (catastro) con caché en `gcba_parcela_cache`, el Código por parcela
+está en `gcba_parcelas_cur` (318.127 filas) y la **envolvente oficial** se lee de las teselas
+vectoriales de Ciudad 3D (`volumen_edif`). Cálculo en `lib/prefactibilidad/*` con tests; la regla del
+cuarto (LFI) es control y respaldo cuando no hay envolvente. Valor de la tierra: mediana y rango de
+terrenos en venta de `mercado_avisos` a 800 m (RPC `prefactibilidad_terrenos_cerca`, mínimo 5).
+Guardar en `prefactibilidades` (el servidor recalcula desde `{smp, direccion}`, nunca confía en el
+snapshot del cliente) y ficha pública por token en `/prefactibilidad/[token]` (noindex, PDF).
+
+- **Adenda 17-sep:** las capas de Ciudad 3D son teselas públicas
+  `vectortiles.usig.buenosaires.gob.ar/cur3d/{capa}/{z}/{x}/{y}.pbf` (gzip sin Content-Encoding).
+  Roosevelt 4554: 261 m²/planta oficial vs 242 por la regla del cuarto → la envolvente oficial es la
+  fuente.
+- **Validación (18-sep):** 21 filas / 20 parcelas contra la capa oficial 2021 del GCBA como oráculo
+  (±5 %): **0 fallas, 0 sin dato**. TodoProps NO es oráculo: sobreestima lotes profundos y en
+  corredores publica el basamento (spec enmendada). Evidencia en
+  `docs/superpowers/specs/evidencia/prefactibilidad/2026-09-18-validacion-20-parcelas.md`.
+- **Producción (con OK de Leonardo, 18-sep):** migraciones `20260918100000_prefactibilidad_gcba` y
+  `20260918100100_prefactibilidades` por Management API (RLS select + revoke de escritura directa;
+  RPC solo `service_role`); carga del Código y de las puertas con los scripts de `scripts/gcba/`.
+  Comprobado con la clave anon: select vacío, insert 401, token falso → 404.
+- **Hallazgo en producción (19a):** USIG dice "ROOSEVELT FRANKLIN D." y frentes "AV. FRANKLIN D.
+  ROOSEVELT"; la clave de calle ahora saca partículas y preposiciones y ordena las palabras
+  (`normalizar-calle.ts`): 27/40 → 40/40 puertas resueltas en la muestra. Puertas recargadas.
+- **Navegador (escritorio 1440 y celular emulado, PRISMAIA - VAKDOR):** Zuviría 3939 (atípica,
+  1.128 m²/nivel), Roosevelt 4554 (261 m²/nivel, sin avisos), Cabildo 2040 (dos alturas, CM+CA con
+  basamento, PH consolidado, 52 comparables), "Mitre 100, San Isidro" → "Por ahora solo Ciudad de
+  Buenos Aires", "Zuviria 3941" → "No encontramos ese número…", Guardar/Compartir, ficha pública sin
+  sesión. Arreglos de 19b: fecha corrida un día (UTC), desplegable que reabría, buscador vacío al
+  abrir una guardada, error de hidratación por `<style>{CSS}</style>`, decimales con punto, "1 pisos",
+  botón PDF ilegible con color oscuro, y el buscador deshabilitado mientras se abre una guardada (una
+  respuesta tardía pisaba lo que se tecleaba).
+
+**Decisiones:** ficha para el dueño del lote (captar terrenos); edificabilidad + valor de la tierra,
+sin plusvalía ni IA; huella real en manzana típica y rango con aviso en el resto; solo CABA.
+
+**Trampas:** el portal de datos exige `User-Agent` de navegador; epok por `x,y` devuelve `{}`
+siempre; PostgREST no escribe JSON en columnas `geometry` (por eso `jsonb`); `next lint` no revisa
+los `.mts`; los agentes de exploración no ven el worktree y leen el repo principal.
+
+**Abierto:** el OK de Leonardo para el merge (la revisión final de la rama corrió antes de este
+commit; sus hallazgos, si los hubo, están en el commit siguiente). Descartado: la revisión automática
+marcó un SSRF potencial en `app/api/acm/comparable-link/route.ts` (de main, 16-sep); verificado que
+esa ruta llama a `comparableDesdeLink` → `extractFromUrl` (`lib/acm/extract.ts`), que ya pasa por
+`lib/acm/url-segura.ts` desde la entrada del 16-sep. Falsa alarma.
+
+---
+
 ## 2026-09-16 — ACM: el link ya no puede abrir direcciones internas, y el barrio de los links
 
 **Link seguro (pedido de Leonardo, con el requisito "si el ataque no falla, no está hecho").**

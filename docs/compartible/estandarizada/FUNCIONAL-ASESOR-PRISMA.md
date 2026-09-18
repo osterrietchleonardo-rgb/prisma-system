@@ -25,6 +25,7 @@
 14. [Tutor IA](#14-tutor-ia)
 15. [Buscador IA](#15-buscador-ia)
 16. [ACM — Análisis Comparativo de Mercado](#16-acm--análisis-comparativo-de-mercado)
+    16-bis. [Prefactibilidad: cuánto se puede construir en un lote](#16-bis-prefactibilidad-cuánto-se-puede-construir-en-un-lote)
 17. [Biblioteca (documentos)](#17-biblioteca-documentos)
 18. [Configuración](#18-configuración)
 19. [Sugerencias](#19-sugerencias)
@@ -62,7 +63,7 @@
   - **Bandejas:** WhatsApp Bandeja (las conversaciones que entran).
   - **Contactos:** Mi Pipeline, Leads Tokko, Leads WhatsApp (los listados de gente).
   - **Difusión:** Contactos (tu agenda de WhatsApp).
-  - **Propiedades:** Mis Propiedades, Buscador IA, ACM, Pulso de Mercado.
+  - **Propiedades:** Mis Propiedades, Buscador IA, ACM, Prefactibilidad, Pulso de Mercado.
   - **Marketing IA:** Crear Anuncio, HomeStaging, Clientes Ideales (IPC), Mi ADN, Mis Generaciones, Guía Mágica.
   - **Documentación:** Contratos IA. (Si tu agencia no lo tiene contratado, este grupo no aparece.)
   - **Ayuda:** Tutor IA, Biblioteca, Sugerencias.
@@ -631,6 +632,37 @@ Con los comparables a la vista podés armar una **ficha profesional** para pasar
 
 > 💡 **Tip:** la ficha usa los **colores y el logo** de tu agencia (los configura el director en **Marketing IA → Identidad Visual**). Si todavía no están cargados, sale con un diseño elegante por defecto.
 > 💰 Crear la ficha **no consume créditos**.
+
+---
+
+## 16-bis. Prefactibilidad: cuánto se puede construir en un lote
+
+**Qué es:** escribís **cualquier dirección de la Ciudad de Buenos Aires** y PRISMA te marca el lote oficial en el mapa y te dice **cuánto se puede construir** ahí según el Código Urbanístico y **cuánto vale la tierra** hoy. Sirve para captar terrenos: le mostrás al dueño de una casa vieja lo que vale su lote como terreno, con datos oficiales y en una ficha con la marca de tu agencia.
+
+**Cómo usarla paso a paso:**
+1. Entrá a **Propiedades → Prefactibilidad**.
+2. Escribí la calle y el número (por ejemplo, *Roosevelt 4554*). Mientras escribís aparecen las direcciones que reconoce el Gobierno de la Ciudad; **elegí una**.
+3. Esperá unos segundos ("Consultando el catastro de la Ciudad…"). El mapa marca el **contorno del lote** con un pin, y al lado aparece la ficha en tres bloques:
+   - **El lote:** la parcela oficial (sección-manzana-parcela), la superficie, el frente × fondo, si hoy es propiedad horizontal y qué hay construido hoy.
+   - **Qué se puede construir:** cuántos pisos y cuántos **m² por planta** permite la envolvente oficial (la misma que publica el Gobierno de la Ciudad en Ciudad 3D), el total de **m² construibles** y los **m² vendibles**, que son el 80 % (se descuentan pasillos, escaleras y muros; los balcones no se cuentan). También la altura máxima y el plano límite.
+   - **Cuánto vale la tierra:** el valor en **USD por m²** de los terrenos que hoy están en venta a menos de 800 metros, y el **valor del lote** que sale de ahí (mediana y rango). Abajo ves la lista de esos terrenos.
+4. Si querés volver a esta ficha más adelante, tocá **Guardar**. Queda en **Mis prefactibilidades**, debajo del mapa; tocás la fila y vuelve a abrirse.
+5. Tocá **Compartir ficha** para generar el **link para el dueño del lote**: una página con el plano del lote, los números, tu contacto y la marca de tu agencia. Desde ahí él puede **Descargar PDF**.
+
+> ⚠️ **Leé los avisos antes de prometer nada.** Cuando el lote tiene algo particular, la ficha lo dice arriba de los números: **lote en esquina**, **manzana atípica** (el organismo fija el fondo caso por caso), **dos alturas distintas** (frente a dos calles o lindero a esquina), **protección patrimonial**, **área especial** con normas propias, o **un edificio en propiedad horizontal consolidado** (ahí el terreno no está disponible en la práctica). En esos casos la ficha aclara **"Requiere estudio profesional"**: el número sirve para la charla, no para firmar.
+
+> ℹ️ **Si aparece un rango en vez de un número fijo**, es porque el Gobierno de la Ciudad no publica la envolvente de esa parcela y PRISMA la estima con la regla general del Código. En la lista de guardadas esas fichas dicen **"rango"**.
+
+> 🔒 **De dónde salen los datos.** Todo es información pública y oficial del Gobierno de la Ciudad: el catastro, el Código Urbanístico parcela por parcela y la envolvente de Ciudad 3D. Los precios de la tierra salen de los avisos de terrenos en venta que PRISMA ya usa en el Buscador y en el ACM. Por eso la ficha lleva siempre esta leyenda: *"Estudio orientativo elaborado con datos públicos del Gobierno de la Ciudad de Buenos Aires. No reemplaza el informe de un profesional matriculado ni el certificado urbanístico oficial."*
+
+**Cosas que te van a pasar:**
+- **"Por ahora solo Ciudad de Buenos Aires":** escribiste una dirección del Gran Buenos Aires. Todavía no hay datos oficiales por parcela fuera de CABA.
+- **"No encontramos ese número. Probá con otro número de la misma cuadra":** el catastro no tiene esa puerta (pasa con numeraciones nuevas o con lotes grandes que tienen una sola puerta registrada).
+- **"El catastro de la Ciudad no está respondiendo, probá en unos minutos":** el servidor del Gobierno está caído o lento; no es PRISMA.
+- **"Sin comparables suficientes":** hacen falta al menos **5 terrenos en venta a menos de 800 m** para mostrar un valor de la tierra. En zonas sin terrenos en venta la ficha muestra igual lo que se puede construir.
+- En la lista de guardadas puede aparecer **"hay Código nuevo, recalcular"**: el Gobierno publicó una versión más nueva del Código desde que guardaste esa ficha. Volvé a buscar la dirección y guardá de nuevo.
+
+> 💰 Prefactibilidad **no consume créditos**.
 
 ---
 

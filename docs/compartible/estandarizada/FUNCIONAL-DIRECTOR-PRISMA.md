@@ -25,6 +25,7 @@
 14. [Asesores (gestión del equipo)](#14-asesores-gestión-del-equipo)
 15. [Documentos (base de conocimiento)](#15-documentos-base-de-conocimiento)
 16. [ACM — Análisis Comparativo de Mercado](#16-acm--análisis-comparativo-de-mercado)
+    16-bis. [Prefactibilidad: cuánto se puede construir en un lote](#16-bis-prefactibilidad-cuánto-se-puede-construir-en-un-lote)
 17. [Calendario (visitas)](#17-calendario-visitas)
 18. [Tutor IA](#18-tutor-ia)
 19. [Buscador IA (+ notas del director)](#19-buscador-ia--notas-del-director)
@@ -77,7 +78,7 @@ Antes de operar, dejá lista la base. Andá a **Configuración** (último ítem 
   - **Bandejas:** Asesor IA WhatsApp (las conversaciones que entran).
   - **Contactos:** Pipeline, Leads Tokko, Leads WhatsApp (los listados de gente).
   - **Difusión:** Contactos, Plantillas, Campañas, Configuración IA (todo lo de WhatsApp que no es el chat: la agenda, las plantillas, los envíos masivos y cómo se comporta el bot).
-  - **Propiedades:** Propiedades, Buscador IA, ACM, Pulso de Mercado.
+  - **Propiedades:** Propiedades, Buscador IA, ACM, Prefactibilidad, Pulso de Mercado.
   - **Marketing IA:** Crear Anuncio, HomeStaging, Clientes Ideales (IPC), Mi ADN, Historial / Galería, Guía Mágica, Configuración IA.
   - **Documentación:** Contratos IA. (Si tu agencia no tiene contratado Contratos IA, este grupo directamente no aparece.)
   - **Mi equipo:** Equipo, Asesores, Tracking Performance.
@@ -786,6 +787,14 @@ Tercera solapa del ACM, **Configuración**. **Solo la ves vos**: tus asesores no
 > 📌 Las fichas **ya enviadas no cambian**. Si mañana editás este material, las que tu equipo mandó antes siguen igual que el día que se enviaron.
 
 > 💰 Consume créditos **cada vez que tocás "Volver a leer con IA" o "Acomodar con IA"** (nunca por ACM generado). Como los dos botones los apretás vos, el gasto lo decidís vos.
+
+---
+
+## 16-bis. Prefactibilidad: cuánto se puede construir en un lote
+
+**Qué es:** en **Propiedades → Prefactibilidad**, vos y tu equipo escriben cualquier dirección de la Ciudad de Buenos Aires y PRISMA marca el lote oficial en el mapa y arma una ficha con **cuánto se puede construir** (pisos, m² por planta, m² construibles y vendibles, según la envolvente oficial del Código Urbanístico que publica el Gobierno de la Ciudad) y **cuánto vale la tierra** (USD por m² y valor del lote, a partir de los terrenos en venta a menos de 800 m; hacen falta al menos 5). La herramienta está pensada para **captar terrenos**: el asesor le muestra al dueño de una casa vieja lo que vale su lote, y le manda la ficha con un link (**Compartir ficha**), con el plano del lote, la marca de tu agencia y tu aviso legal. Todo sale de datos públicos y oficiales, la ficha lo aclara en su leyenda y, cuando el lote tiene algo particular (esquina, manzana atípica, dos alturas, protección patrimonial, área especial, edificio en propiedad horizontal), avisa **"Requiere estudio profesional"**. No consume créditos. El paso a paso completo está en la guía del asesor, sección 16-bis.
+
+**Qué ves vos de más:** en tu pantalla, la lista de abajo se llama **"Prefactibilidades de la agencia"** y muestra las fichas guardadas por **todo tu equipo**, con la fecha, si ya fue compartida y si quedó vieja (**"hay Código nuevo, recalcular"** aparece cuando el Gobierno publicó una versión más nueva del Código después de guardarla). Las fichas compartidas usan los **colores, el logo y el aviso legal** que cargaste en **Marketing IA → Identidad Visual**. Por ahora solo funciona en la Ciudad de Buenos Aires: para una dirección del Gran Buenos Aires el asesor ve **"Por ahora solo Ciudad de Buenos Aires"**.
 
 ---
 
