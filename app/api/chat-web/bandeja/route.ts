@@ -66,7 +66,13 @@ export async function GET(req: Request) {
     // El costo NO sale a la pantalla de PRISMA (Leonardo, 17/9): es un dato nuestro, no de la
     // agencia. Se saca acá y no solo en el dibujo: si viaja al navegador, se ve igual.
     const { costoTotalUSD: _t, costoPromedioUSD: _p, ...resumen } = completo
-    return NextResponse.json({ conversaciones: data ?? [], resumen, soloMias: !filtro.todas })
+    // `configurado` es lo que decide si la pantalla muestra el cartel de "falta el formulario".
+    return NextResponse.json({
+      conversaciones: data ?? [],
+      resumen,
+      soloMias: !filtro.todas,
+      configurado: Boolean(widget?.id),
+    })
   } catch (error) {
     const mensaje = error instanceof Error ? error.message : "Error"
     return NextResponse.json({ error: mensaje }, { status: mensaje === "Unauthorized" ? 401 : 500 })

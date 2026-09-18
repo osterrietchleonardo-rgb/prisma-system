@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
+import { ConfiguracionChatWeb } from "@/components/chat-web/configuracion-chat-web"
 import { 
   User, 
   Lock, 
@@ -63,6 +65,7 @@ import { MetaTokenManager } from "@/components/whatsapp/MetaTokenManager"
 import { NuevoCodigoDialog } from "@/components/director/NuevoCodigoDialog"
 
 export default function DirectorConfiguracionPage() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const defaultTab = searchParams.get('tab') || 'perfil'
   
@@ -792,6 +795,12 @@ export default function DirectorConfiguracionPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* El Asesor IA Web se configura ACA (Leonardo, 18/9): la pantalla del asesor es para
+              mirar los chats y las metricas, no para cargar datos. Al guardar, lleva alla. */}
+          <div className="mt-6">
+            <ConfiguracionChatWeb alGuardar={() => router.push("/director/chat-web")} />
+          </div>
         </TabsContent>
       </Tabs>
 

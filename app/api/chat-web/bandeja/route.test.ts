@@ -102,6 +102,12 @@ describe("quién entra", () => {
     expect(cuerpo.resumen.porObjetivo.sumarse_equipo).toBe(1)
   })
 
+  it("dice si ya esta configurado: con eso la pantalla muestra (o no) el cartel", async () => {
+    expect((await (await pedir()).json()).configurado).toBe(true)
+    base.widget = null
+    expect((await (await pedir()).json()).configurado).toBe(false)
+  })
+
   it("el costo NO viaja al navegador: es un dato nuestro, no de la agencia", async () => {
     const cuerpo = await (await pedir()).json()
     expect(cuerpo.resumen.costoTotalUSD).toBeUndefined()

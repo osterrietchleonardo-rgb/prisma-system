@@ -69,7 +69,7 @@ const MOTIVOS: Record<string, string> = {
   sin_paginas: "No se encontró ninguna página para leer.",
 }
 
-export function ConfiguracionChatWeb() {
+export function ConfiguracionChatWeb({ alGuardar }: { alGuardar?: () => void } = {}) {
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [leyendo, setLeyendo] = useState(false)
@@ -155,6 +155,8 @@ export function ConfiguracionChatWeb() {
       }
       setWidget(d.widget)
       setAviso({ tipo: "ok", texto: "Guardado." })
+      // Vuelve a la pantalla del Asesor IA Web: ahi se ven los chats y las metricas.
+      alGuardar?.()
     } catch {
       setAviso({ tipo: "error", texto: "No se pudo guardar." })
     } finally {
@@ -212,12 +214,12 @@ export function ConfiguracionChatWeb() {
   if (cargando) return <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 p-4 sm:p-6">
+    <div className="w-full space-y-6">
       <header>
-        <h1 className="text-xl font-semibold">Chat de la web</h1>
+        <h2 className="text-lg font-semibold">Asesor IA Web</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          El asistente atiende a quien entra a tu sitio, entiende qué necesita y te pasa el contacto
-          por WhatsApp. Los colores y el logo los toma de Marketing IA → Configuración.
+          El asistente atiende a quien entra a tu sitio, entiende qué necesita y te pasa el contacto.
+          Los colores y el logo los toma de Marketing IA → Configuración.
         </p>
       </header>
 
