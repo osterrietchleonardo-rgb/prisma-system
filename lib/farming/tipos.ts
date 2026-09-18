@@ -2,6 +2,7 @@
 // Solo tipos: lo que viaja entre la API de Farming y la pantalla. Nada ejecutable.
 import type { Choque, Dibujo } from "./geometria"
 import type { EtapaDireccion, TipoDireccion, Vinculo } from "./direcciones"
+import type { Indicadores } from "./tablero"
 
 export type { Choque, Dibujo }
 
@@ -104,6 +105,9 @@ export interface RespuestaDirecciones {
    *  y no solo con lo que le llegó por props. Una zona `liberada` nunca llega hasta acá. */
   zona: { id: string; nombre: string; estado: "activa" | "archivada" }
   direcciones: FilaDireccion[]
+  /** Los nueve del punto 8, ya calculados en el servidor sobre TODAS las direcciones de la
+   *  zona. La pantalla nunca los recalcula: los lee y los muestra. */
+  indicadores: Indicadores
 }
 
 /** Una persona de una tarjeta, tal como la devuelve la API. `tracking_log_id` es de la etapa

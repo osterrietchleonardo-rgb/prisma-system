@@ -1030,7 +1030,50 @@ La tercera solapa: **lo que caminaste vos**. Acá va lo que el portal no tiene �
 
 **Las personas de cada dirección** se cargan desde la tarjeta, en "personas": nombre, piso, unidad, vínculo y teléfono. El teléfono queda como link para llamar de un toque. Un edificio puede tener muchos propietarios conocidos, cada uno con su unidad.
 
-**La lista está agrupada por etapa.** Por ahora todo nace en "Relevado"; mover las tarjetas entre columnas llega en la próxima etapa.
+**Arriba de todo, los nueve números del método.** No los cargás en ningún lado: salen solos de lo que fuiste moviendo. Cuadras relevadas, propiedades relevadas, unidades potenciales, contactos realizados, encargados contactados, respuestas recibidas, tasaciones solicitadas, entrevistas y captaciones. Debajo de cada número dice **de dónde sale**, para que nunca tengas que adivinar qué está contando. Un número en cero también es información: "todavía no mandaste ninguna carta" es un dato.
+
+**Dos formas de ver lo mismo: "tablero" y "lista".** Arrancás en el tablero, que es donde se trabaja. Si preferís la lista, la elegís y **el sistema se acuerda** para la próxima vez.
+
+### El tablero: las seis columnas
+
+Cada puerta es una tarjeta y va pasando por las columnas del método: **Relevado → Presentado → En secuencia → Respondió → Tasación → Captada**. Las descartadas quedan plegadas al costado; las abrís tocándolas.
+
+**Para mover una tarjeta** tenés dos caminos, y los dos terminan en el mismo lugar:
+
+- **En la computadora:** la arrastrás de una columna a otra.
+- **En el celular:** el botón **"Mover a…"** de cada tarjeta. Es el camino principal parado en la vereda: seis columnas no se arrastran con el pulgar.
+
+**Siempre se abre el mismo cuadro, y hasta que no lo guardás no se mueve nada.** Si lo cancelás, la tarjeta se queda donde estaba.
+
+En ese cuadro ponés:
+
+| Qué te pide | Para qué |
+|---|---|
+| **A qué columna** | viene elegida según lo que tocaste. La podés cambiar ahí mismo. |
+| **Qué hiciste** | te sugiere lo más probable (si pasás a "Presentado", "Carta 1"). Podés elegir otra cosa de la lista. |
+| **Cuántas cartas dejaste** | solo aparece si lo que hiciste es una carta. |
+| **Cuál es el próximo paso** | qué vas a hacer la próxima vez que vuelvas a esa puerta. |
+| **Para cuándo** | **la fecha es obligatoria.** Sin fecha el botón de guardar queda apagado. |
+| **Nota** | opcional, para lo que no entra en ningún campo. |
+
+**Por qué la fecha es obligatoria:** es la regla del método. Una puerta sin próxima fecha es una puerta que se pierde. Esa fecha aparece después **como línea visible en la tarjeta**, y si ya pasó, la tarjeta dice **"vencida"** con todas las letras — no con un color nomás, porque un teléfono al sol en la vereda no distingue un rojo de un gris.
+
+**"Anotar sin moverla"** es la primera opción del menú, y es la que más vas a usar: dejaste la carta 3 y la puerta sigue en "En secuencia". Se anota el contacto, se actualiza el próximo paso, y la tarjeta no se mueve de columna.
+
+**Los nueve números se actualizan solos** apenas guardás el movimiento. No hay que recargar nada.
+
+### El historial de cada puerta
+
+Cada tarjeta tiene **"historial"**: la lista de todo lo que se hizo en esa puerta, con la fecha, qué se hizo, de qué columna a cuál y **quién lo anotó**. Vos no cargás nada ahí: **se llena solo** con cada movimiento. Si compartís la zona, ves también lo que hizo tu colega, con su nombre al lado.
+
+### Pasar a una persona a tu pipeline de Tracking
+
+En "personas", cada propietario con teléfono tiene un botón para **pasarlo a tu pipeline**. Elegís si es **vendedor** o **locador** y listo: se crea la actividad en Tracking, cruzada con la dirección y la zona.
+
+- **Nunca pasa solo.** El que te dijo "dejá la carta, gracias" no es una prospección. Lo decidís vos, apretando.
+- **Una persona, una sola actividad.** Si ya está, te lo dice en vez de crear otra. Y si la zona es compartida y la pasó tu colega, te avisa que **ya está en el pipeline del equipo** — aunque no la veas en el tuyo.
+
+**En una zona archivada el tablero se ve y no se toca:** las tarjetas se leen, el historial se abre, pero no hay "Mover a…" ni se arrastra nada.
 
 **Si una dirección queda fuera de tu zona** —porque la cargaste del otro lado de la línea, o porque moviste el trazo— la tarjeta te lo dice y **la podés seguir trabajando igual**. No se borra nada.
 
@@ -1041,7 +1084,6 @@ La tercera solapa: **lo que caminaste vos**. Acá va lo que el portal no tiene �
 - Las **tarjetas** se leen enteras, como siempre.
 - **"ver personas"** sigue funcionando: abrís la puerta y ahí están tus propietarios con su piso, su unidad, el vínculo, las notas y **el teléfono para llamar de un toque**. Lo que no aparece es el formulario para sumar a alguien, ni el lápiz, ni el tacho.
 - Los botones de **agregar dirección, editar y borrar** quedan apagados.
+- El **tablero** también se ve, y el **historial** de cada puerta se abre. Lo que no está es el "Mover a…": una zona archivada no se trabaja.
 
 Si querés volver a trabajar esas calles, dibujá la zona de nuevo desde "Mis zonas"; las tarjetas viejas se quedan donde están, en la zona archivada.
-
-> 🔜 El tablero con las 6 columnas —donde vas moviendo cada dirección según avanzás, y que se anota solo quién hizo qué y cuándo—, los indicadores del método y el botón para pasar un propietario a tu pipeline de Tracking llegan en la próxima etapa.

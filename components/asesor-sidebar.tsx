@@ -19,9 +19,11 @@ interface AsesorSidebarProps {
   userName?: string
   userRole?: string
   onSelect?: () => void
+  /** Si a este asesor el director lo eligió para recibir los leads del chat de la web. */
+  verChatWeb?: boolean
 }
 
-export function AsesorSidebar({ className, agencyName, agencyId, userName, userRole, onSelect }: AsesorSidebarProps) {
+export function AsesorSidebar({ className, agencyName, agencyId, userName, userRole, onSelect, verChatWeb }: AsesorSidebarProps) {
   return (
     <div className={cn("flex flex-col h-full border-r bg-card", className)}>
       <div className="relative p-6 pb-2">
@@ -47,7 +49,7 @@ export function AsesorSidebar({ className, agencyName, agencyId, userName, userR
       </div>
 
       <ScrollArea className="flex-1 px-4">
-        <SidebarNav rol="asesor" agencyId={agencyId} onSelect={onSelect} />
+        <SidebarNav rol="asesor" agencyId={agencyId} onSelect={onSelect} verChatWeb={verChatWeb} />
       </ScrollArea>
 
       <div className="p-4 border-t space-y-1">

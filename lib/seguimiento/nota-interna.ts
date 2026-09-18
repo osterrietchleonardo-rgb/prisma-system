@@ -329,6 +329,14 @@ export async function procesarNotaDelCaso(
     nombreBot?: string
     ahoraMs: number
     fetchFn?: typeof fetch
+    /**
+     * Se avisa JUSTO ANTES de llamar a la IA, y solo entonces. La barrida tiene un presupuesto
+     * de pensadas por corrida (MAX_LLAMADAS_IA) y hasta el 17/9 lo descontaba por cada caso que
+     * tuviera nota, aunque la nota ya estuviera evaluada y acá no se llamara a nadie. Con 140
+     * casos esperando, el presupuesto se agotaba en el caso 27 y las notas de los demás no se
+     * leían nunca (queja de Carolina Grossi, 16/9).
+     */
+    alLlamarIA?: () => void
     llamar?: LlamarVeredicto
     enviar?: typeof enviarAviso
   }
@@ -360,6 +368,7 @@ export async function procesarNotaDelCaso(
 
   let veredicto: VeredictoNota
   try {
+    opts.alLlamarIA?.()
     veredicto = await (opts.llamar ?? crearLlamadaVeredicto())(
       semillaVeredicto({ nota, mensajes, ...registro, propiedadInteres, ahoraISO })
     )

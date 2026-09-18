@@ -17,6 +17,7 @@ const DIRECTOR = [
   { name: "Dashboard",              href: "/director/dashboard" },
   { name: "Calendario",             href: "/director/calendario" },
   { name: "Asesor IA WhatsApp",     href: "/director/asesor-ia-whatsapp" },
+  { name: "Asesor IA Web",          href: "/director/chat-web" },
   { name: "Pipeline",               href: "/director/pipeline" },
   { name: "Leads Tokko",            href: "/director/leads" },
   { name: "Leads WhatsApp",         href: "/director/leads-whatsapp" },
@@ -92,8 +93,8 @@ describe("las páginas del menú, por nombre y dirección", () => {
     expect(ahora).toEqual(esperados.map(clave).sort())
   })
 
-  it("director: 31 renglones; asesor: 25", () => {
-    expect(planos("director")).toHaveLength(31)
+  it("director: 32 renglones; asesor: 25", () => {
+    expect(planos("director")).toHaveLength(32)
     expect(planos("asesor")).toHaveLength(25)
   })
 
@@ -228,5 +229,23 @@ describe("grupoActivo", () => {
   it("el pie y las rutas desconocidas no tienen grupo", () => {
     expect(grupoActivo("director", "/director/configuracion")).toBeNull()
     expect(grupoActivo("director", "/director/algo-que-no-existe")).toBeNull()
+  })
+})
+
+describe("la bandeja del chat web: quién la ve en el menú (Leonardo, 17/9)", () => {
+  const nombres = (rol: "director" | "asesor", opciones = {}) =>
+    menuPara(rol, opciones).flatMap((g) => g.items.map((i) => i.name))
+
+  it("el director la ve siempre", () => {
+    expect(nombres("director")).toContain("Asesor IA Web")
+  })
+
+  it("un asesor cualquiera NO la ve: adentro hay teléfonos de gente que no es cliente", () => {
+    expect(nombres("asesor")).not.toContain("Asesor IA Web")
+    expect(nombres("asesor", { verChatWeb: false })).not.toContain("Asesor IA Web")
+  })
+
+  it("el asesor que el director eligió, sí", () => {
+    expect(nombres("asesor", { verChatWeb: true })).toContain("Asesor IA Web")
   })
 })

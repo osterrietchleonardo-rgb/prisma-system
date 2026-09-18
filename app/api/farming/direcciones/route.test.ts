@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { baseFalsa } from "@/lib/farming/base-falsa"
+import { calcularIndicadores, type FilaIndicadores } from "@/lib/farming/tablero"
 
 /**
  * La compuerta de la tarjeta de la caminata: lista y alta de `farming_direcciones`.
@@ -59,6 +60,7 @@ function nuevaBase(extra: Record<string, any[]> = {}) {
     farming_zonas_compartidas: [],
     farming_direcciones: [],
     farming_avisos_marca: [],
+    farming_contactos: [],
     ...extra,
   })
 }
@@ -130,6 +132,149 @@ describe("GET /api/farming/direcciones", () => {
     expect(r.status).toBe(200)
     expect(d.direcciones.map((x: any) => x.id)).toEqual(["d-vieja"])
     expect(d.zona.estado).toBe("archivada")
+  })
+})
+
+/**
+ * Los nueve indicadores del punto 8 del PDF, viajando con la lista: «el tablero ES el
+ * reporte». `calcularIndicadores` (lib/farming/tablero.ts) ya está probado en aislamiento
+ * (tablero.test.ts); lo que este bloque prueba es el CABLEADO: que el GET arme el
+ * `FilaIndicadores[]` correcto a partir de la fila de `farming_direcciones` y de UNA sola
+ * consulta a `farming_contactos` filtrada por las direcciones de la zona pedida — nunca la
+ * agencia entera, nunca una consulta por tarjeta.
+ */
+describe("GET /api/farming/direcciones — indicadores", () => {
+  const Z_OTRA = "10000000-0000-0000-0000-000000000006"
+  const D1 = "20000000-0000-0000-0000-000000000010"
+  const D2 = "20000000-0000-0000-0000-000000000011"
+  const D_OTRA_ZONA = "20000000-0000-0000-0000-000000000012"
+
+  const direccionIndicadorFixture = (id: string, zonaId: string, extra: any) => ({
+    id, zona_id: zonaId, agency_id: AGENCIA, creada_por: YO,
+    calle: "Conde", altura: "950", tipo: "edificio", orden: 0, created_at: "2026-09-16T10:00:00.000Z",
+    ...extra,
+  })
+
+  const contactoFixture = (id: string, direccionId: string, extra: any = {}) => ({
+    id, direccion_id: direccionId, agency_id: AGENCIA, user_id: YO,
+    fecha: "2026-09-16", cartas_entregadas: null, etapa_desde: "relevado", nota: null,
+    created_at: "2026-09-16T10:00:00.000Z",
+    ...extra,
+  })
+
+  // Las MISMAS dos tarjetas (y los mismos cuatro contactos) que las dos primeras filas del
+  // fixture de `describe("calcularIndicadores", ...)` en tablero.test.ts. El "esperado" no se
+  // hardcodea a mano: sale de llamarle a la MISMA función pura con el MISMO `FilaIndicadores[]`
+  // — así, si alguna vez esos números cambian ahí, este test cambia solo y no queda desviado.
+  const filaD1: FilaIndicadores = {
+    tramo: "Conde 900-1000", etapa: "captada", unidades_totales: 32, encargado_nombre: "Roberto",
+    contactos: [{ tipo: "visita_encargado", etapa_hasta: "presentado" }, { tipo: "tasacion", etapa_hasta: "tasacion" }],
+  }
+  const filaD2: FilaIndicadores = {
+    tramo: "Conde 900-1000", etapa: "respondio", unidades_totales: 8, encargado_nombre: null,
+    contactos: [{ tipo: "carta_1", etapa_hasta: "presentado" }, { tipo: "llamada", etapa_hasta: "respondio" }],
+  }
+
+  const conDosTarjetas = () => {
+    nuevaBase({
+      farming_zonas: [...zonasFixture(), { id: Z_OTRA, agency_id: AGENCIA, owner_user_id: YO, nombre: "Otra", geojson: cuadrado, estado: "activa" }],
+      farming_direcciones: [
+        direccionIndicadorFixture(D1, Z_MIA, { etapa: filaD1.etapa, tramo: filaD1.tramo, unidades_totales: filaD1.unidades_totales, encargado_nombre: filaD1.encargado_nombre }),
+        direccionIndicadorFixture(D2, Z_MIA, { etapa: filaD2.etapa, tramo: filaD2.tramo, unidades_totales: filaD2.unidades_totales, encargado_nombre: filaD2.encargado_nombre }),
+      ],
+      farming_contactos: [
+        contactoFixture("c1", D1, { tipo: filaD1.contactos[0].tipo, etapa_hasta: filaD1.contactos[0].etapa_hasta }),
+        contactoFixture("c2", D1, { tipo: filaD1.contactos[1].tipo, etapa_hasta: filaD1.contactos[1].etapa_hasta }),
+        contactoFixture("c3", D2, { tipo: filaD2.contactos[0].tipo, etapa_hasta: filaD2.contactos[0].etapa_hasta }),
+        contactoFixture("c4", D2, { tipo: filaD2.contactos[1].tipo, etapa_hasta: filaD2.contactos[1].etapa_hasta }),
+      ],
+    })
+  }
+
+  it("dos tarjetas y cuatro contactos dan los mismos números que calcularIndicadores en tablero.test.ts", async () => {
+    conDosTarjetas()
+    const esperado = calcularIndicadores([filaD1, filaD2])
+    const r = await pedirGET(`zona_id=${Z_MIA}`)
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.indicadores).toEqual(esperado)
+    // Ancla de lectura, no de fe: si alguien cambia la lógica de tablero.ts sin querer, al
+    // menos este número conocido (propiedades=2, contactos=4) hace ruido acá también.
+    expect(d.indicadores.propiedades).toBe(2)
+    expect(d.indicadores.contactos).toBe(4)
+  })
+
+  it("una zona sin tarjetas: los indicadores dan todo en cero, no explota", async () => {
+    nuevaBase({ farming_direcciones: [], farming_contactos: [] })
+    const r = await pedirGET(`zona_id=${Z_MIA}`)
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.indicadores).toEqual(calcularIndicadores([]))
+  })
+
+  // SON DE LA ZONA PEDIDA, NO DE LA AGENCIA. Una tarjeta con su propio historial en OTRA zona
+  // mía (Z_OTRA) no puede colarse en los indicadores de Z_MIA.
+  it("los indicadores son de la zona pedida: el ruido de otra zona mía no se cuenta", async () => {
+    conDosTarjetas()
+    base.tablas.farming_direcciones.push(direccionIndicadorFixture(D_OTRA_ZONA, Z_OTRA, { etapa: "captada", tramo: "Otro tramo", unidades_totales: 999, encargado_nombre: null }))
+    base.tablas.farming_contactos.push(contactoFixture("c-ruido", D_OTRA_ZONA, { tipo: "tasacion", etapa_hasta: "tasacion" }))
+
+    const esperado = calcularIndicadores([filaD1, filaD2])
+    const r = await pedirGET(`zona_id=${Z_MIA}`)
+    const d = await r.json()
+    expect(r.status).toBe(200)
+    expect(d.indicadores).toEqual(esperado)
+    expect(d.indicadores.propiedades).toBe(2) // no 3: D_OTRA_ZONA no es de Z_MIA
+  })
+
+  // LA MISMA REGLA, pero mirando el FILTRO en vez del resultado: el join en JS por
+  // `direccion_id` ya descarta el ruido de otra zona aunque la consulta trajera TODA la
+  // agencia — así que el test de arriba, solo, no agarraría un `.in("direccion_id", ...)`
+  // borrado por error. Este mira el `.in()` de la consulta a farming_contactos directamente:
+  // tiene que pedirse SOLO con los ids de las direcciones de Z_MIA, nunca con los de otra zona
+  // ni sin filtro.
+  it("la consulta a farming_contactos se filtra por los ids de ESTA zona, no trae la agencia entera", async () => {
+    conDosTarjetas()
+    base.tablas.farming_direcciones.push(direccionIndicadorFixture(D_OTRA_ZONA, Z_OTRA, { etapa: "captada", tramo: "Otro tramo", unidades_totales: 999, encargado_nombre: null }))
+    base.tablas.farming_contactos.push(contactoFixture("c-ruido", D_OTRA_ZONA, { tipo: "tasacion", etapa_hasta: "tasacion" }))
+
+    let idsFiltrados: string[] | null = null
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => {
+      const q = fromOriginal(tabla)
+      if (tabla === "farming_contactos") {
+        const inOriginal = q.in
+        q.in = (c: string, vs: any[]) => {
+          if (c === "direccion_id") idsFiltrados = vs
+          return inOriginal(c, vs)
+        }
+      }
+      return q
+    }) as typeof base.from
+
+    const r = await pedirGET(`zona_id=${Z_MIA}`)
+    expect(r.status).toBe(200)
+    expect(idsFiltrados).not.toBeNull()
+    expect(idsFiltrados).toEqual(expect.arrayContaining([D1, D2]))
+    expect(idsFiltrados).not.toContain(D_OTRA_ZONA)
+    expect((idsFiltrados as unknown as string[]).length).toBe(2)
+  })
+
+  // NO NUEVE CONSULTAS, NO UNA POR TARJETA. Con dos tarjetas en la zona, `farming_contactos`
+  // se tiene que pedir UNA sola vez, filtrado por las direcciones de esa zona — nunca un
+  // `.eq` o `.select` repetido tarjeta por tarjeta.
+  it("una sola consulta a farming_contactos, sin importar cuántas tarjetas tenga la zona", async () => {
+    conDosTarjetas()
+    let llamadas = 0
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => {
+      if (tabla === "farming_contactos") llamadas++
+      return fromOriginal(tabla)
+    }) as typeof base.from
+
+    const r = await pedirGET(`zona_id=${Z_MIA}`)
+    expect(r.status).toBe(200)
+    expect(llamadas).toBe(1)
   })
 })
 
