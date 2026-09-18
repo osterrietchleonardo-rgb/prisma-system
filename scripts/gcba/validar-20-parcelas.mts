@@ -28,66 +28,89 @@ const ORACULO_2021: Record<string, { cuerpo: number; basamento?: number }> = {
 };
 
 const gcba = crearClienteGcba();
-const filas: string[] = []; const notas: string[] = []; let fallas = 0;
+const filas: string[] = []; const notas: string[] = []; let fallas = 0; let sinDato = 0;
 
+// Ruling 22-sep-2026 (fix round 2): una corrida incompleta no es evidencia: se vuelve a correr.
+// Un GcbaNoResponde (o cualquier error) a mitad de la lista NO puede abortar el script entero
+// sin escribir la evidencia: se registra la parcela como SIN DATO y se sigue con las demás.
 for (const smp of PARCELAS) {
-  const lote = await gcba.geometriaLote(smp);
-  if (!lote) { filas.push(`| ${smp} | — | sin lote en catastro | — | — | — | — | — | — | — |`); console.log(filas.at(-1)); continue; }
-
-  const origen = anillosDe(lote)[0][0] as [number, number];
-  const loteM2 = medirM2(lote, origen);
-  const vol = await gcba.volumenes(smp, bboxDe(lote));
-  const e = calcularEdificabilidadOficial(vol, lote);
-  const html = await fetch(`https://www.todoprops.com/terrenos/caba/parcela/${smp.toLowerCase()}`, { headers: { "User-Agent": "Mozilla/5.0" } }).then((r) => r.ok ? r.text() : "").catch(() => "");
-  const tpM2 = Number((html.match(/edificable por planta[^0-9]*([\d.]+)\s*m²/i)?.[1] || "").replace(/\./g, "")) || null;
-
-  if (!e) {
-    filas.push(`| ${smp} | sin envolvente | — | — | — | — | ${tpM2 ?? "—"} | — | ${loteM2.toFixed(0)} | OK |`);
-    console.log(filas.at(-1));
-    continue;
-  }
-
-  const oraculo = ORACULO_2021[smp];
-  if (e.unidades.length > 1) notas.push(`${smp}: TodoProps publica un solo número (${tpM2 ?? "—"} m²) que no corresponde a ninguna de las unidades (${e.unidades.join(", ")}).`);
-
-  for (const unidad of e.unidades) {
-    const cuerpo = e.plantas.find((p) => p.unidad === unidad && !p.nombre.startsWith("Basamento") && !p.nombre.includes("retirado"));
-    const basamento = e.plantas.find((p) => p.unidad === unidad && p.nombre.startsWith("Basamento"));
-    if (!cuerpo) continue;
-
-    // (a) consistencia: 0 < m² cuerpo <= superficie del lote (epok) + 1
-    const consistente = cuerpo.m2PorNivel > 0 && cuerpo.m2PorNivel <= loteM2 + 1;
-
-    // (b) oráculo oficial 2021, donde hay dato medido para este SMP
-    let oficialOk = true; let oficialTxt = "—"; let difOficialTxt = "—";
-    if (oraculo) {
-      const difCuerpo = (cuerpo.m2PorNivel - oraculo.cuerpo) / oraculo.cuerpo;
-      let okCuerpo = Math.abs(difCuerpo) <= TOLERANCIA;
-      let okBasamento = true; let difBasTxt = "";
-      if (oraculo.basamento !== undefined) {
-        const difBas = basamento ? (basamento.m2PorNivel - oraculo.basamento) / oraculo.basamento : null;
-        okBasamento = difBas !== null && Math.abs(difBas) <= TOLERANCIA;
-        difBasTxt = ` / ${difBas === null ? "sin basamento" : (difBas * 100).toFixed(1) + " %"}`;
-        oficialTxt = `${oraculo.cuerpo.toFixed(1)} / ${oraculo.basamento.toFixed(1)}`;
-      } else {
-        oficialTxt = oraculo.cuerpo.toFixed(1);
-      }
-      difOficialTxt = `${(difCuerpo * 100).toFixed(1)} %${difBasTxt}`;
-      oficialOk = okCuerpo && okBasamento;
+  try {
+    const lote = await gcba.geometriaLote(smp);
+    if (!lote) {
+      filas.push(`| ${smp} | SIN DATO | — | — | — | — | — | — | — | SIN DATO: sin lote en catastro |`);
+      console.log(filas.at(-1));
+      sinDato++;
+      continue;
     }
 
-    if (!consistente || !oficialOk) fallas++;
-    const resultado = consistente && oficialOk ? "OK" : "FALLA";
+    const origen = anillosDe(lote)[0][0] as [number, number];
+    const loteM2 = medirM2(lote, origen);
+    const vol = await gcba.volumenes(smp, bboxDe(lote));
+    const e = calcularEdificabilidadOficial(vol, lote);
+    const html = await fetch(`https://www.todoprops.com/terrenos/caba/parcela/${smp.toLowerCase()}`, { headers: { "User-Agent": "Mozilla/5.0" } }).then((r) => r.ok ? r.text() : "").catch(() => "");
+    const tpM2 = Number((html.match(/edificable por planta[^0-9]*([\d.]+)\s*m²/i)?.[1] || "").replace(/\./g, "")) || null;
 
-    const dif = tpM2 ? (cuerpo.m2PorNivel - tpM2) / tpM2 : null;
-    filas.push(`| ${smp} | ${unidad} | ${cuerpo.m2PorNivel.toFixed(1)} | ${basamento ? basamento.m2PorNivel.toFixed(1) : "—"} | ${oficialTxt} | ${difOficialTxt} | ${tpM2 ?? "—"} | ${dif === null ? "—" : (dif * 100).toFixed(1) + " %"} | ${loteM2.toFixed(0)} | ${resultado} |`);
+    if (!e) {
+      filas.push(`| ${smp} | sin envolvente | — | — | — | — | ${tpM2 ?? "—"} | — | ${loteM2.toFixed(0)} | OK |`);
+      console.log(filas.at(-1));
+      continue;
+    }
+
+    const oraculo = ORACULO_2021[smp];
+    if (e.unidades.length > 1) notas.push(`${smp}: TodoProps publica un solo número (${tpM2 ?? "—"} m²) que no corresponde a ninguna de las unidades (${e.unidades.join(", ")}).`);
+
+    for (const unidad of e.unidades) {
+      const cuerpo = e.plantas.find((p) => p.unidad === unidad && !p.nombre.startsWith("Basamento") && !p.nombre.includes("retirado"));
+      const basamento = e.plantas.find((p) => p.unidad === unidad && p.nombre.startsWith("Basamento"));
+      if (!cuerpo) {
+        filas.push(`| ${smp} | ${unidad} | — | — | — | — | ${tpM2 ?? "—"} | — | ${loteM2.toFixed(0)} | SIN DATO: sin cuerpo principal en la envolvente |`);
+        console.log(filas.at(-1));
+        sinDato++;
+        continue;
+      }
+
+      // (a) consistencia: 0 < m² cuerpo <= superficie del lote (epok) + 1
+      const consistente = cuerpo.m2PorNivel > 0 && cuerpo.m2PorNivel <= loteM2 + 1;
+
+      // (b) oráculo oficial 2021, donde hay dato medido para este SMP
+      let oficialOk = true; let oficialTxt = "—"; let difOficialTxt = "—";
+      if (oraculo) {
+        const difCuerpo = (cuerpo.m2PorNivel - oraculo.cuerpo) / oraculo.cuerpo;
+        let okCuerpo = Math.abs(difCuerpo) <= TOLERANCIA;
+        let okBasamento = true; let difBasTxt = "";
+        if (oraculo.basamento !== undefined) {
+          const difBas = basamento ? (basamento.m2PorNivel - oraculo.basamento) / oraculo.basamento : null;
+          okBasamento = difBas !== null && Math.abs(difBas) <= TOLERANCIA;
+          difBasTxt = ` / ${difBas === null ? "sin basamento" : (difBas * 100).toFixed(1) + " %"}`;
+          oficialTxt = `${oraculo.cuerpo.toFixed(1)} / ${oraculo.basamento.toFixed(1)}`;
+        } else {
+          oficialTxt = oraculo.cuerpo.toFixed(1);
+        }
+        difOficialTxt = `${(difCuerpo * 100).toFixed(1)} %${difBasTxt}`;
+        oficialOk = okCuerpo && okBasamento;
+      }
+
+      if (!consistente || !oficialOk) fallas++;
+      const resultado = consistente && oficialOk ? "OK" : "FALLA";
+
+      const dif = tpM2 ? (cuerpo.m2PorNivel - tpM2) / tpM2 : null;
+      filas.push(`| ${smp} | ${unidad} | ${cuerpo.m2PorNivel.toFixed(1)} | ${basamento ? basamento.m2PorNivel.toFixed(1) : "—"} | ${oficialTxt} | ${difOficialTxt} | ${tpM2 ?? "—"} | ${dif === null ? "—" : (dif * 100).toFixed(1) + " %"} | ${loteM2.toFixed(0)} | ${resultado} |`);
+      console.log(filas.at(-1));
+      if (!consistente) console.log(`  ! consistencia: ${cuerpo.m2PorNivel.toFixed(1)} m² de cuerpo no está en (0, ${(loteM2 + 1).toFixed(1)}] (lote)`);
+      if (oraculo && !oficialOk) console.log(`  ! oráculo 2021 (${FUENTE_ORACULO}): fuera de ±5 %`);
+    }
+  } catch (err) {
+    const mensaje = err instanceof Error ? err.message : String(err);
+    filas.push(`| ${smp} | SIN DATO | — | — | — | — | — | — | — | SIN DATO: ${mensaje} |`);
     console.log(filas.at(-1));
-    if (!consistente) console.log(`  ! consistencia: ${cuerpo.m2PorNivel.toFixed(1)} m² de cuerpo no está en (0, ${(loteM2 + 1).toFixed(1)}] (lote)`);
-    if (oraculo && !oficialOk) console.log(`  ! oráculo 2021 (${FUENTE_ORACULO}): fuera de ±5 %`);
+    sinDato++;
   }
 }
 const fecha = new Date().toISOString().slice(0, 10);
 const dir = path.join(RAIZ, "docs/superpowers/specs/evidencia/prefactibilidad"); fs.mkdirSync(dir, { recursive: true });
-fs.writeFileSync(path.join(dir, `${fecha}-validacion-20-parcelas.md`), `# Validación de la envolvente oficial contra la capa oficial GCBA 2021 — ${fecha}\n\nOráculo: ${FUENTE_ORACULO}. Dos controles duros deciden el resultado: (a) consistencia — 0 < m² cuerpo ≤ superficie del lote (epok) + 1; (b) ±5 % contra ORACULO_2021, donde hay dato medido (cuerpo, y basamento para CA/CM). TodoProps queda como columna informativa, sin peso en el veredicto.\n\n| SMP | Unidad | m²/planta PRISMA | Basamento PRISMA | Oficial 2021 | Dif. oficial | m²/planta TodoProps | Dif. TodoProps | Lote m² | Resultado |\n|---|---|---|---|---|---|---|---|---|---|\n${filas.join("\n")}\n\n${notas.length ? notas.map((n) => `- ${n}`).join("\n") + "\n\n" : ""}Nota: TodoProps coincide con la capa oficial en lotes cortos; en lotes profundos da más m² y en corredores publica el basamento. No es oráculo.\n\nFallas: ${fallas}.\n`);
-console.log(fallas ? `\nX ${fallas} parcelas fuera de tolerancia (consistencia u oráculo 2021). NO habilitar el menú.` : "\nOK: las 20 dentro de tolerancia.");
-process.exit(fallas ? 1 : 0);
+fs.writeFileSync(path.join(dir, `${fecha}-validacion-20-parcelas.md`), `# Validación de la envolvente oficial contra la capa oficial GCBA 2021 — ${fecha}\n\nOráculo: ${FUENTE_ORACULO}. Dos controles duros deciden el resultado: (a) consistencia — 0 < m² cuerpo ≤ superficie del lote (epok) + 1; (b) ±5 % contra ORACULO_2021, donde hay dato medido (cuerpo, y basamento para CA/CM). TodoProps queda como columna informativa, sin peso en el veredicto. Una parcela SIN DATO (error de red o sin cuerpo principal) cuenta como corrida incompleta: no es evidencia, se vuelve a correr.\n\n| SMP | Unidad | m²/planta PRISMA | Basamento PRISMA | Oficial 2021 | Dif. oficial | m²/planta TodoProps | Dif. TodoProps | Lote m² | Resultado |\n|---|---|---|---|---|---|---|---|---|---|\n${filas.join("\n")}\n\n${notas.length ? notas.map((n) => `- ${n}`).join("\n") + "\n\n" : ""}Nota: TodoProps coincide con la capa oficial en lotes cortos; en lotes profundos da más m² y en corredores publica el basamento. No es oráculo.\n\nFallas: ${fallas} · Sin dato: ${sinDato}.\n`);
+console.log(`\nFallas: ${fallas} · Sin dato: ${sinDato}`);
+console.log(fallas || sinDato
+  ? `X ${fallas} parcelas fuera de tolerancia, ${sinDato} sin dato. NO habilitar el menú (una corrida incompleta no es evidencia: se vuelve a correr).`
+  : "OK: las 20 dentro de tolerancia.");
+process.exit(fallas || sinDato ? 1 : 0);

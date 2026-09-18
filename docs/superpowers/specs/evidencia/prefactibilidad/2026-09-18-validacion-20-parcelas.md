@@ -1,6 +1,6 @@
 # Validación de la envolvente oficial contra la capa oficial GCBA 2021 — 2026-09-18
 
-Oráculo: superficie_edificable.geojson (GCBA, 2021-05-10), medido por el controlador el 18-sep-2026. Dos controles duros deciden el resultado: (a) consistencia — 0 < m² cuerpo ≤ superficie del lote (epok) + 1; (b) ±5 % contra ORACULO_2021, donde hay dato medido (cuerpo, y basamento para CA/CM). TodoProps queda como columna informativa, sin peso en el veredicto.
+Oráculo: superficie_edificable.geojson (GCBA, 2021-05-10), medido por el controlador el 18-sep-2026. Dos controles duros deciden el resultado: (a) consistencia — 0 < m² cuerpo ≤ superficie del lote (epok) + 1; (b) ±5 % contra ORACULO_2021, donde hay dato medido (cuerpo, y basamento para CA/CM). TodoProps queda como columna informativa, sin peso en el veredicto. Una parcela SIN DATO (error de red o sin cuerpo principal) cuenta como corrida incompleta: no es evidencia, se vuelve a correr.
 
 | SMP | Unidad | m²/planta PRISMA | Basamento PRISMA | Oficial 2021 | Dif. oficial | m²/planta TodoProps | Dif. TodoProps | Lote m² | Resultado |
 |---|---|---|---|---|---|---|---|---|---|
@@ -30,4 +30,4 @@ Oráculo: superficie_edificable.geojson (GCBA, 2021-05-10), medido por el contro
 
 Nota: TodoProps coincide con la capa oficial en lotes cortos; en lotes profundos da más m² y en corredores publica el basamento. No es oráculo.
 
-Fallas: 0.
+Fallas: 0 · Sin dato: 0.
