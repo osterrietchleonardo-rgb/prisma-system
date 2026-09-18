@@ -16,7 +16,13 @@ export default defineConfig({
      * Los tests de endpoint se escriben con el cliente de base falso: no tocan
      * red ni Supabase.
      */
-    include: ["lib/**/*.test.ts", "app/api/**/*.test.ts"],
+    /**
+     * `mercado-sync/**` entra por la misma razón que `app/api/**`: ahí vive el
+     * plan de gasto de Apify (qué zonas se refrescan cada mes, cuántos días pide
+     * el descubrimiento, cuándo se frena por presupuesto). Es plata real por mes,
+     * y hasta ahora no lo miraba ningún test.
+     */
+    include: ["lib/**/*.test.ts", "app/api/**/*.test.ts", "mercado-sync/**/*.test.mjs"],
     // Los tests del mapa están escritos para node:test, no para vitest, y los corre
     // el segundo tramo del script `test` (`node --test "lib/mapa/**/*.test.ts"`).
     // Sin esta exclusión vitest los barre igual y falla con "No test suite found".

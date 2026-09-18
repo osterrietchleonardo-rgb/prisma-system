@@ -565,7 +565,7 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 **Cómo usarlo paso a paso:**
 1. **Elegí la propiedad a analizar** de una de estas 3 formas:
-   - **Cargar a mano:** completás el formulario (tipo, zona, m², ambientes, baños, amenities…).
+   - **Cargar a mano:** completás el formulario (tipo, zona, m², ambientes, baños, amenities…). Entre las amenities está **Laundry**: es el laundry **del edificio**, no el lavadero del departamento.
    - **Desde la cartera:** abrís el selector y **escribís para buscar** (por título, dirección o zona) entre las propiedades de tu agencia; elegís una y se completa sola. Tener buscador ayuda cuando son muchas propiedades.
    - **Desde un link:** pegás el link de un aviso (MercadoLibre, ZonaProp, Argenprop…) y apretás **Analizar**: trae los datos automáticamente. Si el portal bloquea la lectura o tarda demasiado, te avisa con un mensaje claro y completás a mano.
 
@@ -573,7 +573,14 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 > 📸 **Fotos de la propiedad (opcional).** Antes de buscar comparables podés adjuntar **hasta 4 fotos** de la propiedad y, si querés, decirle a la IA en qué fijarse (por ejemplo "estado de la cocina y del jardín"). Al tocar **"Analizar fotos con IA"**, Gemini te devuelve una **descripción escrita a partir de lo que ve** — no inventa nada ni oculta lo que está deteriorado, pero lo dice sin castigar la propiedad (por ejemplo, "cocina original, con posibilidad de actualización"). Esa descripción **es tuya**: la podés editar o reescribir del todo antes de seguir, y una casilla te deja elegir si va a la ficha del cliente o se queda solo para afinar la búsqueda. **El análisis se hace una sola vez** (no hay botón para repetirlo): una vez que la IA escribió la descripción, las fotos quedan fijas y el botón de analizar desaparece. Si querés rehacerlo con otras fotos, cambiá de forma de carga (manual / cartera / link) — eso limpia el formulario y arranca de cero. Ojo: si el análisis **falla** (se cayó internet o la IA no respondió), eso no cuenta como analizado y podés reintentar sin perder nada. Las fotos **no se guardan en ningún lado**: se usan para el análisis y se descartan. Tener esta descripción también **ayuda a encontrar mejores comparables**, porque el sistema empieza a comparar también por lo que se ve en las fotos, no solo por m²/ambientes/zona. Si elegiste la propiedad **desde la cartera**, no hace falta que busques las fotos en tu dispositivo: te aparece una **grilla con las fotos que esa propiedad ya tiene cargadas** y tildás hasta 4 con un toque (podés combinarlas con fotos subidas a mano; el tope de 4 es entre las dos). En carga a mano o por link, seguís subiendo las fotos vos, como antes. Después de analizar, también ves **cómo calificó la IA el estado de conservación y la luminosidad de tu propiedad** — corregilo con un toque si no estás de acuerdo; esa corrección es la base contra la que se comparan después las fotos de cada comparable (ver más abajo).
 2. Elegí la **operación** (Venta / Alquiler) y apretá **Buscar comparables**.
-3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**.
+3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**. Cada tarjeta muestra también la **antigüedad** (cuando el aviso la informa) y abajo tiene dos botones: **"Ver publicación"**, que abre el aviso original en otra pestaña, y **"Ver checklist"**.
+
+> 🔗 **¿Tenés un aviso que querés usar y no apareció?** Arriba de los resultados hay un cuadro para **pegar el link** de un aviso de **Zonaprop, Argenprop o MercadoLibre**. Tocás **"Sumar"** y el aviso entra en un bloque nuevo, **"Sumados por link"**, con sus datos, sus fotos, su antigüedad y su **% de comparabilidad** calculado igual que el resto. Lo podés elegir para la ficha del cliente como cualquier otro comparable, y queda **guardado en ese ACM** (lo ves al reabrirlo desde Mis ACM). Si te equivocaste, lo sacás con el **tacho** de la tarjeta.
+> - Si el aviso **ya estaba en la lista**, no lo repite: te avisa en qué bloque está y con qué %.
+> - Algunos portales tardan en dejarse leer: puede demorar **hasta 40 segundos**. Si no deja ver los datos, te avisa y no suma nada.
+> - Si el portal no deja leer el precio, la superficie o las fotos, igual lo suma y **te dice qué le faltó**.
+> - Si el aviso es de **otro barrio**, el % lo refleja (baja). Que lo hayas elegido vos no lo convierte en un comparable del mismo barrio.
+> 💰 Sumar un aviso por link **no consume créditos**.
 
 > 💡 El **tipo** y la **operación** son filtros estrictos. El **barrio, por defecto, se compara solo contra el mismo barrio y sus sub-barrios** (si tu propiedad es de Belgrano, un Belgrano R o un Belgrano Chico entran normalmente). Los **barrios limítrofes** (Núñez, Colegiales, Saavedra si tu propiedad es de Belgrano) **no entran salvo que vos lo pidas**: hay una casilla **"Incluir barrios linderos"** arriba del botón de buscar. Es así a propósito — un comparable de otro barrio puede tener el precio correcto, pero si tu cliente lo ve en su propia tasación, deja de confiar en el informe aunque el número esté bien. Si tildás la casilla, esos comparables **sí aparecen, marcados con un chip "lindero"** para que sepas cuáles son y decidas si los mostrás. No le molestan los acentos (Nuñez = Núñez).
 
@@ -598,6 +605,7 @@ Arriba de todo tenés dos solapas: **Nuevo ACM** y **Mis ACM**.
 
 - **Tocá cualquier fila** y volvés a la **misma pantalla de resultados**, tal como quedó ese día.
 - Si de ese ACM armaste una **ficha para el cliente**, la fila te muestra el botón **"Ficha"** para abrir el link directo.
+- Los avisos que **sumaste pegando el link** también quedan guardados ahí.
 - Si armás **otra ficha** desde el mismo ACM (por ejemplo con otros comparables), te queda **una fila por cada ficha**, así no perdés ninguna.
 - Podés **borrar** un ACM del historial con el tacho. Ojo: si ya compartiste la ficha con el cliente, **el link sigue funcionando**.
 
@@ -943,13 +951,107 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 
 **Si te faltó una manzana o te pasaste:**
 - **"sumar un pedazo"**: dibujás un trazo más y se suma a la zona (una zona puede tener varios pedazos).
-- **"redibujar"**: el trazo nuevo reemplaza al anterior.
+- **"redibujar"**: el trazo nuevo reemplaza al anterior. **El viejo no queda guardado en ningún lado.** Si ya terminaste con esa zona y vas a trabajar otra, conviene dibujar una zona nueva en vez de reemplazar ésta.
 
 **Compartir la zona:** con **"compartir"** elegís a un colega del desplegable. A él le aparece en su Farming como "zona que comparten conmigo" y la trabajan juntos. Vos seguís siendo el dueño: solo vos podés borrarla o sacar a alguien.
 
-**Borrar:** con **"borrar"**. Ojo: esas cuadras quedan libres para que otro las dibuje.
+**Borrar:** con **"borrar"**. Ojo: **no queda registro de la zona ni de su trazo**, y esas cuadras quedan libres para que otro las dibuje.
 
 **Los topes:** hasta **3 zonas** activas por asesor y **5 km²** por zona (sumando sus pedazos). Farming es para trabajar una zona concreta, no para dispersarse.
 
 > 💡 Si el director **libera** una zona tuya (por ejemplo, porque cambiaste de territorio), desaparece de tu lista y esas cuadras vuelven a estar disponibles. No se pierde nada: queda en el historial.
-> 🔜 Las solapas **"Relevamiento"** (el tablero de direcciones que vas trabajando) y **"A la venta en mi zona"** (los avisos publicados adentro de tu zona) llegan en las próximas etapas.
+
+### "A la venta en mi zona"
+
+Es la segunda solapa de Farming, al lado de "Mis zonas". **No tenés que cargar nada:** te muestra todas las propiedades que hoy están publicadas adentro de tu zona. Si compartís la zona con un colega, los dos ven la misma lista.
+
+**Arriba están los atajos**, que son las cuatro señales que más sirven para captar:
+
+| Atajo | Qué quiere decir |
+|---|---|
+| **Dueño directo** | lo vende el propietario, sin inmobiliaria. Es el que más conviene tocar. |
+| **Se cayó del portal** | lo bajaron sin venderlo: la propiedad sigue disponible y el dueño ya se cansó. |
+| **Lleva +120 días** | hace más de cuatro meses que está publicado y no se mueve. |
+| **Bajó el precio** | el dueño ya aceptó que estaba caro. |
+
+**Un atajo solo aparece si tiene propiedades.** Si no ves "Se cayó del portal", es porque hoy no hay ninguna en tu zona que cumpla eso, no porque esté roto. Tocás un atajo y la lista se achica; lo tocás de nuevo y volvés a ver todas. Abajo del atajo hay un renglón que te recuerda por qué esa señal importa.
+
+**De cada propiedad ves** la foto, el precio, la dirección, los metros, los ambientes y **quién la publica** (acá no se esconde: es tu pantalla de trabajo, no la del cliente). Con **"ver el aviso"** se abre la publicación original en otra pestaña.
+
+**"Descartar"** es para las que ya miraste o no te sirven: desaparecen de la lista y **no vuelven a aparecer**, ni aunque recargues. Si te equivocaste, tenés **"deshacer"** ahí mismo. Ojo: en una zona compartida, lo que descartás vos también desaparece de la lista de tu colega.
+
+**Si movés el trazo, la lista se acomoda sola.** No hay nada guardado: se calcula cada vez que entrás. Si agrandás la zona aparecen las propiedades nuevas, y si sacás una cuadra se van las de esa cuadra.
+
+**Para pasarla a tu relevamiento** está el botón **"crear tarjeta"**, al lado de "descartar". La propiedad se suma a la solapa "Relevamiento" con lo que el aviso ya sabe (dirección, tipo, precio) y desaparece de esta lista. Si te arrepentís, tenés **deshacer** ahí mismo. Y si esa puerta ya estaba en tu tablero, te lo dice en vez de cargarla dos veces.
+
+### "Relevamiento"
+
+La tercera solapa: **lo que caminaste vos**. Acá va lo que el portal no tiene —que es la mayoría—: el edificio de la esquina, la casa con el cartel de dueño, el PH que te comentó el encargado.
+
+**Para cargar una puerta:** "+ agregar dirección". Lo único obligatorio es **la calle y el tipo de propiedad**. Nada más. Todo lo demás lo completás cuando puedas, desde la oficina o al otro día.
+
+- **El buscador de arriba** te encuentra la dirección y le pone la ubicación en el mapa. Si no aparece, **escribila a mano igual**: se guarda lo mismo, sin ubicación.
+- **Las unidades no se cargan a mano.** Ponés 8 pisos y 4 unidades por piso, y el sistema dice **32 unidades**. Si es una casa, ponés 1.
+- **El encargado va con nombre**, no con un sí/no: "Roberto, turno mañana" sirve; "tiene encargado" no sirve para nada.
+- **Podés marcar que está a la venta aunque no esté publicada**: el cartel de dueño en el balcón también es información.
+- Si escribís algo incompleto —los pisos sin las unidades, por ejemplo— **te avisa pero te deja guardar igual**. Estás parado en la vereda, no llenando una planilla.
+
+**Las personas de cada dirección** se cargan desde la tarjeta, en "personas": nombre, piso, unidad, vínculo y teléfono. El teléfono queda como link para llamar de un toque. Un edificio puede tener muchos propietarios conocidos, cada uno con su unidad.
+
+**Arriba de todo, los nueve números del método.** No los cargás en ningún lado: salen solos de lo que fuiste moviendo. Cuadras relevadas, propiedades relevadas, unidades potenciales, contactos realizados, encargados contactados, respuestas recibidas, tasaciones solicitadas, entrevistas y captaciones. Debajo de cada número dice **de dónde sale**, para que nunca tengas que adivinar qué está contando. Un número en cero también es información: "todavía no mandaste ninguna carta" es un dato.
+
+**Dos formas de ver lo mismo: "tablero" y "lista".** Arrancás en el tablero, que es donde se trabaja. Si preferís la lista, la elegís y **el sistema se acuerda** para la próxima vez.
+
+### El tablero: las seis columnas
+
+Cada puerta es una tarjeta y va pasando por las columnas del método: **Relevado → Presentado → En secuencia → Respondió → Tasación → Captada**. Las descartadas quedan plegadas al costado; las abrís tocándolas.
+
+**Para mover una tarjeta** tenés dos caminos, y los dos terminan en el mismo lugar:
+
+- **En la computadora:** la arrastrás de una columna a otra.
+- **En el celular:** el botón **"Mover a…"** de cada tarjeta. Es el camino principal parado en la vereda: seis columnas no se arrastran con el pulgar.
+
+**Siempre se abre el mismo cuadro, y hasta que no lo guardás no se mueve nada.** Si lo cancelás, la tarjeta se queda donde estaba.
+
+En ese cuadro ponés:
+
+| Qué te pide | Para qué |
+|---|---|
+| **A qué columna** | viene elegida según lo que tocaste. La podés cambiar ahí mismo. |
+| **Qué hiciste** | te sugiere lo más probable (si pasás a "Presentado", "Carta 1"). Podés elegir otra cosa de la lista. |
+| **Cuántas cartas dejaste** | solo aparece si lo que hiciste es una carta. |
+| **Cuál es el próximo paso** | qué vas a hacer la próxima vez que vuelvas a esa puerta. |
+| **Para cuándo** | **la fecha es obligatoria.** Sin fecha el botón de guardar queda apagado. |
+| **Nota** | opcional, para lo que no entra en ningún campo. |
+
+**Por qué la fecha es obligatoria:** es la regla del método. Una puerta sin próxima fecha es una puerta que se pierde. Esa fecha aparece después **como línea visible en la tarjeta**, y si ya pasó, la tarjeta dice **"vencida"** con todas las letras — no con un color nomás, porque un teléfono al sol en la vereda no distingue un rojo de un gris.
+
+**"Anotar sin moverla"** es la primera opción del menú, y es la que más vas a usar: dejaste la carta 3 y la puerta sigue en "En secuencia". Se anota el contacto, se actualiza el próximo paso, y la tarjeta no se mueve de columna.
+
+**Los nueve números se actualizan solos** apenas guardás el movimiento. No hay que recargar nada.
+
+### El historial de cada puerta
+
+Cada tarjeta tiene **"historial"**: la lista de todo lo que se hizo en esa puerta, con la fecha, qué se hizo, de qué columna a cuál y **quién lo anotó**. Vos no cargás nada ahí: **se llena solo** con cada movimiento. Si compartís la zona, ves también lo que hizo tu colega, con su nombre al lado.
+
+### Pasar a una persona a tu pipeline de Tracking
+
+En "personas", cada propietario con teléfono tiene un botón para **pasarlo a tu pipeline**. Elegís si es **vendedor** o **locador** y listo: se crea la actividad en Tracking, cruzada con la dirección y la zona.
+
+- **Nunca pasa solo.** El que te dijo "dejá la carta, gracias" no es una prospección. Lo decidís vos, apretando.
+- **Una persona, una sola actividad.** Si ya está, te lo dice en vez de crear otra. Y si la zona es compartida y la pasó tu colega, te avisa que **ya está en el pipeline del equipo** — aunque no la veas en el tuyo.
+
+**En una zona archivada el tablero se ve y no se toca:** las tarjetas se leen, el historial se abre, pero no hay "Mover a…" ni se arrastra nada.
+
+**Si una dirección queda fuera de tu zona** —porque la cargaste del otro lado de la línea, o porque moviste el trazo— la tarjeta te lo dice y **la podés seguir trabajando igual**. No se borra nada.
+
+**Ojo con borrar una tarjeta:** se borra la dirección, sus propietarios y todo su historial, y no se puede deshacer. Distinto es **borrar una zona**: si tenés tarjetas cargadas, la zona **se archiva** y tu trabajo queda guardado; las cuadras sí vuelven a estar libres para otro asesor.
+
+**Dónde quedan las tarjetas de una zona archivada.** En el mismo desplegable de "Relevamiento", con la palabra **"archivada"** al lado del nombre. La elegís y ves todo lo que habías cargado. Arriba te aparece un renglón que te lo recuerda: **esa zona se lee, no se trabaja** — sus cuadras ya son de quien las dibuje ahora.
+
+- Las **tarjetas** se leen enteras, como siempre.
+- **"ver personas"** sigue funcionando: abrís la puerta y ahí están tus propietarios con su piso, su unidad, el vínculo, las notas y **el teléfono para llamar de un toque**. Lo que no aparece es el formulario para sumar a alguien, ni el lápiz, ni el tacho.
+- Los botones de **agregar dirección, editar y borrar** quedan apagados.
+- El **tablero** también se ve, y el **historial** de cada puerta se abre. Lo que no está es el "Mover a…": una zona archivada no se trabaja.
+
+Si querés volver a trabajar esas calles, dibujá la zona de nuevo desde "Mis zonas"; las tarjetas viejas se quedan donde están, en la zona archivada.

@@ -291,6 +291,37 @@ describe("procesarNotaDelCaso", () => {
     expect(inserts).toHaveLength(0)
   })
 
+  // 17/9 (queja de Carolina Grossi): la barrida tiene un presupuesto de 20 "pensadas" por
+  // corrida. El contador sumaba una por CADA caso con nota, aunque esa nota ya estuviera
+  // evaluada y no se llamara a la IA. Con 140 casos esperando en Central, el presupuesto se
+  // agotaba en el caso 27 y las notas de los casos siguientes no se leían nunca: el asesor
+  // escribía "Respondido!!!" y los avisos seguían saliendo igual.
+  it("una nota YA evaluada no gasta presupuesto: no se avisa una pensada que no ocurrió", async () => {
+    const { db } = armarDb({
+      wa_messages: [nota],
+      lead_eventos: [{ datos: { nota_id: "n-1", t0, atendido: false } }],
+    })
+    let pensadas = 0
+    const llamar = async () => { throw new Error("no debería re-evaluar") }
+    await procesarNotaDelCaso(db, c, t0, opciones({ llamar, alLlamarIA: () => { pensadas++ } }))
+    expect(pensadas, "no se llamó a la IA, así que no se gasta presupuesto").toBe(0)
+  })
+
+  it("cuando la IA sí evalúa, la pensada se cuenta una sola vez", async () => {
+    const { db } = armarDb({ wa_messages: [nota], lead_eventos: [] })
+    let pensadas = 0
+    const llamar = async () => ({ atendido: true, pedir_registro_chat: false, pedir_registro_visita: false, pedir_registro_actividad: false, razon: "ya lo llamó" })
+    await procesarNotaDelCaso(db, c, t0, opciones({ llamar, alLlamarIA: () => { pensadas++ } }))
+    expect(pensadas).toBe(1)
+  })
+
+  it("sin nota no se gasta presupuesto", async () => {
+    const { db } = armarDb({ wa_messages: null })
+    let pensadas = 0
+    await procesarNotaDelCaso(db, c, t0, opciones({ alLlamarIA: () => { pensadas++ } }))
+    expect(pensadas).toBe(0)
+  })
+
   it("'atendido' es pegajoso: una segunda nota inofensiva NO re-arma la escalera", async () => {
     // El caso ya tuvo un veredicto atendido (nota n-1). Llega una nota nueva ("ojo, pregunta
     // por cochera"): no se re-evalúa nada y la escalera sigue frenada para este mismo t0.

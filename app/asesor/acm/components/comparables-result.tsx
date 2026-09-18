@@ -11,8 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Check, X, Minus, ChevronDown, ExternalLink, Building2, Network, ArrowLeft, MapPin, Ruler, DoorOpen,
-  FileText, Loader2, CheckSquare, Square, Plus, Trash2, Sparkles, ScanEye, ImageOff, AlertTriangle,
+  FileText, Loader2, CheckSquare, Square, Plus, Trash2, Sparkles, ScanEye, ImageOff, AlertTriangle, Link2,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   MAX_COMPARABLES_ANALISIS,
   PISO_MATCH_PCT_ANALISIS,
@@ -23,12 +24,16 @@ import {
 } from "@/lib/acm/analisis-fotos";
 import type { FichaZona } from "@/lib/acm/ficha";
 import { RevisionZona } from "./revision-zona";
+import { antiguedadDesdeChecklist, fmtAntiguedad } from "@/lib/acm/antiguedad";
 
 interface Props {
   sujeto: Sujeto;
   operacion: Operacion;
   cartera: AcmComparable[];
   roomix: AcmComparable[];
+  /** Comparables que el asesor sumó pegando el link del aviso. */
+  agregados?: AcmComparable[];
+  onAgregadosChange?: (agregados: AcmComparable[]) => void;
   conSemantica: boolean;
   /** true = la búsqueda en cartera/red falló (ej. timeout) y el resultado de esa fuente está
    *  incompleto — nunca hay que mostrarlo como si fuera un resultado completo y válido. */
@@ -124,10 +129,12 @@ const fmtFecha = (iso: string) => {
 };
 
 function ComparableCard({
-  c, selectable, selected, onToggle, sujeto, fotos, medianaM2,
+  c, selectable, selected, onToggle, sujeto, fotos, medianaM2, onQuitar,
 }: {
   c: AcmComparable; selectable?: boolean; selected?: boolean; onToggle?: (id: string) => void;
   sujeto: Sujeto;
+  /** Solo en los sumados por link: sacarlo de la lista. */
+  onQuitar?: (id: string) => void;
   /** Mediana de US$/m² del conjunto mostrado (fase 2): posiciona a cada comparable como
    *  caro/barato RELATIVO sin que el asesor tenga que calcular nada. null = sin datos. */
   medianaM2?: number | null;
@@ -149,6 +156,8 @@ function ComparableCard({
   const noMuestraInterior = resultado?.noMuestraInterior ?? false;
   const ajuste = resultado?.ajuste ?? null;
   const pctAjustado = resultado && !noMuestraInterior ? resultado.pctAjustado : null;
+  // Las búsquedas guardadas antes de sep-2026 no traen el campo: se lee del checklist.
+  const antiguedad = c.antiguedad !== undefined ? c.antiguedad : antiguedadDesdeChecklist(c.checklist);
 
   return (
     <div
@@ -190,8 +199,13 @@ function ComparableCard({
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="font-bold truncate">{c.titulo || c.direccion}</p>
-              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+              <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-1 mt-0.5">
                 <MapPin className="w-3 h-3" /> {c.zona || c.direccion || "—"}
+                {c.agregado_por_link && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-accent/15 text-accent text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                    sumado por link
+                  </span>
+                )}
                 {esLindero && (
                   <span className="ml-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-800 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wide">
                     lindero
@@ -239,6 +253,7 @@ function ComparableCard({
             <span className="flex items-center gap-1"><Ruler className="w-3 h-3" /> {c.m2 ? `${c.m2} m²` : "—"}</span>
             <span className="flex items-center gap-1"><DoorOpen className="w-3 h-3" /> {c.ambientes ? `${c.ambientes} amb` : "—"}</span>
             <span>{c.banos ? `${c.banos} baño${c.banos > 1 ? "s" : ""}` : ""}</span>
+            {antiguedad !== null && <span className="whitespace-nowrap">{fmtAntiguedad(antiguedad)}</span>}
           </div>
 
           {/* `flex-wrap`: en celular el precio y el dato de la inmobiliaria no entran en una
@@ -339,13 +354,38 @@ function ComparableCard({
         </div>
       )}
 
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-center gap-1 py-2 text-xs font-bold text-accent border-t border-accent/10 hover:bg-accent/5"
-      >
-        Ver checklist de comparabilidad
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
+      {/* El link al aviso va a la vista, al lado del checklist. Antes vivía al fondo del
+          checklist desplegado y una asesora reportó (16-sep) que "no se pueden abrir los links":
+          estaba, pero nadie abre un desplegable para buscarlo. Alto mínimo de 44px: es un
+          botón que se toca con el dedo en el celular. */}
+      <div className="flex border-t border-accent/10">
+        {c.url && (
+          <a
+            href={c.url}
+            target="_blank"
+            rel="noreferrer"
+            className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 px-2 text-xs font-bold text-accent hover:bg-accent/5 border-r border-accent/10"
+          >
+            Ver publicación <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        )}
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex-1 min-h-[44px] flex items-center justify-center gap-1 px-2 text-xs font-bold text-accent hover:bg-accent/5"
+        >
+          {c.url ? "Ver checklist" : "Ver checklist de comparabilidad"}
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        {onQuitar && (
+          <button
+            onClick={() => onQuitar(c.id)}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center px-3 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 border-l border-accent/10"
+            aria-label="Quitar este comparable"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
       {open && (
         <div className="px-4 pb-4 space-y-1.5">
@@ -365,11 +405,6 @@ function ComparableCard({
               </span>
             </div>
           ))}
-          {c.url && (
-            <a href={c.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-accent pt-2">
-              Ver aviso original <ExternalLink className="w-3 h-3" />
-            </a>
-          )}
         </div>
       )}
     </div>
@@ -377,9 +412,10 @@ function ComparableCard({
 }
 
 function Section({
-  title, icon: Icon, items, empty, selectable, selected, onToggle, sujeto, fotosPorId,
+  title, icon: Icon, items, empty, selectable, selected, onToggle, sujeto, fotosPorId, onQuitar,
 }: {
   title: string; icon: any; items: AcmComparable[]; empty: string;
+  onQuitar?: (id: string) => void;
   selectable?: boolean; selected?: Set<string>; onToggle?: (id: string) => void;
   sujeto: Sujeto;
   /** Mapa id → resultado (o "cargando") solo para los comparables que entraron al top analizado. */
@@ -427,6 +463,7 @@ function Section({
               sujeto={sujeto}
               fotos={fotosPorId.get(c.id)}
               medianaM2={medianaM2}
+              onQuitar={onQuitar}
             />
           ))}
         </div>
@@ -438,8 +475,8 @@ function Section({
 const MAX_FICHA = 12;
 
 export function ComparablesResult({
-  sujeto, operacion, cartera, roomix, conSemantica, carteraFallo, roomixFallo, searchId, onFichaCreada,
-  zonasUsadas = [], onBuscarSinZona, onVolver,
+  sujeto, operacion, cartera, roomix, agregados = [], onAgregadosChange, conSemantica, carteraFallo, roomixFallo,
+  searchId, onFichaCreada, zonasUsadas = [], onBuscarSinZona, onVolver,
 }: Props) {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -459,9 +496,64 @@ export function ComparablesResult({
 
   const byId = useMemo(() => {
     const m = new Map<string, AcmComparable>();
-    for (const c of [...cartera, ...roomix]) m.set(c.id, c);
+    for (const c of [...cartera, ...roomix, ...agregados]) m.set(c.id, c);
     return m;
-  }, [cartera, roomix]);
+  }, [cartera, roomix, agregados]);
+
+  // ── Sumar un comparable pegando el link del aviso ─────────────────────────────────────
+  const [linkAviso, setLinkAviso] = useState("");
+  const [sumando, setSumando] = useState(false);
+
+  const sumarPorLink = async () => {
+    const url = linkAviso.trim();
+    if (!url) return;
+    setSumando(true);
+    try {
+      const res = await fetch("/api/acm/comparable-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, sujeto, operacion, search_id: searchId ?? null }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.error) throw new Error(data?.error || "No pudimos sumar ese aviso.");
+      const nuevo: AcmComparable = data.comparable;
+      // Si la búsqueda ya lo había traído, no se duplica: se avisa dónde está. Lo dice el
+      // servidor (que mira lo guardado); sin búsqueda guardada se mira la lista en pantalla.
+      const enLista: { source: string; match_pct: number } | undefined =
+        data.ya_en_lista ?? [...cartera, ...roomix].find((c) => c.id === nuevo.id);
+      if (enLista) {
+        toast.info(
+          `Ese aviso ya está en la lista de ${enLista.source === "cartera" ? "tu cartera" : "la red de colaboración"} (${enLista.match_pct}%).`
+        );
+      } else {
+        onAgregadosChange?.([...agregados.filter((c) => c.id !== nuevo.id), nuevo]);
+        if (data.aviso) toast.warning(data.aviso);
+        else toast.success(`Sumado: ${nuevo.match_pct}% comparable.`);
+      }
+      setLinkAviso("");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSumando(false);
+    }
+  };
+
+  const quitarAgregado = (id: string) => {
+    onAgregadosChange?.(agregados.filter((c) => c.id !== id));
+    setSelected((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    if (searchId) {
+      fetch("/api/acm/comparable-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "quitar", id, search_id: searchId }),
+      }).catch(() => toast.error("No pudimos sacarlo del ACM guardado. Al reabrirlo puede volver a aparecer."));
+    }
+  };
 
   // ── 3ra capa: fotos contra fotos ──────────────────────────────────────────────────────
   // Solo disponible si el sujeto tiene descripción por fotos (sin eso no hay contra qué
@@ -476,11 +568,13 @@ export function ComparablesResult({
   // importar la fuente. Datos reales: 12.8 comparables ≥90% en promedio, máximo 54; el tope
   // evita gastar 54 llamadas de visión con el cliente esperando.
   const top10 = useMemo(() => {
-    return [...cartera, ...roomix]
+    // Los sumados por link que no están en la red (source "link") quedan afuera: el análisis de
+    // fotos las lee de la base, y esos avisos no están ahí.
+    return [...cartera, ...roomix, ...agregados.filter((c) => c.source !== "link")]
       .filter((c) => c.match_pct >= PISO_MATCH_PCT_ANALISIS)
       .sort((a, b) => b.match_pct - a.match_pct)
       .slice(0, MAX_COMPARABLES_ANALISIS);
-  }, [cartera, roomix]);
+  }, [cartera, roomix, agregados]);
 
   // Firma estable de "qué hay que analizar" — evita re-pedir si el componente re-renderiza
   // por otro motivo (ej. tildar un comparable). Cambia si cambia la búsqueda (otro searchId)
@@ -590,6 +684,10 @@ export function ComparablesResult({
   const carteraOrdenada = useMemo(
     () => [...cartera].sort((a, b) => pctEfectivo(b, sujeto, fotosPorId.get(b.id)) - pctEfectivo(a, sujeto, fotosPorId.get(a.id))),
     [cartera, sujeto, fotosPorId]
+  );
+  const agregadosOrdenados = useMemo(
+    () => [...agregados].sort((a, b) => pctEfectivo(b, sujeto, fotosPorId.get(b.id)) - pctEfectivo(a, sujeto, fotosPorId.get(a.id))),
+    [agregados, sujeto, fotosPorId]
   );
   const roomixOrdenado = useMemo(
     () => [...roomix].sort((a, b) => pctEfectivo(b, sujeto, fotosPorId.get(b.id)) - pctEfectivo(a, sujeto, fotosPorId.get(a.id))),
@@ -824,6 +922,65 @@ export function ComparablesResult({
           Marcá los comparables que querés incluir en la ficha para tu cliente. Cada uno ocupará una hoja con todas sus fotos y
           características.
         </div>
+      )}
+
+      {/* Sumar un comparable pegando el link (pedido de un asesor, 31-ago): cuando la búsqueda no
+          trae el aviso que el asesor ya conoce, o trae de más. Entra con su % y se puede elegir
+          para la ficha como cualquier otro. */}
+      <div className="p-3.5 sm:p-4 rounded-2xl border border-accent/20 bg-card/30 space-y-2.5">
+        <div className="flex items-start gap-2.5">
+          <Link2 className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold">¿Tenés un aviso que querés usar de comparable?</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Pegá el link de Zonaprop, Argenprop o MercadoLibre. Traemos sus datos y fotos, y le calculamos el %.
+            </p>
+          </div>
+        </div>
+        <form
+          className="flex flex-col sm:flex-row gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            sumarPorLink();
+          }}
+        >
+          <Input
+            value={linkAviso}
+            onChange={(e) => setLinkAviso(e.target.value)}
+            placeholder="https://www.zonaprop.com.ar/propiedades/…"
+            inputMode="url"
+            disabled={sumando}
+            className="bg-background/50 border-accent/20 min-h-[44px]"
+          />
+          <Button
+            type="submit"
+            disabled={sumando || !linkAviso.trim()}
+            className="bg-accent text-accent-foreground hover:bg-accent/90 min-h-[44px] shrink-0"
+          >
+            {sumando ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+            {sumando ? "Leyendo el aviso…" : "Sumar"}
+          </Button>
+        </form>
+        {sumando && (
+          <p className="text-xs text-muted-foreground">
+            Algunos portales tardan en dejarse leer: puede demorar hasta 40 segundos.
+          </p>
+        )}
+      </div>
+
+      {agregadosOrdenados.length > 0 && (
+        <Section
+          title="Sumados por link"
+          icon={Link2}
+          items={agregadosOrdenados}
+          empty=""
+          selectable={selecting}
+          selected={selected}
+          onToggle={toggle}
+          sujeto={sujeto}
+          fotosPorId={fotosPorId}
+          onQuitar={quitarAgregado}
+        />
       )}
 
       <Section

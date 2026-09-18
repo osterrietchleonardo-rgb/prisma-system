@@ -63,7 +63,7 @@ const CUADRO: Record<"nueva" | "redibujar" | "sumar", { titulo: string; texto: s
   },
   redibujar: {
     titulo: "¿Reemplazar el trazo de la zona?",
-    texto: "El dibujo nuevo reemplaza al anterior. Si pisa la zona de un colega, no se guarda y te lo marcamos en rojo.",
+    texto: "El dibujo nuevo reemplaza al anterior y el viejo no queda guardado en ningún lado. Si ya terminaste con esta zona y vas a trabajar otra, mejor dibujá una zona nueva. Si pisa la zona de un colega, no se guarda y te lo marcamos en rojo.",
     boton: "Reemplazar",
   },
   sumar: {

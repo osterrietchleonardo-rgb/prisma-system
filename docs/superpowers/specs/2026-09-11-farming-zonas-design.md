@@ -101,6 +101,21 @@ de compartir trae los asesores activos de la agencia. Cinco botones por zona: **
 **sumar un pedazo**, **compartir**, **borrar** y el mapa para verla. Y arriba, **dibujar una
 zona nueva**.
 
+> **Los dos números de la tarjeta —«direcciones relevadas» y «avisos a la venta hoy»— van con
+> la etapa 3, no con la 2.** «Direcciones relevadas» no existe hasta que exista el tablero. Y
+> «avisos a la venta hoy», que la etapa 2 recién ahora hace calculable, se postergó a propósito
+> el 16-sep (decisión delegada por Leonardo, «lo que vos decidas»):
+> - Cuesta un recorte PostGIS por zona en la primera carga de Farming. Medido ese día contra
+>   producción: ~90-135 ms cada uno. En paralelo son ~150 ms de más en una pantalla que hoy
+>   abre al toque.
+> - El número ya está a un toque de distancia, en el encabezado de la solapa «A la venta en mi
+>   zona» («N propiedades publicadas en «…»»).
+> - La etapa 3 rehace esa tarjeta igual, porque tiene que mostrar sus propios indicadores. Se
+>   hace una vez, con los dos números juntos, en vez de tocarla dos veces.
+>
+> Si al usarlo se nota que la solapa pasa desapercibida sin ese número, es una línea: agregar
+> `farming_avisos_conteos` por zona en `GET /api/farming/zonas`, en paralelo.
+
 **Solapa 2 · Relevamiento.** El tablero de 6 columnas. Es la hoja 1 del Excel convertida en
 tarjetas. Botón **«+ agregar dirección»** siempre visible (ver «La carga a pie», más abajo).
 
@@ -116,6 +131,17 @@ polígonos, con cuatro atajos de captación arriba:
 
 De cada aviso salen dos botones: **«crear tarjeta de relevamiento»** (lo manda a la solapa 2
 ya cargado con lo que el aviso traiga) y **«descartar»** (no vuelve a aparecer).
+
+> **Decisión de Leonardo, 16-sep-2026 (al construir la etapa 2): un atajo se dibuja SOLO si
+> tiene al menos un aviso.** Medido ese día en producción sobre 67.577 avisos de venta: dueño
+> directo 823, +120 días 13.950, **caídos 0 y con baja de precio 20**. Dos de los cuatro atajos
+> darían siempre cero, y un botón que siempre da cero se siente roto. Cuando el descubrimiento
+> diario vuelva a marcar caídos, los atajos aparecen solos: la pantalla los deriva de los
+> conteos vivos, no de una lista fija.
+>
+> La causa de esos ceros no es la consulta: el descubrimiento está caído desde el 9-sep-2026
+> (`FATAL: lanzar: 403`, tope de Apify agotado), y la verificación que marca «caído» corre una
+> vez por mes (cron día 3).
 
 **Acá no se tapa al colega.** En la ficha pública del ACM la descripción se recorta porque
 delata a la inmobiliaria que publica (55% traen matrícula, 42% el nombre del publicador). En

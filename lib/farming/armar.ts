@@ -74,13 +74,18 @@ export function candidatasParaChoque(
 }
 
 export function armarRespuesta(args: {
+  /** SOLO las activas. El mapa, los topes y el control de choque leen lo que sale de acá. */
   filas: FilaZona[]
+  /** Las archivadas que esta persona puede mirar. Van en su PROPIO balde y no se mezclan con
+   *  `mias`: sus cuadras ya están libres, así que no pueden contar para el tope de zonas, ni
+   *  dibujarse como contorno, ni frenar el trazo de nadie. Se miran, no se trabajan. */
+  archivadas: FilaZona[]
   compartidas: FilaCompartida[]
   perfiles: FilaPerfil[]
   userId: string
   role: string
 }): RespuestaZonas {
-  const { filas, compartidas, perfiles, userId, role } = args
+  const { filas, archivadas, compartidas, perfiles, userId, role } = args
   const todas = filas.map((f) => armarZona(f, compartidas, perfiles))
   const esDirector = role === "director"
 
@@ -94,6 +99,7 @@ export function armarRespuesta(args: {
   return {
     mias,
     compartidas_conmigo: compartidasConmigo,
+    archivadas: archivadas.map((f) => armarZona(f, compartidas, perfiles)),
     ajenas,
     equipo: esDirector ? todas : [],
     colegas: colegasActivos(perfiles, userId),
@@ -104,7 +110,10 @@ export function armarRespuesta(args: {
 
 /** Todo lo que se dibuja como contorno mientras el asesor traza: las ajenas, las compartidas
  *  conmigo y las propias (menos la que está editando). Las propias se llaman "vos". Sin esto
- *  el asesor dibuja a ciegas contra zonas que el servidor sí controla, y se lleva un 409. */
+ *  el asesor dibuja a ciegas contra zonas que el servidor sí controla, y se lleva un 409.
+ *
+ *  Las ARCHIVADAS quedan afuera a propósito: sus cuadras están libres y el servidor no las
+ *  controla. Dibujarlas acá le mostraría al asesor una pared que no existe. */
 export function contornosParaDibujar(datos: RespuestaZonas, excluirId?: string): ContornoAjeno[] {
   const vistos = new Set<string>()
   const contornos: ContornoAjeno[] = []

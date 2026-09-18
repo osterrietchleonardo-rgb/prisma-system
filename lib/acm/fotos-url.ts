@@ -30,10 +30,15 @@ export const HOSTS_ROOMIX = [/^cdn\.roomix\.ai$/];
 /** CDN real de fotos de `mercado_avisos` (ZonaProp). Verificado contra producción el
  *  2-sep-2026: los 20.407 avisos con foto usan un único host, imgar.zonapropcdn.com. */
 export const HOSTS_MERCADO = [/(^|\.)zonapropcdn\.com$/];
+/** Donde sirven las fotos los otros dos portales, para los comparables que el asesor suma
+ *  pegando un link (ver `lib/acm/fotos-aviso.ts`). Verificado contra avisos reales el
+ *  16-sep-2026: Argenprop las sirve desde su propio dominio (`/static-content/`) y
+ *  MercadoLibre desde `http2.mlstatic.com`. Zonaprop ya está en `HOSTS_MERCADO`. */
+export const HOSTS_PORTALES = [/^www\.argenprop\.com$/, /^http2\.mlstatic\.com$/];
 /** La red completa: toda foto que no es de la cartera propia sale por nuestro proxy
- *  (`RUTA_FOTO_RED`), por el mismo motivo en las dos fuentes — que el navegador del asesor
+ *  (`RUTA_FOTO_RED`), por el mismo motivo en todas las fuentes — que el navegador del asesor
  *  no deje su `Referer` escrito en el CDN de un tercero. */
-export const HOSTS_RED = [...HOSTS_ROOMIX, ...HOSTS_MERCADO];
+export const HOSTS_RED = [...HOSTS_ROOMIX, ...HOSTS_MERCADO, ...HOSTS_PORTALES];
 
 /** Primeras `n` URLs de `images` que pasan la allowlist de hosts dada, en el orden en que están
  *  guardadas (sin curar — política validada en la ronda de holdout de San Telmo). */
@@ -78,6 +83,31 @@ export function normalizarFotoRoomix(url: string): string {
   }
 }
 
+/** `mercado_avisos.foto_portada` (ZonaProp) guarda una URL PLANTILLA: el segmento `/wxh/` es un
+ *  ancho-x-alto que el crawler nunca completa — ejemplo real:
+ *  `.../avisos/1/00/59/63/47/02/wxh/2065983405.jpg`. El CDN de origen da 404 sobre `/wxh/`
+ *  literal y sirve 200 con cualquier tamaño real: `360x266`, `720x532` y `1200x1200`, los tres
+ *  probados el 16-sep-2026. Medido contra producción el 16-sep-2026: de 70.322 avisos con foto,
+ *  70.202 (el 99,8%) llevan el `wxh` sin completar — prácticamente todos, no un caso raro.
+ *
+ *  Se pide `360x266`, el más chico de los tres: la tarjeta de Farming la muestra a 128×96
+ *  (`h-24 w-32` en `avisos-en-zona.tsx`), y es una lista que baja muchas fotos por página —
+ *  mismo criterio de peso que ya usa `normalizarFotoRoomix` de acá arriba, solo que en sentido
+ *  contrario (esa pide más peso porque el `.jpg` chico no existe; esta pide menos porque el
+ *  grande no hace falta).
+ *
+ *  Solo toca el CDN de mercado (`HOSTS_MERCADO`). Una URL que ya trae un tamaño real (no
+ *  `wxh`) sale igual, y cualquier otra URL (roomix, Tokko, Storage) también. */
+export function normalizarFotoMercado(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!HOSTS_MERCADO.some((re) => re.test(parsed.hostname))) return url;
+    return url.replace("/wxh/", "/360x266/");
+  } catch {
+    return url;
+  }
+}
+
 /** Ruta del proxy propio que sirve las fotos de la red de colaboración. Existe para que el
  *  navegador del asesor deje de pedirle cada foto al CDN de roomix: desde el 26-ago-2026 la
  *  foto se baja UNA sola vez, server-side, se guarda en nuestro Storage y de ahí en más sale
@@ -91,9 +121,10 @@ export const RUTA_FOTO_RED = "/api/foto-red";
 /** Convierte una foto de la red de colaboración en la URL de nuestro proxy. Cualquier otra
  *  foto (Tokko, Storage) sale igual: la cartera propia no pasa por acá.
  *
- *  PURA a propósito, igual que el resto del archivo: arma un string, no baja nada. Y aplica
- *  `normalizarFotoRoomix` primero para que al proxy le llegue siempre el `.jpg`, que es el
- *  único que el CDN de origen sirve — así el caché no se llena de 404. */
+ *  PURA a propósito, igual que el resto del archivo: arma un string, no baja nada. Aplica
+ *  `normalizarFotoRoomix` y `normalizarFotoMercado` primero, cada una sobre su propio CDN, para
+ *  que al proxy le llegue siempre la URL que el origen sí sirve (200) y no la que da 404 — así
+ *  el caché del proxy no se llena de errores. */
 export function urlFotoRed(url: string): string {
   let parsed: URL;
   try {
@@ -102,7 +133,7 @@ export function urlFotoRed(url: string): string {
     return url;
   }
   if (parsed.protocol !== "https:" || !HOSTS_RED.some((re) => re.test(parsed.hostname))) return url;
-  return `${RUTA_FOTO_RED}?u=${encodeURIComponent(normalizarFotoRoomix(url))}`;
+  return `${RUTA_FOTO_RED}?u=${encodeURIComponent(normalizarFotoMercado(normalizarFotoRoomix(url)))}`;
 }
 
 /** `urlFotoRed` sobre una lista ya normalizada. Azúcar para los endpoints que devuelven

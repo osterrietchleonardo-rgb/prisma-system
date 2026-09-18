@@ -83,7 +83,20 @@ export function contornosDeTexto(texto: string, x0: number, y: number, cuerpo: n
     if (previo) x += f.getKerningValue(previo, g) * escala;
     // Un decimal alcanza y sobra para una letra chica, y achica el archivo un 20%.
     const d = g.getPath(x, y, cuerpoEntero).toPathData(1);
-    if (d && d.includes("NaN")) letrasRotas++;
+    // Una letra que la fuente NO TIENE devuelve el glifo .notdef, y en esta Inter incrustada
+    // .notdef es una "caja de tofu" VISIBLE, con un contorno real de 638 caracteres (medido
+    // 16-sep-2026) — no un contorno vacio. Por eso `d.includes("NaN")` nunca la agarraba: una
+    // caja es un path valido, sin ningun NaN adentro. Hasta el 16-sep-2026 esa caja se dibujaba
+    // Y no se contaba, asi que un emoji pasaba el control en silencio mientras aparecia en la
+    // placa como un rectangulo. El espacio, en cambio, SI tiene contorno vacio (0 caracteres,
+    // glifo "space") y SI existe en la fuente: por eso el criterio tiene que ser el nombre del
+    // glifo y no si el contorno vino vacio, o cada espacio del aviso legal se reportaria como
+    // letra rota. Ademas TAB y salto de linea tambien resuelven a .notdef en esta fuente: hoy
+    // no llegan hasta aca porque todo el que llama a esta funcion pasa antes por
+    // repartirEnRenglones, que colapsa los espacios en blanco — pero un futuro llamador directo
+    // los dibujaria como cajas.
+    if (g.name === ".notdef") letrasRotas++;
+    else if (d && d.includes("NaN")) letrasRotas++;
     else if (d) paths.push(d);
     x += (g.advanceWidth ?? 0) * escala;
     previo = g;
@@ -97,4 +110,51 @@ export function comoPaths(paths: string[], fill: string, opacidad = 1): string {
   return paths
     .map((d) => `<path d="${d}" fill="${fill}"${opacidad < 1 ? ` fill-opacity="${opacidad}"` : ""}/>`)
     .join("");
+}
+
+/**
+ * Reparte un texto en renglones que entren en `anchoUtil` con ese cuerpo de letra.
+ *
+ * Respeta los saltos de linea que ya traiga el texto (en el aviso legal suelen separar el aviso
+ * de la firma de la agencia) y acomoda cada parrafo dentro del ancho disponible.
+ *
+ * Vive acá y no en aviso-legal.ts porque desde el 16-sep-2026 lo usan dos cosas: la franja legal
+ * y el panel de la placa con foto.
+ */
+export function repartirEnRenglones(texto: string, cuerpo: number, anchoUtil: number): string[] {
+  const renglones: string[] = [];
+
+  for (const parrafo of texto.replace(/\r\n?/g, "\n").split("\n")) {
+    const limpio = parrafo.trim().replace(/\s+/g, " ");
+    if (!limpio) continue;
+
+    let actual = "";
+    for (const palabra of limpio.split(" ")) {
+      const tentativa = actual ? `${actual} ${palabra}` : palabra;
+      if (anchoDelTexto(tentativa, cuerpo) <= anchoUtil) {
+        actual = tentativa;
+        continue;
+      }
+      if (actual) renglones.push(actual);
+
+      // Una sola palabra mas larga que el renglon (una URL, por ejemplo): se parte a lo bruto.
+      if (anchoDelTexto(palabra, cuerpo) > anchoUtil) {
+        let trozo = "";
+        for (const ch of palabra) {
+          if (anchoDelTexto(trozo + ch, cuerpo) > anchoUtil && trozo) {
+            renglones.push(trozo);
+            trozo = ch;
+          } else {
+            trozo += ch;
+          }
+        }
+        actual = trozo;
+      } else {
+        actual = palabra;
+      }
+    }
+    if (actual) renglones.push(actual);
+  }
+
+  return renglones;
 }

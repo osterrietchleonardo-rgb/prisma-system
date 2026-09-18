@@ -87,6 +87,8 @@ const AMEN_RE = {
   seguridad_24hs: /seguridad 24|vigilanc|24 ?hs|24 hour|porter[ií]a|portero/i,
   jardin_privado: /jard[ií]n|\bgarden\b|backyard|fondo verde/i,
   terraza_privada: /terraza|\bterrace\b|solarium|sol[áa]rium/i,
+  // Laundry del edificio. "Laundry room" (Tokko) y "lavadero" son de la unidad: no cuentan.
+  laundry: /laundry(?! ?room)|lavander[íi]a/i,
 };
 function mapAmenidades(text) {
   const out = {};
@@ -262,7 +264,7 @@ async function fromIA(ctx) {
   if (!GEMINI_API_KEY || contenido.length < 60) return null;
 
   const prompt = `Sos un analista inmobiliario experto de Argentina. Te paso TODO el contenido de la página de un aviso. Leé y RAZONÁ sobre el conjunto (título, URL, descripción, datos del portal y texto), y devolvé SOLO un JSON válido (sin texto extra):
-{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_semicubiertos":0,"m2_descubiertos":0,"m2_terreno":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"piso":null,"orientacion":"norte|sur|este|oeste|ne|no|se|so|null","precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","expensas":0,"responsable":"inmobiliaria o agente que publica, o null","fecha_publicacion":null,"amenidades":{"cochera_cubierta":false,"cochera_descubierta":false,"baulera":false,"pileta":false,"gimnasio":false,"sum":false,"seguridad_24hs":false,"jardin_privado":false,"terraza_privada":false}}
+{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_semicubiertos":0,"m2_descubiertos":0,"m2_terreno":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"piso":null,"orientacion":"norte|sur|este|oeste|ne|no|se|so|null","precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","expensas":0,"responsable":"inmobiliaria o agente que publica, o null","fecha_publicacion":null,"amenidades":{"cochera_cubierta":false,"cochera_descubierta":false,"baulera":false,"pileta":false,"gimnasio":false,"sum":false,"seguridad_24hs":false,"jardin_privado":false,"terraza_privada":false,"laundry":false}}
 Traé el MÁXIMO de variables que ENCUENTRES en el aviso (no dejes vacío lo que sí está escrito). Cómo razonar (interpretá lo que dice la página, NO adivines ni pongas valores por defecto):
 - operacion: mirá la URL, el título y el texto. "alquiler"/"alquilar"/"renta"/"$ ... por mes" -> alquiler. "venta"/"en venta"/"comprar" -> venta. Si de verdad no se puede determinar, poné null. PROHIBIDO asumir "venta" cuando no hay señal.
 - moneda: mirá CÓMO se muestra el precio. "US$"/"U$S"/"USD"/"dólares" -> USD. "$"/"ARS"/"pesos" sin símbolo de dólar -> ARS. Usá la coherencia (un alquiler mensual suele ser en ARS; una venta suele ser en USD) para desambiguar, pero mandá lo que la página realmente indica. Si no hay ninguna señal, null.
@@ -272,7 +274,7 @@ Traé el MÁXIMO de variables que ENCUENTRES en el aviso (no dejes vacío lo que
 - piso: número de piso si aplica (PB = 0); si no corresponde/no está, null. orientacion: solo si el aviso la indica; si no, null.
 - antiguedad_anios: años de antigüedad; "a estrenar"/"nuevo" = 0.
 - "ambientes" NO es "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1 (monoambiente/1 ambiente = 0 dormitorios).
-- amenidades: RAZONÁ cada una y poné true SOLO la que el aviso confirme que SÍ tiene (si dice "No" o no la menciona, false). Guía de interpretación: "cochera/garage cubierta" -> cochera_cubierta; "cochera descubierta" -> cochera_descubierta; "baulera" -> baulera; "pileta/piscina" -> pileta; "gimnasio/gym" -> gimnasio; "SUM/salón de usos múltiples" -> sum; cualquier vigilancia/portería/seguridad (incluso "Seguridad: Sí") -> seguridad_24hs; "jardín" propio -> jardin_privado; "terraza/balcón aterrazado/solárium" -> terraza_privada. NO uses coincidencia literal de palabras: interpretá el sentido.
+- amenidades: RAZONÁ cada una y poné true SOLO la que el aviso confirme que SÍ tiene (si dice "No" o no la menciona, false). Guía de interpretación: "cochera/garage cubierta" -> cochera_cubierta; "cochera descubierta" -> cochera_descubierta; "baulera" -> baulera; "pileta/piscina" -> pileta; "gimnasio/gym" -> gimnasio; "SUM/salón de usos múltiples" -> sum; cualquier vigilancia/portería/seguridad (incluso "Seguridad: Sí") -> seguridad_24hs; "jardín" propio -> jardin_privado; "terraza/balcón aterrazado/solárium" -> terraza_privada; "laundry"/"lavandería" del edificio -> laundry (el "lavadero" de la unidad NO es laundry). NO uses coincidencia literal de palabras: interpretá el sentido.
 - Si un dato no está: null (0 en numéricos, amenidades en false).
 CONTENIDO:
 """${contenido}"""`;
@@ -309,7 +311,7 @@ CONTENIDO:
     if (piso !== null) sujeto.piso = piso;
     if (orient) sujeto.orientacion = orient;
     // Amenidades: las RAZONA la IA (objeto de 9 banderas). Nos quedamos solo con las true.
-    const AMEN_KEYS = ['cochera_cubierta', 'cochera_descubierta', 'baulera', 'pileta', 'gimnasio', 'sum', 'seguridad_24hs', 'jardin_privado', 'terraza_privada'];
+    const AMEN_KEYS = ['cochera_cubierta', 'cochera_descubierta', 'baulera', 'pileta', 'gimnasio', 'sum', 'seguridad_24hs', 'jardin_privado', 'terraza_privada', 'laundry'];
     const amen = {};
     if (j.amenidades && typeof j.amenidades === 'object') for (const k of AMEN_KEYS) if (j.amenidades[k] === true) amen[k] = true;
     if (Object.keys(amen).length) sujeto.amenidades = amen;
@@ -438,7 +440,7 @@ function pickBarrioCoherente(cands, url) {
   return limpios.slice().sort((a, b) => score(b) - score(a))[0];
 }
 
-async function extract(url, maxAttempts = 5, debug = false) {
+async function extract(url, maxAttempts = 5, debug = false, conHtml = false) {
   let best = { html: '', text: '', title: '' };
   let bestScore = -1;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -543,6 +545,11 @@ async function extract(url, maxAttempts = 5, debug = false) {
   // sepa que la lectura fue parcial (en vez de mostrar datos vagos como si fueran completos).
   const ok = Boolean(merged.precio > 0 || merged.sujeto.m2_cubiertos > 0);
   const result = { ok, requiere_completar_manual: !ok, ...merged };
+  // La app pide la página cuando el aviso se suma como comparable: de ahí saca las fotos del
+  // propio aviso y su texto (lib/acm/fotos-aviso.ts). Se devuelve entera y no las fotos ya
+  // filtradas para que esa regla, que distingue las fotos del aviso de las ajenas, viva en un
+  // solo lugar y con pruebas. Sin el pedido no viaja: pesa cientos de KB.
+  if (conHtml) result.html = html || '';
   // Modo debug (temporal): devuelve un pedazo del texto renderizado y los @type del JSON-LD,
   // para verificar/afinar los parsers contra la página real sin adivinar. NO afecta la salida normal.
   if (debug) {
@@ -569,11 +576,11 @@ const server = http.createServer((req, res) => {
       if (body.length > 1e6) req.destroy();
     });
     req.on('end', () => {
-      let url, debug = false;
-      try { const b = JSON.parse(body); url = b.url; debug = !!b.debug; } catch { return send(400, { error: 'bad json' }); }
+      let url, debug = false, conHtml = false;
+      try { const b = JSON.parse(body); url = b.url; debug = !!b.debug; conHtml = !!b.con_html; } catch { return send(400, { error: 'bad json' }); }
       if (!url || !/^https?:\/\//i.test(url)) return send(400, { error: 'invalid url' });
       log('▶️  extract', url);
-      limit(() => extract(url, 5, debug))
+      limit(() => extract(url, 5, debug, conHtml))
         .then((r) => { log('✅', url, r.ok ? 'ok' : 'thin'); send(200, r); })
         .catch((e) => { log('❌', url, e.message); send(500, { error: e.message, ok: false, requiere_completar_manual: true, sujeto: {} }); });
     });

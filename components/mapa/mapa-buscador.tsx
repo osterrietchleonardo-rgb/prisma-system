@@ -191,6 +191,12 @@ export function MapaBuscador({ onElegir }: { onElegir: (l: Lugar) => void }) {
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600 dark:text-zinc-400" />
         <input
+          // type="text" explícito, aunque sea el default: las dos reglas para el celular de
+          // app/globals.css son selectores de ATRIBUTO (`input[type="text"] … { font-size:
+          // 16px !important }`), y un selector de atributo no matchea el valor por defecto —
+          // sin el atributo escrito, la regla no existe para este input. Sin ella la caja queda
+          // en 14 px y iOS hace zoom a toda la página apenas el asesor la toca en la calle.
+          type="text"
           value={texto}
           onChange={(e) => {
             // Si sigue escribiendo cambio de idea: el Enter viejo ya no aplica.
@@ -201,7 +207,11 @@ export function MapaBuscador({ onElegir }: { onElegir: (l: Lugar) => void }) {
           onFocus={() => setAbierto(true)}
           onKeyDown={teclas}
           placeholder="Buscar un barrio, una zona guardada o una dirección…"
-          className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-9 pr-9 text-sm outline-none transition-colors focus:border-sky-500 dark:border-zinc-800 dark:bg-zinc-900"
+          // py-3 y no py-2.5: con 2.5 la caja medía 42 px (20 de linea + 20 de padding + 2 de
+          // borde) y la regla de los 44 px de app/globals.css NO la alcanza — solo llega a
+          // button, a.btn, [role=button] y .select-trigger, nunca a un input pelado. Es lo
+          // primero que toca el asesor en el formulario de Relevamiento, parado en la vereda.
+          className="w-full rounded-xl border border-zinc-200 bg-white py-3 pl-9 pr-9 text-sm outline-none transition-colors focus:border-sky-500 dark:border-zinc-800 dark:bg-zinc-900"
         />
         {buscando ? (
           <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-zinc-600 dark:text-zinc-400" />

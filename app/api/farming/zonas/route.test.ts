@@ -59,6 +59,47 @@ describe("GET /api/farming/zonas", () => {
     expect(d.colegas).toEqual([{ id: JUAN, nombre: "Juan Pérez" }])
     expect(JSON.stringify(d)).not.toContain("z-otra-agencia")
   })
+
+  /**
+   * Archivar una zona no puede ser hacerla desaparecer. El cartel del borrado promete que «tus
+   * tarjetas, tus propietarios y su historial quedan guardados»; si el GET no la devolviera,
+   * esa promesa sería falsa: la zona no aparecería en el selector de Relevamiento y no habría
+   * ninguna pantalla de PRISMA desde donde llegar a ese trabajo.
+   *
+   * Y va en su PROPIO balde: `mias` la leen el mapa, el tope de zonas y el control de choque,
+   * que tienen que seguir viendo solo activas — las cuadras de una archivada están libres.
+   */
+  it("las archivadas vuelven en su propio balde, y NUNCA adentro de mias, compartidas_conmigo ni ajenas", async () => {
+    base.tablas.farming_zonas.push({ id: "z-mia", agency_id: AGENCIA, owner_user_id: YO, nombre: "Mía", geojson: cuadrado(-58.40, -34.56), area_km2: 1, estado: "activa", origen_mapa_zona_id: null, trazo_editado_en: null, created_at: "2026-09-12T11:00:00Z" })
+    base.tablas.farming_zonas.push({ id: "z-archivada", agency_id: AGENCIA, owner_user_id: YO, nombre: "Vieja", geojson: cuadrado(-58.30, -34.56), area_km2: 1, estado: "archivada", origen_mapa_zona_id: null, trazo_editado_en: null, created_at: "2026-09-10T11:00:00Z" })
+    const d = await (await GET()).json()
+    expect(d.archivadas.map((z: any) => z.id)).toEqual(["z-archivada"])
+    expect(d.archivadas[0].estado).toBe("archivada")
+    expect(d.mias.map((z: any) => z.id)).toEqual(["z-mia"])
+    expect(d.compartidas_conmigo).toEqual([])
+    expect(d.ajenas.map((z: any) => z.id)).toEqual(["z-juan"])
+  })
+
+  it("la zona archivada que me compartieron también vuelve: el colega que la trabajaba no puede quedarse sin su tablero", async () => {
+    base.tablas.farming_zonas.push({ id: "z-de-juan-vieja", agency_id: AGENCIA, owner_user_id: JUAN, nombre: "De Juan, vieja", geojson: cuadrado(-58.30, -34.56), area_km2: 1, estado: "archivada", origen_mapa_zona_id: null, trazo_editado_en: null, created_at: "" })
+    base.tablas.farming_zonas_compartidas.push({ zona_id: "z-de-juan-vieja", user_id: YO, agregado_por: JUAN, created_at: "" })
+    const d = await (await GET()).json()
+    expect(d.archivadas.map((z: any) => z.id)).toEqual(["z-de-juan-vieja"])
+    expect(d.archivadas[0].compartida_con).toEqual([{ id: YO, nombre: "Leo" }])
+  })
+
+  it("la zona archivada de un colega que NO me compartió no viaja", async () => {
+    base.tablas.farming_zonas.push({ id: "z-de-juan-vieja", agency_id: AGENCIA, owner_user_id: JUAN, nombre: "De Juan, vieja", geojson: cuadrado(-58.30, -34.56), area_km2: 1, estado: "archivada", origen_mapa_zona_id: null, trazo_editado_en: null, created_at: "" })
+    const d = await (await GET()).json()
+    expect(d.archivadas).toEqual([])
+    expect(JSON.stringify(d)).not.toContain("z-de-juan-vieja")
+  })
+
+  it("una zona LIBERADA por el director no vuelve por ningún balde", async () => {
+    base.tablas.farming_zonas.push({ id: "z-liberada", agency_id: AGENCIA, owner_user_id: YO, nombre: "Liberada", geojson: cuadrado(-58.30, -34.56), area_km2: 1, estado: "liberada", origen_mapa_zona_id: null, trazo_editado_en: null, created_at: "" })
+    const d = await (await GET()).json()
+    expect(JSON.stringify(d)).not.toContain("z-liberada")
+  })
 })
 
 describe("POST /api/farming/zonas", () => {
@@ -110,6 +151,21 @@ describe("POST /api/farming/zonas", () => {
     expect(d.choques[0].owner_nombre).toBe("Juan Pérez")
     expect(d.choques[0].recorte.type).toBe("Polygon")
     expect(base.tablas.farming_zonas).toHaveLength(antes)
+  })
+
+  it("una zona ARCHIVADA no cuenta para el tope de 3: sus cuadras ya están libres", async () => {
+    for (let i = 0; i < 2; i++) {
+      base.tablas.farming_zonas.push({ id: `z-mia-${i}`, agency_id: AGENCIA, owner_user_id: YO, nombre: `Mía ${i}`, geojson: cuadrado(-58.30 + i * 0.05, -34.56), area_km2: 1, estado: "activa", origen_mapa_zona_id: null, trazo_editado_en: null, created_at: "" })
+    }
+    base.tablas.farming_zonas.push({ id: "z-archivada", agency_id: AGENCIA, owner_user_id: YO, nombre: "Vieja", geojson: cuadrado(-58.20, -34.56), area_km2: 1, estado: "archivada", origen_mapa_zona_id: null, trazo_editado_en: null, created_at: "" })
+    const r = await post({ nombre: "Tercera", geojson: cuadrado(-58.10, -34.56) })
+    expect(r.status).toBe(201)
+  })
+
+  it("una zona ARCHIVADA tampoco bloquea el trazo: se puede volver a dibujar encima", async () => {
+    base.tablas.farming_zonas.find((z) => z.id === "z-juan")!.estado = "archivada"
+    const r = await post({ nombre: "Encima", geojson: cuadrado(-58.455, -34.56) })
+    expect(r.status).toBe(201)
   })
 
   it("una zona liberada ya no bloquea", async () => {

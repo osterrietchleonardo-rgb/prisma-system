@@ -12,6 +12,7 @@ import PrintButton from "./PrintButton";
 import AjusteAncho from "./AjusteAncho";
 import type { AcmFichaSnapshot, FichaBrand, FichaComparable, FichaZona } from "@/lib/acm/ficha";
 import { condensarDescripcion } from "@/lib/acm/descripcion";
+import { fmtAntiguedad } from "@/lib/acm/antiguedad";
 import { metrosLegible } from "@/lib/acm/zona-formato";
 import { COLOR_ZONA, COLOR_PROPIEDAD, categoriasEnElMapa } from "@/lib/acm/zona-mapa";
 
@@ -169,7 +170,7 @@ export default async function FichaAcmPage({ params }: { params: { token: string
             <div className="cover-meta-block">
               <span className="label">Propiedad de referencia</span>
               <strong style={{ color: primary }}>{subject.direccion || "Propiedad analizada"}</strong>
-              <span className="muted">{[subject.tipo, subject.barrio, subject.m2 ? `${subject.m2} m²` : null, opLabel].filter(Boolean).join(" · ")}</span>
+              <span className="muted">{[subject.tipo, subject.barrio, subject.m2 ? `${subject.m2} m²` : null, subject.antiguedad != null ? fmtAntiguedad(subject.antiguedad) : null, opLabel].filter(Boolean).join(" · ")}</span>
             </div>
             <div className="cover-meta-block">
               <span className="label">Fecha de análisis</span>
@@ -580,6 +581,7 @@ function ComparableSheet({
     { label: "Ambientes", value: c.ambientes ?? "—" },
     { label: "Dormitorios", value: c.dormitorios ?? "—" },
     { label: "Baños", value: c.banos ?? "—" },
+    { label: "Antigüedad", value: fmtAntiguedad(c.antiguedad) },
     { label: "Valor / m²", value: fmtM2(c.precio_m2, c.moneda) },
   ];
 
@@ -819,7 +821,7 @@ const CSS = `
 .comp-lindero { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; background: #f5ead6; color: #8a6320; vertical-align: middle; }
 
 /* Ficha técnica */
-.specs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin: 11px 0; }
+.specs { display: grid; grid-template-columns: repeat(6, 1fr) 1.45fr; gap: 7px; margin: 11px 0; }
 .spec { border: 1px solid #ece8df; border-radius: 10px; padding: 7px 4px; text-align: center; background: #fcfbf8; }
 .spec-val { font-size: 13.5px; font-weight: 800; }
 .spec-label { font-size: 8.5px; text-transform: uppercase; letter-spacing: .05em; color: #8a8a8a; margin-top: 3px; }

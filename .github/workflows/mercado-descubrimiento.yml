@@ -1,8 +1,17 @@
 # Descubrimiento diario de mercado_avisos: captura lo publicado en TODO CABA
-# (filterLocation "Capital Federal", barrido A, centavos por corrida) y lo
-# embebe. El cron de Actions se atrasa horas — es esperado y no importa: el
-# filtro es "publicado en los últimos 2 días", así que corra cuando corra no
-# pierde nada, y el solape lo cubre el refresco mensual.
+# (filterLocation "Capital Federal", barrido A) y lo embebe. El cron de Actions
+# se atrasa horas — es esperado y no importa para la cobertura: la ventana es
+# "el día anterior entero + lo que va de hoy", así que corra cuando corra no
+# pierde nada.
+#
+# PERO LA HORA SÍ IMPORTA PARA EL BOLSILLO. Apify cobra por aviso devuelto y la
+# ventana incluye lo que va de hoy, que mañana se vuelve a pagar. Medido el
+# 8-sep con la corrida de las 11:19 de la mañana: 1.182 avisos del día anterior
+# + 315 del propio día; esos 315 se pagaron dos veces. Corriendo a la medianoche
+# argentina esa repetición baja a casi nada: ~US$ 10 por mes.
+#
+# La ventana ya no se escribe acá: la calcula el script (piso 2, techo 3 cuando
+# faltó una corrida). El plan de gasto completo está en mercado-sync/plan.mjs.
 #
 # Secrets que necesita: APIFY_API_KEY, NEXT_PUBLIC_SUPABASE_URL,
 # SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY.
@@ -11,7 +20,7 @@ name: mercado-descubrimiento
 
 on:
   schedule:
-    - cron: '0 10 * * *'   # ~7:00 Argentina (se atrasa; da igual, ver arriba)
+    - cron: '30 3 * * *'   # 00:30 en Argentina (el cron se atrasa: cuanto más temprano arranque, menos se repite)
   workflow_dispatch: {}
 
 jobs:
@@ -41,7 +50,7 @@ jobs:
           APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node mercado-sync/descubrimiento.mjs --location "Capital Federal" --zona caba --dentro-de 2 --max 1800
+        run: node mercado-sync/descubrimiento.mjs --location "Capital Federal" --zona caba --max 1800 --tope-usd 90
       # Zonas fuera de CABA: el filtro "Capital Federal" no las ve, van como paso propio.
       # `continue-on-error`: una falla acá no debe frenar los embeddings de CABA.
       # --zona con centroide en loader.mjs → lo que caiga fuera de la localidad va a cuarentena.
@@ -51,7 +60,7 @@ jobs:
           APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node mercado-sync/descubrimiento.mjs --location "Don Torcuato" --zona don-torcuato --tipo-prop terrenos --dentro-de 2 --max 200
+        run: node mercado-sync/descubrimiento.mjs --location "Don Torcuato" --zona don-torcuato --tipo-prop terrenos --max 200 --tope-usd 90
       - name: Embeddings de lo nuevo
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

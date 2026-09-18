@@ -12,13 +12,19 @@ export const dynamic = "force-dynamic"
 async function zonaPropia(admin: ReturnType<typeof createAdminClient>, id: string, agencyId: string, userId: string) {
   const { data, error } = await admin
     .from("farming_zonas")
-    .select("id, owner_user_id")
+    .select("id, owner_user_id, estado")
     .eq("id", id)
     .eq("agency_id", agencyId)
     .maybeSingle()
   if (error) throw error
   if (!data) return { status: 404 as const, error: "No encontramos esa zona" }
   if ((data as any).owner_user_id !== userId) return { status: 403 as const, error: "Solo quien dibujó la zona puede compartirla" }
+  // Compartir y dejar de compartir ESCRIBEN sobre el territorio, y una zona archivada (o
+  // liberada) ya no se trabaja: se mira. Sacarle el acceso acá a un colega sería borrarle de la
+  // pantalla un tablero que ya no puede recuperar de ninguna otra forma.
+  if ((data as any).estado !== "activa") {
+    return { status: 409 as const, error: "Esta zona ya no está activa: no se puede cambiar con quién la compartís." }
+  }
   return { status: 200 as const, error: null }
 }
 

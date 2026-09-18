@@ -13,6 +13,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { prismaIA } from "@/lib/gemini";
+import { fotosDelAviso } from "@/lib/acm/fotos-aviso";
+import { elegirBarrio } from "@/lib/acm/barrio-aviso";
+import { obtenerPaginaSegura, UrlNoPermitida, validarUrlPublica } from "@/lib/acm/url-segura";
 import type { ExtractResult, Moneda, Operacion, TipoPropiedad, Sujeto } from "@/lib/tasacion/types";
 
 const UA =
@@ -79,6 +82,8 @@ const AMEN_RE: Record<string, RegExp> = {
   seguridad_24hs: /seguridad 24|vigilanc|24 ?hs|24 hour|porter[ií]a|portero/i,
   jardin_privado: /jard[ií]n|\bgarden\b|backyard|fondo verde/i,
   terraza_privada: /terraza|\bterrace\b|solarium|sol[áa]rium/i,
+  // Laundry del edificio. "Laundry room" (Tokko) y "lavadero" son de la unidad: no cuentan.
+  laundry: /laundry(?! ?room)|lavander[íi]a/i,
 };
 function mapAmenidades(text?: string | null): Record<string, boolean> {
   const out: Record<string, boolean> = {};
@@ -115,7 +120,7 @@ function pickListing(nodes: any[]): any | null {
   );
 }
 
-function fromJsonLd(html: string): { extract: Partial<ExtractResult>; sujeto: Partial<Sujeto> } | null {
+function fromJsonLd(html: string): { extract: Partial<ExtractResult>; sujeto: Partial<Sujeto>; barrios: string[] } | null {
   const nodes = parseJsonLdListings(html);
   if (nodes.length === 0) return null;
   const ld = pickListing(nodes);
@@ -142,7 +147,6 @@ function fromJsonLd(html: string): { extract: Partial<ExtractResult>; sujeto: Pa
 
   const sujeto: Partial<Sujeto> = {
     direccion: addr.streetAddress || ld.name || "",
-    barrio: addr.addressLocality || addr.addressRegion || "",
     tipo_propiedad: mapTipo(Array.isArray(me["@type"]) ? me["@type"][0] : me["@type"] || ld.name),
     m2_cubiertos: m2 ?? 0,
     dormitorios: bedrooms ?? (rooms ? Math.max(0, rooms - 1) : 0),
@@ -159,6 +163,9 @@ function fromJsonLd(html: string): { extract: Partial<ExtractResult>; sujeto: Pa
       metodo: "json-ld",
     },
     sujeto,
+    // Los dos campos van como CANDIDATOS: Argenprop y Zonaprop ponen la ciudad en
+    // addressLocality y el barrio en addressRegion. Decide `elegirBarrio` al final.
+    barrios: [addr.addressLocality, addr.addressRegion].filter((b: unknown): b is string => typeof b === "string"),
   };
 }
 
@@ -215,7 +222,7 @@ async function fromIA(html: string, url = ""): Promise<{ extract: Partial<Extrac
   if (contenido.length < 60) return null;
 
   const prompt = `Sos un analista inmobiliario experto de Argentina. Te paso TODO el contenido de la página de un aviso. Leé y RAZONÁ sobre el conjunto (título, URL, descripción, datos del portal y texto), y devolvé SOLO un JSON válido (sin texto extra):
-{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_semicubiertos":0,"m2_descubiertos":0,"m2_terreno":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"piso":null,"orientacion":"norte|sur|este|oeste|ne|no|se|so|null","precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","expensas":0,"responsable":"inmobiliaria o publicante, o null","fecha_publicacion":null,"amenidades":{"cochera_cubierta":false,"cochera_descubierta":false,"baulera":false,"pileta":false,"gimnasio":false,"sum":false,"seguridad_24hs":false,"jardin_privado":false,"terraza_privada":false}}
+{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_semicubiertos":0,"m2_descubiertos":0,"m2_terreno":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"piso":null,"orientacion":"norte|sur|este|oeste|ne|no|se|so|null","precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","expensas":0,"responsable":"inmobiliaria o publicante, o null","fecha_publicacion":null,"amenidades":{"cochera_cubierta":false,"cochera_descubierta":false,"baulera":false,"pileta":false,"gimnasio":false,"sum":false,"seguridad_24hs":false,"jardin_privado":false,"terraza_privada":false,"laundry":false}}
 Traé el MÁXIMO de variables que ENCUENTRES en el aviso (no dejes vacío lo que sí está escrito). Cómo razonar (interpretá lo que dice la página, NO adivines ni pongas valores por defecto):
 - operacion: mirá la URL, el título y el texto. "alquiler"/"alquilar"/"renta" -> alquiler. "venta"/"en venta"/"comprar" -> venta. Si de verdad no se puede determinar, null. PROHIBIDO asumir "venta" sin señal.
 - moneda: mirá cómo se muestra el precio. "US$"/"U$S"/"USD"/"dólares" -> USD. "$"/"ARS"/"pesos" sin símbolo de dólar -> ARS. Coherencia: alquiler mensual suele ser ARS, venta suele ser USD, pero mandá lo que la página indica. Si no hay señal, null.
@@ -223,7 +230,7 @@ Traé el MÁXIMO de variables que ENCUENTRES en el aviso (no dejes vacío lo que
 - superficies: m2_cubiertos = cubierta; m2_semicubiertos = balcón/semicubierto; m2_descubiertos = patio/descubierto; m2_terreno = lote. Si solo dan total, ponela en m2_cubiertos.
 - piso: número de piso si aplica (PB = 0), si no null. orientacion: solo si el aviso la indica, si no null. antiguedad_anios: años; "a estrenar"/"nuevo" = 0.
 - "ambientes" NO es "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1.
-- amenidades: RAZONÁ cada una y poné true SOLO la que el aviso confirme (si dice "No" o no la menciona, false). "cochera cubierta"->cochera_cubierta; "cochera descubierta"->cochera_descubierta; "baulera"->baulera; "pileta/piscina"->pileta; "gimnasio/gym"->gimnasio; "SUM"->sum; cualquier vigilancia/portería/"Seguridad: Sí"->seguridad_24hs; "jardín" propio->jardin_privado; "terraza/balcón aterrazado/solárium"->terraza_privada. NO coincidencia literal: interpretá el sentido.
+- amenidades: RAZONÁ cada una y poné true SOLO la que el aviso confirme (si dice "No" o no la menciona, false). "cochera cubierta"->cochera_cubierta; "cochera descubierta"->cochera_descubierta; "baulera"->baulera; "pileta/piscina"->pileta; "gimnasio/gym"->gimnasio; "SUM"->sum; cualquier vigilancia/portería/"Seguridad: Sí"->seguridad_24hs; "jardín" propio->jardin_privado; "terraza/balcón aterrazado/solárium"->terraza_privada; "laundry"/"lavandería" del edificio -> laundry (el "lavadero" de la unidad NO es laundry). NO coincidencia literal: interpretá el sentido.
 - Si un dato no está: null (0 en numéricos, amenidades en false).
 CONTENIDO:
 """${contenido}"""`;
@@ -272,6 +279,29 @@ CONTENIDO:
   }
 }
 
+const ENTIDADES: Record<string, string> = { "&amp;": "&", "&quot;": '"', "&#39;": "'", "&#x27;": "'", "&lt;": "<", "&gt;": ">", "&nbsp;": " " };
+
+/** El texto de la publicación: la descripción del JSON-LD si el portal la trae, si no la de las
+ *  etiquetas meta. Se usa en la ficha del cliente cuando el aviso se suma como comparable (ahí
+ *  pasa por `condensarDescripcion`, que le saca la letra chica y los datos de contacto). */
+export function descripcionDesdeHtml(html: string | null | undefined): string {
+  if (!html) return "";
+  const ld = parseJsonLdListings(html)
+    .map((n) => (typeof n?.description === "string" ? n.description : typeof n?.mainEntity?.description === "string" ? n.mainEntity.description : ""))
+    .find((d) => d.trim().length > 40);
+  const meta = (prop: string) => {
+    const re = new RegExp(`<meta[^>]+(?:property|name)\\s*=\\s*["']${prop}["'][^>]*content\\s*=\\s*["']([^"']+)["']`, "i");
+    return html.match(re)?.[1] || "";
+  };
+  const crudo = ld || meta("og:description") || meta("description") || "";
+  return crudo
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&(?:amp|quot|#39|#x27|lt|gt|nbsp);/g, (e: string) => ENTIDADES[e] ?? e)
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 4000);
+}
+
 function looksBlocked(status: number, html: string): boolean {
   if (status === 403 || status === 429 || status === 503 || status === 0) return true;
   const h = html.toLowerCase();
@@ -279,22 +309,29 @@ function looksBlocked(status: number, html: string): boolean {
 }
 
 // ── Tier 2: servicio extractor con navegador stealth (opcional, env-gated). ──
-async function tryExtractorService(url: string): Promise<ExtractResult | null> {
+async function tryExtractorService(url: string, conFotos = false): Promise<ExtractResult | null> {
   const svc = process.env.ACM_EXTRACTOR_URL;
   if (!svc) return null;
+  // El servicio abre el link con un navegador dentro de NUESTRO servidor de EasyPanel: un link
+  // interno no se le manda nunca. Se valida acá, antes de mandarlo, y no se confía en que el que
+  // llama lo haya hecho.
+  if (!(await validarUrlPublica(url)).ok) return null;
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (process.env.ACM_EXTRACTOR_SECRET) headers["x-extractor-secret"] = process.env.ACM_EXTRACTOR_SECRET;
     const res = await fetch(svc, {
       method: "POST",
       headers,
-      body: JSON.stringify({ url }),
+      // `con_html`: el servicio devuelve además la página, de donde salen las fotos y el texto
+      // del aviso. Solo lo pide el comparable por link: la carga de la propiedad no los usa y la
+      // página pesa cientos de KB. Un servicio viejo que no conoce el campo lo ignora (sin fotos).
+      body: JSON.stringify({ url, ...(conFotos ? { con_html: true } : {}) }),
       // el servicio puede tardar (resuelve Cloudflare); damos margen, pero acotado
       // para que la suma de tiempos no supere el maxDuration de la función (60s).
       signal: AbortSignal.timeout(38000),
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as Partial<ExtractResult>;
+    const { html: paginaServicio, ...data } = (await res.json()) as Partial<ExtractResult> & { html?: string };
     // Respetamos el veredicto del servicio: si NO pudo leer la página (bloqueo/thin), devuelve
     // ok:false y requiere_completar_manual:true. NO lo forzamos a "ok" para no dar datos inventados.
     const ok = data.ok ?? Boolean(data.precio || (data.sujeto && (data.sujeto.m2_cubiertos || data.sujeto.dormitorios)));
@@ -304,6 +341,9 @@ async function tryExtractorService(url: string): Promise<ExtractResult | null> {
       ok,
       requiere_completar_manual: data.requiere_completar_manual ?? !ok,
       metodo: "extractor-service",
+      ...(conFotos && typeof paginaServicio === "string"
+        ? { fotos: fotosDelAviso(url, paginaServicio), descripcion: descripcionDesdeHtml(paginaServicio) }
+        : {}),
     };
   } catch {
     return null;
@@ -311,24 +351,41 @@ async function tryExtractorService(url: string): Promise<ExtractResult | null> {
 }
 
 // ── Orquestador principal ──
-export async function extractFromUrl(url: string): Promise<ExtractResult> {
+/**
+ * @param opts.conFotos Además de los datos, las fotos y el texto del propio aviso. Lo pide el
+ *   comparable sumado por link; la carga de la propiedad analizada no lo necesita.
+ */
+export async function extractFromUrl(url: string, opts: { conFotos?: boolean } = {}): Promise<ExtractResult> {
+  const conFotos = opts.conFotos === true;
   const fuente_portal = portalFromUrl(url);
+
+  // Antes que nada: un link que apunta a una dirección interna no se abre por ningún camino
+  // (ni acá ni en el servicio con navegador). Ver lib/acm/url-segura.ts.
+  const validacion = await validarUrlPublica(url);
+  if (!validacion.ok) {
+    return { ...emptyResult(), fuente_portal, aviso: `Ese link no se puede abrir: ${validacion.motivo}.` };
+  }
 
   let status = 0;
   let html = "";
   try {
-    const res = await fetch(url, {
+    // Pedido seguro: sigue las redirecciones a mano y vuelve a controlar el destino en cada una,
+    // incluida la dirección a la que se conecta de verdad.
+    const pagina = await obtenerPaginaSegura(url, {
       headers: {
         "User-Agent": UA,
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
       },
-      redirect: "follow",
-      signal: AbortSignal.timeout(12000),
+      timeoutMs: 12000,
     });
-    status = res.status;
-    html = await res.text();
-  } catch {
+    status = pagina.status;
+    html = pagina.html;
+  } catch (e) {
+    // Un salto que lleva adentro corta todo: tampoco se le pasa el link al servicio con navegador.
+    if (e instanceof UrlNoPermitida) {
+      return { ...emptyResult(), fuente_portal, aviso: `Ese link no se puede abrir: ${e.message}.` };
+    }
     status = 0;
   }
 
@@ -343,14 +400,18 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
   // Si parece bloqueado, intentamos primero el servicio con navegador (si existe).
   if (blocked) {
     serviceTried = true;
-    const viaSvc = await tryExtractorService(url);
+    const viaSvc = await tryExtractorService(url, conFotos);
     if (viaSvc) return { ...viaSvc, fuente_portal };
   }
 
   // Tier 1: estructurado (JSON-LD → OpenGraph) y, si queda flojo, IA.
   const parts: Array<{ extract: Partial<ExtractResult>; sujeto: Partial<Sujeto> } | null> = [];
+  // Candidatos a barrio de todas las fuentes; se elige uno solo al final (ver barrio-aviso.ts).
+  const barrios: string[] = [];
   if (html) {
-    parts.push(fromJsonLd(html));
+    const ld = fromJsonLd(html);
+    if (ld) barrios.push(...ld.barrios);
+    parts.push(ld);
     parts.push(fromOpenGraph(html));
   }
 
@@ -370,7 +431,7 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
   // renderizada como un usuario real: resuelve ML/ZonaProp/Argenprop) antes de seguir.
   if (!tieneDatosMinimos && !serviceTried) {
     serviceTried = true;
-    const viaSvc = await tryExtractorService(url);
+    const viaSvc = await tryExtractorService(url, conFotos);
     if (viaSvc) return { ...viaSvc, fuente_portal };
   }
 
@@ -380,6 +441,7 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
   if (html && !blocked) {
     const ia = await fromIA(html, url);
     if (ia) {
+      if (ia.sujeto.barrio) barrios.push(ia.sujeto.barrio);
       // Vacíos: la IA completa lo que los deterministas no trajeron.
       for (const [k, v] of Object.entries(ia.sujeto)) if (isEmpty((sujeto as any)[k]) && !isEmpty(v)) (sujeto as any)[k] = v;
       for (const [k, v] of Object.entries(ia.extract)) if (isEmpty((ext as any)[k]) && !isEmpty(v)) (ext as any)[k] = v;
@@ -399,6 +461,10 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
     }
   }
 
+  // El barrio no es "el primero que llegó" sino el que confirman el link o varias fuentes, y
+  // nunca una ciudad entera ("CABA", "Capital Federal"). Vacío si ninguno es un barrio real.
+  sujeto.barrio = elegirBarrio(barrios, url);
+
   const ok = Boolean((sujeto.m2_cubiertos && sujeto.m2_cubiertos > 0) || (sujeto.dormitorios && sujeto.dormitorios > 0) || ext.precio);
 
   return {
@@ -414,6 +480,7 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
     metodo: (ext.metodo as ExtractResult["metodo"]) ?? "opengraph",
     ok,
     requiere_completar_manual: !ok,
+    ...(conFotos && html && !blocked ? { fotos: fotosDelAviso(url, html), descripcion: descripcionDesdeHtml(html) } : {}),
     aviso: ok
       ? undefined
       : blocked

@@ -73,6 +73,18 @@ describe("compartir", () => {
     expect((await postCompartir("z-juan", { user_id: PAUSADO })).status).toBe(403)
   })
 
+  // Compartir y dejar de compartir ESCRIBEN sobre el territorio. Una zona archivada ya no se
+  // trabaja —se mira—, y sacarle el acceso a un colega ahí sería borrarle de la pantalla un
+  // tablero que no puede recuperar de ninguna otra forma.
+  it("una zona archivada no se comparte ni se descomparte: 409 y la lista de compartidos queda igual", async () => {
+    base.tablas.farming_zonas_compartidas.push({ zona_id: "z-mia", user_id: JUAN, agregado_por: YO, created_at: "" })
+    base.tablas.farming_zonas.find((z) => z.id === "z-mia")!.estado = "archivada"
+
+    expect((await postCompartir("z-mia", { user_id: "u-nulo" })).status).toBe(409)
+    expect((await delCompartir("z-mia", JUAN)).status).toBe(409)
+    expect(base.tablas.farming_zonas_compartidas).toHaveLength(1)
+  })
+
   it("un asesor con estado null cuenta como activo", async () => {
     expect((await postCompartir("z-mia", { user_id: "u-nulo" })).status).toBe(200)
   })

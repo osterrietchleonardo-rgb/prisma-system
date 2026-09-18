@@ -1,4 +1,27 @@
 import type { AcmSecciones } from "./material";
+import { HOSTS_RED, normalizarImagenes, primerasFotosPermitidas, urlsFotoRed } from "./fotos-url";
+
+/**
+ * Fotos, características y texto de un comparable sumado por link que NO está en la red. No hay
+ * fila en la base para releerlos, así que llegan dentro del comparable, que pasó por el
+ * navegador: no se les cree a ciegas. Una foto de un host que no es de un portal conocido no
+ * llega a la ficha, y los textos se acotan.
+ */
+export function datosDeLink(
+  d: { fotos?: unknown; amenities?: unknown; descripcion?: unknown } | null | undefined,
+  maxFotos: number,
+): { images: string[]; amenities: string[]; descripcion: string } {
+  const fotos = primerasFotosPermitidas(normalizarImagenes(d?.fotos), maxFotos, HOSTS_RED);
+  const amenities = (Array.isArray(d?.amenities) ? d!.amenities : [])
+    .filter((a): a is string => typeof a === "string" && a.trim().length > 0)
+    .map((a) => a.slice(0, 60))
+    .slice(0, 30);
+  return {
+    images: urlsFotoRed(fotos),
+    amenities,
+    descripcion: typeof d?.descripcion === "string" ? d.descripcion.slice(0, 4000) : "",
+  };
+}
 
 // ACM · Ficha pública de comparables.
 // Tipos del snapshot + cálculos deterministas (pulso de mercado por barrio/ambientes y comparación de $/m²).
@@ -31,7 +54,7 @@ export interface FichaPulso {
 // ── Un comparable dentro de la ficha (comparable del ACM + fotos/amenities/desc) ──
 export interface FichaComparable {
   id: string;
-  source: "cartera" | "roomix";
+  source: "cartera" | "roomix" | "link";
   match_pct: number;
   titulo: string;
   direccion: string;
@@ -41,6 +64,9 @@ export interface FichaComparable {
   ambientes: number | null;
   dormitorios: number | null;
   banos: number | null;
+  /** 0 = a estrenar, negativo = en pozo, null = el aviso no lo dice. Ausente en fichas
+   *  anteriores a sep-2026 (se muestra "—", igual que un dato que no está). */
+  antiguedad?: number | null;
   precio: number | null;
   moneda: string;
   precio_m2: number | null;
@@ -105,6 +131,8 @@ export interface FichaBrand {
 export interface AcmFichaSnapshot {
   subject: {
     direccion: string; barrio: string; tipo: string; m2: number | null; dormitorios: number | null; banos: number | null;
+    /** Misma convención que en el comparable. Ausente en fichas anteriores a sep-2026. */
+    antiguedad?: number | null;
     /** Descripción de la IA editada por el asesor. Solo viaja si la tildó para la ficha. */
     descripcion?: string | null;
   };

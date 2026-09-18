@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizarFotoRoomix, normalizarImagenes, urlFotoRed, urlsFotoRed, esTipoFotoPermitido } from "./fotos-url";
+import { normalizarFotoRoomix, normalizarFotoMercado, normalizarImagenes, urlFotoRed, urlsFotoRed, esTipoFotoPermitido } from "./fotos-url";
 
 // El caso real que motivó el arreglo: la propiedad 2a998e59 ("Excelente departamento 3
 // ambientes EN DUPLEX", La Cle Estudio Inmobiliario) tenía sus 6 fotos en `.webp` y las 6
@@ -107,11 +107,44 @@ describe("urlFotoRed", () => {
 // imgar.zonapropcdn.com (verificado contra produccion: 20.407 avisos, un solo host). Van por
 // el MISMO proxy que las de roomix y por el mismo motivo: que el navegador del asesor no
 // deje su Referer en el CDN de un tercero.
+//
+// El `wxh` de esta URL no es un dato de ejemplo cualquiera: es la plantilla real que trae
+// `foto_portada` sin completar (ver `normalizarFotoMercado` en fotos-url.ts). Medido contra
+// producción el 16-sep-2026: 70.202 de 70.322 avisos con foto (99,8%) la llevan así.
 const MERCADO = "https://imgar.zonapropcdn.com/avisos/1/00/59/17/71/85/wxh/2054528304.jpg";
+const MERCADO_360 = "https://imgar.zonapropcdn.com/avisos/1/00/59/17/71/85/360x266/2054528304.jpg";
+
+// El `wxh` literal da 404 en el CDN de ZonaProp; `360x266`, `720x532` y `1200x1200` dan 200
+// (los tres probados el 16-sep-2026). Ni un asesor entrando a Farming vio una sola foto hasta
+// que se arregló esto: son 70.202 avisos, prácticamente todos los que tienen `foto_portada`.
+describe("normalizarFotoMercado", () => {
+  it("cambia el wxh sin completar por un tamaño real que el CDN sí sirve (200, no 404)", () => {
+    expect(normalizarFotoMercado(MERCADO)).toBe(MERCADO_360);
+  });
+
+  it("una URL de ZonaProp que YA trae un tamaño real sale sin tocar", () => {
+    const yaTieneTamano = "https://imgar.zonapropcdn.com/avisos/1/foto/720x532/2054528304.jpg";
+    expect(normalizarFotoMercado(yaTieneTamano)).toBe(yaTieneTamano);
+  });
+
+  it("solo toca el CDN de mercado: una URL de roomix con wxh en el path no se toca", () => {
+    const roomixConWxh = "https://cdn.roomix.ai/1/2/wxh/foto.jpg";
+    expect(normalizarFotoMercado(roomixConWxh)).toBe(roomixConWxh);
+  });
+
+  it("una URL inválida sale tal cual, sin romper la lista entera", () => {
+    expect(normalizarFotoMercado("no-es-una-url/wxh/x.jpg")).toBe("no-es-una-url/wxh/x.jpg");
+  });
+});
 
 describe("urlFotoRed con el CDN de ZonaProp (mercado_avisos)", () => {
-  it("manda la foto de ZonaProp por nuestro proxy", () => {
-    expect(urlFotoRed(MERCADO)).toBe(`/api/foto-red?u=${encodeURIComponent(MERCADO)}`);
+  it("manda la foto de ZonaProp por nuestro proxy, con el wxh ya corregido a un tamaño real", () => {
+    expect(urlFotoRed(MERCADO)).toBe(`/api/foto-red?u=${encodeURIComponent(MERCADO_360)}`);
+  });
+
+  it("una URL que YA trae un tamaño real no se toca antes de proxear", () => {
+    const yaTieneTamano = "https://imgar.zonapropcdn.com/avisos/1/foto/720x532/2054528304.jpg";
+    expect(urlFotoRed(yaTieneTamano)).toBe(`/api/foto-red?u=${encodeURIComponent(yaTieneTamano)}`);
   });
 
   it("no cae con un host impostor que CONTIENE al de ZonaProp", () => {
@@ -122,6 +155,31 @@ describe("urlFotoRed con el CDN de ZonaProp (mercado_avisos)", () => {
   it("no le cambia la extension: el arreglo .webp->.jpg es un problema de roomix, no de ZonaProp", () => {
     const webp = "https://imgar.zonapropcdn.com/avisos/1/foto.webp";
     expect(urlFotoRed(webp)).toBe(`/api/foto-red?u=${encodeURIComponent(webp)}`);
+  });
+
+  it("el arreglo de roomix (.webp->.jpg) sigue andando igual, sin que el de mercado lo pise", () => {
+    expect(urlFotoRed(ROTA)).toBe(`/api/foto-red?u=${encodeURIComponent(SANA)}`);
+  });
+});
+
+// Los comparables sumados por link (16-sep-2026): las fotos de Argenprop y MercadoLibre salen
+// por el mismo proxy. Solo esos dos hosts exactos: el resto del dominio de un portal no.
+describe("urlFotoRed con las fotos de los portales (comparables por link)", () => {
+  it("manda por el proxy las fotos de Argenprop y de MercadoLibre", () => {
+    const ap = "https://www.argenprop.com/static-content/77823402/01d78f9b-bbb7-4043-af36-c3254ceeb024.jpg";
+    const ml = "https://http2.mlstatic.com/D_NQ_NP_2X_717437-MLA114123645099_072026-F.webp";
+    expect(urlFotoRed(ap)).toBe(`/api/foto-red?u=${encodeURIComponent(ap)}`);
+    expect(urlFotoRed(ml)).toBe(`/api/foto-red?u=${encodeURIComponent(ml)}`);
+  });
+
+  it("no cae con impostores ni con otros subdominios del portal", () => {
+    for (const u of [
+      "https://www.argenprop.com.evil.com/a.jpg",
+      "https://static.argenprop.com/a.jpg",
+      "https://http2.mlstatic.com.evil.com/a.webp",
+    ]) {
+      expect(urlFotoRed(u)).toBe(u);
+    }
   });
 });
 

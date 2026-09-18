@@ -1,7 +1,8 @@
 "use client"
 
-// La página Farming del asesor. Etapa 1: solo «Mis zonas». Las solapas «Relevamiento» y
-// «A la venta en mi zona» llegan en las etapas 3 y 2: acá no se dibujan solapas vacías.
+// La página Farming del asesor, en tres solapas: «Mis zonas» (el territorio), «A la venta en mi
+// zona» (lo que se publica adentro) y «Relevamiento» (lo que carga caminando, la pantalla para
+// la que existe toda la etapa 3).
 import { useCallback, useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
@@ -9,9 +10,12 @@ import type { Dibujo } from "@/lib/farming/geometria"
 import { contornosParaDibujar } from "@/lib/farming/armar"
 import { pedir } from "@/lib/farming/cliente"
 import type { RespuestaZonas, ZonaFarming } from "@/lib/farming/tipos"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ListaZonas } from "./lista-zonas"
 import { CompartirDialog } from "./compartir-dialog"
 import { MapaFarming, type ModoMapa } from "./mapa-farming"
+import { AvisosEnZona } from "./avisos-en-zona"
+import { Relevamiento } from "./relevamiento"
 
 export function FarmingPage() {
   const [datos, setDatos] = useState<RespuestaZonas | null>(null)
@@ -58,11 +62,24 @@ export function FarmingPage() {
   }
 
   const borrar = async (z: ZonaFarming) => {
-    // ETAPA 3: si la zona tiene tarjetas, el texto cambia: "se archiva, tus tarjetas quedan".
-    if (!window.confirm(`¿Borrar «${z.nombre}»? Esas cuadras quedan libres para otro asesor.`)) return
+    // El servidor decide entre borrar y archivar según si la zona tiene tarjetas cargadas
+    // (esta pantalla no lo sabe de antemano: pedirlo costaría una consulta por zona en cada
+    // carga de Farming). Por eso el texto tiene que ser honesto con los DOS desenlaces.
+    if (
+      !window.confirm(
+        `¿Borrar «${z.nombre}»?\n\nSi tenés tarjetas cargadas en esta zona, no se pierde nada: la zona se archiva y tus tarjetas, tus propietarios y su historial quedan guardados. Los vas a poder leer en «Relevamiento», eligiendo la zona archivada, aunque ya no los puedas cambiar.\n\nSi no tenés ninguna, se borra del todo y no queda registro.\n\nEn los dos casos, esas cuadras vuelven a estar libres para que otro asesor las dibuje.`,
+      )
+    )
+      return
     try {
-      await pedir(`/api/farming/zonas/${z.id}`, { method: "DELETE" })
-      toast.success("Zona borrada")
+      const r = await pedir(`/api/farming/zonas/${z.id}`, { method: "DELETE" })
+      // Si la zona tenía tarjetas cargadas, el servidor no la borró: la archivó (spec, "nunca
+      // se pierde trabajo por apretar un botón"). El mensaje depende de lo que respondió.
+      toast.success(
+        r.accion === "archivada"
+          ? "Zona archivada. Tus tarjetas y su historial quedan guardados: los leés en «Relevamiento», eligiendo la zona archivada. Esas cuadras vuelven a estar libres."
+          : "Zona borrada",
+      )
       await recargar()
     } catch (e: any) {
       toast.error(e.message)
@@ -116,22 +133,51 @@ export function FarmingPage() {
           onCerrar={() => setModo(null)}
         />
       ) : (
-        <ListaZonas
-          mias={datos.mias}
-          compartidasConmigo={datos.compartidas_conmigo}
-          topes={datos.topes}
-          miId={datos.mi_id}
-          onNueva={() => setModo({ tipo: "nueva" })}
-          onVer={(z) => {
-            const esMia = datos.mias.some((m) => m.id === z.id)
-            setTituloVer(esMia ? `«${z.nombre}»` : `«${z.nombre}» · zona de ${z.owner_nombre}`)
-            setModo({ tipo: "ver", actual: z.geojson })
-          }}
-          onRedibujar={(z) => setModo({ tipo: "redibujar", zonaId: z.id, actual: z.geojson })}
-          onSumar={(z) => setModo({ tipo: "sumar", zonaId: z.id, actual: z.geojson })}
-          onCompartir={(z) => setCompartiendo(z)}
-          onBorrar={borrar}
-        />
+        <Tabs defaultValue="zonas" className="flex flex-col">
+          <TabsList className="mb-4 self-start rounded-xl border border-accent/10 bg-muted/50 p-1">
+            <TabsTrigger value="zonas" className="h-9 rounded-lg px-4 text-sm data-[state=active]:bg-card data-[state=active]:text-accent">
+              Mis zonas
+            </TabsTrigger>
+            <TabsTrigger value="avisos" className="h-9 rounded-lg px-4 text-sm data-[state=active]:bg-card data-[state=active]:text-accent">
+              A la venta en mi zona
+            </TabsTrigger>
+            <TabsTrigger value="relevamiento" className="h-9 rounded-lg px-4 text-sm data-[state=active]:bg-card data-[state=active]:text-accent">
+              Relevamiento
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="zonas" className="mt-0 data-[state=inactive]:hidden">
+            <ListaZonas
+              mias={datos.mias}
+              compartidasConmigo={datos.compartidas_conmigo}
+              topes={datos.topes}
+              miId={datos.mi_id}
+              onNueva={() => setModo({ tipo: "nueva" })}
+              onVer={(z) => {
+                const esMia = datos.mias.some((m) => m.id === z.id)
+                setTituloVer(esMia ? `«${z.nombre}»` : `«${z.nombre}» · zona de ${z.owner_nombre}`)
+                setModo({ tipo: "ver", actual: z.geojson })
+              }}
+              onRedibujar={(z) => setModo({ tipo: "redibujar", zonaId: z.id, actual: z.geojson })}
+              onSumar={(z) => setModo({ tipo: "sumar", zonaId: z.id, actual: z.geojson })}
+              onCompartir={(z) => setCompartiendo(z)}
+              onBorrar={borrar}
+            />
+          </TabsContent>
+
+          <TabsContent value="avisos" className="mt-0 data-[state=inactive]:hidden">
+            {/* Las compartidas conmigo también cuentan: la zona se trabaja entre los dos. */}
+            <AvisosEnZona zonas={[...datos.mias, ...datos.compartidas_conmigo]} />
+          </TabsContent>
+
+          <TabsContent value="relevamiento" className="mt-0 data-[state=inactive]:hidden">
+            {/* Las compartidas conmigo también cuentan: el tablero de la zona se trabaja entre
+                los dos. Y las ARCHIVADAS van al final, de solo lectura: al archivar le
+                prometimos al asesor que sus tarjetas, su gente y su historial quedaban
+                guardados — esta es la única pantalla donde puede verlos. */}
+            <Relevamiento zonas={[...datos.mias, ...datos.compartidas_conmigo, ...datos.archivadas]} />
+          </TabsContent>
+        </Tabs>
       )}
 
       <CompartirDialog

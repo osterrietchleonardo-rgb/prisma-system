@@ -38,6 +38,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       roomix: Array.isArray(r.roomix)
         ? r.roomix.map((c: any) => (c?.imagen ? { ...c, imagen: urlFotoRed(c.imagen) } : c))
         : [],
+      // Los comparables que el asesor sumó pegando un link. Ausente en búsquedas viejas.
+      agregados: Array.isArray(r.agregados) ? r.agregados : [],
       con_semantica: Boolean(r.con_semantica),
       // Ausente en búsquedas guardadas ANTES de este fix (viejo `resultados` sin estos campos):
       // `Boolean(undefined)` da `false`, el mismo default seguro que ya tenía el front
