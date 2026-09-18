@@ -132,16 +132,8 @@ export function paginaDelChat(o: OpcionesPagina): string {
   var campo = document.getElementById("texto");
   var boton = form.querySelector("button");
 
-  // Quién es este visitante, para que si vuelve mañana siga su conversación. Vive solo en su
-  // navegador; si no se puede guardar (modo privado), el chat funciona igual, sin memoria.
-  var visitante = "";
-  try {
-    visitante = localStorage.getItem("prisma.chat." + WIDGET) || "";
-    if (!visitante) {
-      visitante = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
-      localStorage.setItem("prisma.chat." + WIDGET, visitante);
-    }
-  } catch (e) { visitante = String(Date.now()) + Math.random(); }
+  // Quien es este visitante NO lo decide esta pagina: lo puso el servidor en una cookie que el
+  // JavaScript no puede leer. Asi nadie puede decir que es otra persona y seguir su conversacion.
 
   function agregar(texto, quien) {
     var d = document.createElement("div");
@@ -173,7 +165,6 @@ export function paginaDelChat(o: OpcionesPagina): string {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         widgetId: WIDGET,
-        visitanteId: visitante,
         texto: texto,
         // La página del sitio donde está puesto el chat. La manda el marco de afuera.
         paginaOrigen: PAGINA

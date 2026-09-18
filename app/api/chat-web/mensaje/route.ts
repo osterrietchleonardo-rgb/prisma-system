@@ -20,6 +20,9 @@ import { buscarPaginas } from "@/lib/chat-web/almacen-supabase"
 import { armarAvisoDerivacion, enviarDerivacionPorEmail, telefonoUsable, type ObjetivoDerivacion } from "@/lib/chat-web/derivar"
 import { decidirAtencion, revisarOrigen, revisarProcedencia, type WidgetPublico } from "@/lib/chat-web/puerta"
 import { partirEnMensajes } from "@/lib/chat-web/partir-mensajes"
+import { LIMITES_IP, huellaDeIp, ipDelPedido, pasaElFreno } from "@/lib/chat-web/freno"
+import { cookieDeVisitante, leerVisitante } from "@/lib/chat-web/identidad"
+import { randomBytes } from "node:crypto"
 import { derivarDentroDePrisma } from "@/lib/chat-web/derivar-a-prisma"
 import { avisarPorWhatsApp } from "@/lib/chat-web/avisar-a-quien-atiende"
 import { linkAlChat } from "@/lib/seguimiento/avisos"
@@ -63,11 +66,17 @@ export async function POST(req: Request) {
 
   const cuerpo = (await req.json().catch(() => ({}))) as Record<string, unknown>
   const widgetId = String(cuerpo.widgetId ?? "")
-  const visitanteId = String(cuerpo.visitanteId ?? "").slice(0, 64)
   const texto = String(cuerpo.texto ?? "").trim().slice(0, MAX_TEXTO)
   const paginaOrigen = String(cuerpo.paginaOrigen ?? "").slice(0, 300)
 
-  if (!widgetId || !visitanteId || !texto)
+  // QUIEN es lo dice la cookie que puso el servidor, NO el cuerpo del pedido: si lo dijera el
+  // pedido, con el numero de otra persona se podria seguir SU conversacion (Leonardo, 17/9).
+  // Sin cookie (navegador que las bloquea) se atiende igual, con una identidad de un solo uso:
+  // el chat funciona, pero sin memoria. Se pierde comodidad, no privacidad.
+  const deLaCookie = leerVisitante(req.headers.get("cookie"), widgetId)
+  const visitanteId = deLaCookie ?? randomBytes(16).toString("hex")
+
+  if (!widgetId || !texto)
     return new NextResponse(JSON.stringify({ error: "Pedido incompleto." }), { status: 400, headers: cors(origin, false) })
 
   const { data: fila } = await db
@@ -96,6 +105,12 @@ export async function POST(req: Request) {
     whatsapp_destino: (fila.whatsapp_destino as string | null) ?? null,
   }
   const cabeceras = cors(origin, true)
+  // Si el navegador no traia cookie, se la damos: desde el proximo mensaje sigue su conversacion.
+  if (!deLaCookie)
+    cabeceras.append(
+      "Set-Cookie",
+      cookieDeVisitante(widgetId, visitanteId, new URL(req.url).protocol === "https:")
+    )
 
   // La conversación de este visitante (una por widget + visitante).
   const { data: existente } = await db
@@ -119,8 +134,39 @@ export async function POST(req: Request) {
     conversacionId = nueva.id as string
   }
 
+  // La huella de la conexion: NO la IP. Solo sirve para contar y frenar un bucle.
+  const huella = huellaDeIp(
+    ipDelPedido(req.headers),
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 24) ?? "sal-por-defecto"
+  )
+
   const guardarMensaje = (rol: "visitante" | "asistente" | "sistema", t: string, extra: Record<string, unknown> = {}) =>
-    db.from("web_mensajes").insert({ conversacion_id: conversacionId, agency_id: widget.agency_id, rol, texto: t, ...extra })
+    db.from("web_mensajes").insert({
+      conversacion_id: conversacionId,
+      agency_id: widget.agency_id,
+      rol,
+      texto: t,
+      ...(rol === "visitante" && huella ? { ip_huella: huella } : {}),
+      ...extra,
+    })
+
+  // El freno por conexion. Va ANTES de guardar el mensaje y antes de pensar: si alguien esta en
+  // un bucle, no tiene que costar ni una fila ni un centavo.
+  if (huella) {
+    const desde = new Date(Date.now() - LIMITES_IP.minutosDeVentana * 60_000).toISOString()
+    const { count } = await db
+      .from("web_mensajes")
+      .select("id", { count: "exact", head: true })
+      .eq("ip_huella", huella)
+      .gte("created_at", desde)
+    if (!pasaElFreno(count ?? 0))
+      return new NextResponse(
+        JSON.stringify({
+          texto: "Estuvimos yendo muy rapido. Espera unos minutos y seguimos, o escribinos por los medios de contacto del sitio.",
+        }),
+        { status: 200, headers: cabeceras }
+      )
+  }
 
   await guardarMensaje("visitante", texto)
 

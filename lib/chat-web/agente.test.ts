@@ -103,6 +103,14 @@ describe("el tono: es una operación de mucho dinero, no un chat informal (Leona
     expect(PROMPT_WEB).toContain("NUNCA hables de vos mismo")
   })
 
+  // 18/9, visto en el navegador: ante "busco un depto de 2 ambientes" eligio consulta_empresa,
+  // y con eso el lead le habria llegado a la persona equivocada segun el reparto del director.
+  it("el objetivo no es un tramite: con eso se decide a quien le llega el lead", () => {
+    expect(PROMPT_WEB).toContain("El campo objetivo NO es un trámite")
+    expect(PROMPT_WEB).toContain("desde el primer mensaje")
+    expect(PROMPT_WEB).toContain("consulta_empresa es SOLO para lo que no entra")
+  })
+
   it("pide una idea por mensaje, que es lo que hace que parezca una persona", () => {
     expect(PROMPT_WEB).toContain("Una idea por mensaje")
     expect(PROMPT_WEB).toContain("punto y aparte")

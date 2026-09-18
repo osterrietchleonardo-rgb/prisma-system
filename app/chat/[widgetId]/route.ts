@@ -9,6 +9,8 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { paletaDelChat, fuentesDelChat } from "@/lib/chat-web/estilo"
 import { cspDeLaVentana, paginaDelChat } from "@/lib/chat-web/pagina"
 import { marcaDeLaAgencia } from "@/lib/ficha/snapshot"
+import { cookieDeVisitante, leerVisitante } from "@/lib/chat-web/identidad"
+import { randomBytes } from "node:crypto"
 
 export const dynamic = "force-dynamic"
 /**
@@ -18,7 +20,7 @@ export const dynamic = "force-dynamic"
  */
 export const fetchCache = "force-no-store"
 
-export async function GET(_req: Request, { params }: { params: { widgetId: string } }) {
+export async function GET(req: Request, { params }: { params: { widgetId: string } }) {
   const db = createAdminClient()
   const { data: widget } = await db
     .from("web_widgets")
@@ -57,12 +59,20 @@ export async function GET(_req: Request, { params }: { params: { widgetId: strin
     logo: marca.logo_url,
   })
 
-  return new Response(html, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Content-Security-Policy": cspDeLaVentana((widget.dominios as string[]) ?? []),
-      // Que no quede cacheada con los colores viejos cuando el director cambia la marca.
-      "Cache-Control": "no-store",
-    },
+  // Quien es el visitante lo decide el SERVIDOR, no el pedido: si lo dijera el navegador,
+  // alguien con el numero de otra persona podria seguir SU conversacion (pregunta de
+  // Leonardo, 17/9). Ver lib/chat-web/identidad.ts.
+  const yaEra = leerVisitante(req.headers.get("cookie"), widget.id as string)
+  const visitante = yaEra ?? randomBytes(16).toString("hex")
+  const seguro = new URL(req.url).protocol === "https:"
+
+  const cabeceras = new Headers({
+    "Content-Type": "text/html; charset=utf-8",
+    "Content-Security-Policy": cspDeLaVentana((widget.dominios as string[]) ?? []),
+    // Que no quede cacheada con los colores viejos cuando el director cambia la marca.
+    "Cache-Control": "no-store",
   })
+  if (!yaEra) cabeceras.append("Set-Cookie", cookieDeVisitante(widget.id as string, visitante, seguro))
+
+  return new Response(html, { headers: cabeceras })
 }
