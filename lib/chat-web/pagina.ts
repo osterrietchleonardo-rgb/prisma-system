@@ -181,8 +181,24 @@ export function paginaDelChat(o: OpcionesPagina): string {
     })
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (d) {
-        esperando.remove();
-        agregar(d.texto || "Ahora no te puedo responder. Probá de nuevo en un rato.", "agente");
+        // De a un mensaje, con su pausa: un parrafo largo de golpe se lee como un robot.
+        var partes = (d.textos && d.textos.length ? d.textos : [d.texto])
+          .filter(function (t) { return t; });
+        if (!partes.length) partes = ["Ahora no te puedo responder. Probá de nuevo en un rato."];
+
+        function demora(t) { return Math.min(2500, Math.max(400, 300 + t.length * 18)); }
+
+        return partes.reduce(function (espera, parte, i) {
+          return espera.then(function () {
+            return new Promise(function (listo) {
+              setTimeout(function () {
+                if (i === 0) esperando.remove();
+                agregar(parte, "agente");
+                listo();
+              }, i === 0 ? Math.min(900, demora(parte)) : demora(parte));
+            });
+          });
+        }, Promise.resolve());
       })
       .catch(function () {
         esperando.remove();

@@ -19,6 +19,7 @@ import { armarContexto, resumenParaElAgente } from "@/lib/chat-web/buscar"
 import { buscarPaginas } from "@/lib/chat-web/almacen-supabase"
 import { armarAvisoDerivacion, enviarDerivacionPorEmail, telefonoUsable, type ObjetivoDerivacion } from "@/lib/chat-web/derivar"
 import { decidirAtencion, revisarOrigen, revisarProcedencia, type WidgetPublico } from "@/lib/chat-web/puerta"
+import { partirEnMensajes } from "@/lib/chat-web/partir-mensajes"
 import { derivarDentroDePrisma } from "@/lib/chat-web/derivar-a-prisma"
 import { avisarPorWhatsApp } from "@/lib/chat-web/avisar-a-quien-atiende"
 import { linkAlChat } from "@/lib/seguimiento/avisos"
@@ -157,7 +158,12 @@ export async function POST(req: Request) {
         ...(actualizacion ?? {}),
       })
       .eq("id", conversacionId)
-    return new NextResponse(JSON.stringify({ texto: respuesta }), { status: 200, headers: cabeceras })
+    // `textos` son las burbujas, una idea por vez, como escribe una persona. `texto` queda por
+    // si algo viejo lo lee.
+    return new NextResponse(
+      JSON.stringify({ texto: respuesta, textos: partirEnMensajes(respuesta) }),
+      { status: 200, headers: cabeceras }
+    )
   }
 
   if (!atencion.ok) return contestar(atencion.paraElVisitante)

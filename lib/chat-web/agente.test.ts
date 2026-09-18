@@ -4,6 +4,7 @@ import {
   MAX_ITERACIONES,
   MAX_CARACTERES_RESPUESTA,
   OBJETIVOS,
+  PROMPT_WEB,
   RespuestaWebSchema,
   conversar,
   linksDelTexto,
@@ -88,6 +89,17 @@ describe("RespuestaWebSchema", () => {
     expect(RespuestaWebSchema.safeParse({ texto: "hola", objetivo: "vender_propiedad" }).success).toBe(true)
     expect(RespuestaWebSchema.safeParse({ texto: "hola", objetivo: "cualquier_cosa" }).success).toBe(false)
     expect(OBJETIVOS).toContain("sumarse_equipo")
+  })
+})
+
+describe("el tono: es una operación de mucho dinero, no un chat informal (Leonardo, 17/9)", () => {
+  it("las muletillas que quedaron mal en la prueba real están prohibidas por nombre", () => {
+    for (const muletilla of ["che", "uy", "je", "jaja", "posta"])
+      expect(PROMPT_WEB.toLowerCase(), muletilla).toContain(`"${muletilla}"`)
+  })
+  it("pide una idea por mensaje, que es lo que hace que parezca una persona", () => {
+    expect(PROMPT_WEB).toContain("Una idea por mensaje")
+    expect(PROMPT_WEB).toContain("punto y aparte")
   })
 })
 
