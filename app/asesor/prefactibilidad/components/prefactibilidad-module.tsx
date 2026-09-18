@@ -18,6 +18,9 @@ export function PrefactibilidadModule({ esDirector = false }: { esDirector?: boo
   const [link, setLink] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [abriendo, setAbriendo] = useState(false);
+  // Guarda contra el doble clic en Guardar / Compartir: sin esto, dos clics rápidos crean dos
+  // filas, o dos genToken() donde el segundo pisa al primero y deja muerto un link ya copiado.
+  const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recargar, setRecargar] = useState(0);
 
@@ -33,20 +36,34 @@ export function PrefactibilidadModule({ esDirector = false }: { esDirector?: boo
 
   // Devuelve el id: el estado de React no se actualiza dentro del mismo tick, así que quien lo
   // llame no puede leer `idGuardada` recién seteado.
-  const guardar = async (): Promise<string | null> => {
+  // `interno` es para cuando compartir() ya puso `ocupado` en true y llama a guardar() por dentro:
+  // si guardar() volviera a chequear `ocupado` ahí se pisaría a sí mismo y nunca guardaría nada.
+  const guardar = async (interno = false): Promise<string | null> => {
     if (!p) return null;
-    const r = await fetch("/api/prefactibilidad", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ smp: p.smp, direccion: p.direccion }) });
-    const j = await r.json();
-    if (!r.ok) { setError(j.error || "No se pudo guardar."); return null; }
-    setIdGuardada(j.id); setRecargar((n) => n + 1);
-    return j.id as string;
+    if (ocupado && !interno) return null;
+    if (!interno) setOcupado(true);
+    try {
+      const r = await fetch("/api/prefactibilidad", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ smp: p.smp, direccion: p.direccion }) });
+      const j = await r.json();
+      if (!r.ok) { setError(j.error || "No se pudo guardar."); return null; }
+      setIdGuardada(j.id); setRecargar((n) => n + 1);
+      return j.id as string;
+    } finally {
+      if (!interno) setOcupado(false);
+    }
   };
   const compartir = async () => {
-    const id = idGuardada ?? (await guardar());
-    if (!id) return;
-    const r = await fetch(`/api/prefactibilidad/${id}/compartir`, { method: "POST" });
-    const j = await r.json();
-    if (r.ok) setLink(`${window.location.origin}${j.path}`); else setError(j.error || "No se pudo compartir.");
+    if (ocupado) return;
+    setOcupado(true);
+    try {
+      const id = idGuardada ?? (await guardar(true));
+      if (!id) return;
+      const r = await fetch(`/api/prefactibilidad/${id}/compartir`, { method: "POST" });
+      const j = await r.json();
+      if (r.ok) setLink(`${window.location.origin}${j.path}`); else setError(j.error || "No se pudo compartir.");
+    } finally {
+      setOcupado(false);
+    }
   };
   // Mientras se abre una guardada el buscador queda deshabilitado: si el asesor pudiera escribir,
   // la respuesta tardía pisaría lo que está tecleando (el buscador sincroniza su texto con `p.direccion`).
@@ -79,8 +96,8 @@ export function PrefactibilidadModule({ esDirector = false }: { esDirector?: boo
             <>
               <FichaLote p={p} />
               <div className="flex flex-wrap gap-3">
-                <button type="button" onClick={() => void guardar()} disabled={Boolean(idGuardada)} className="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm font-medium disabled:opacity-60 dark:border-zinc-700">{idGuardada ? "Guardada" : "Guardar"}</button>
-                <button type="button" onClick={compartir} className="min-h-11 rounded-lg bg-[#8d5c2a] px-4 text-sm font-semibold text-white dark:bg-[#c48a4f] dark:text-zinc-950">Compartir ficha</button>
+                <button type="button" onClick={() => void guardar()} disabled={Boolean(idGuardada) || ocupado} className="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm font-medium disabled:opacity-60 dark:border-zinc-700">{idGuardada ? "Guardada" : "Guardar"}</button>
+                <button type="button" onClick={() => void compartir()} disabled={ocupado} className="min-h-11 rounded-lg bg-[#8d5c2a] px-4 text-sm font-semibold text-white disabled:opacity-60 dark:bg-[#c48a4f] dark:text-zinc-950">Compartir ficha</button>
               </div>
               {link && (
                 <div className="rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">

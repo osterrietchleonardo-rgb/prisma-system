@@ -2,6 +2,7 @@
 
 import { describirPlanta, describirUnidad, m2, usd, fechaCorta, LEYENDA } from "@/lib/prefactibilidad/criollo";
 import { requiereEstudio } from "@/lib/prefactibilidad/avisos";
+import { FACTOR_VENDIBLE } from "@/lib/prefactibilidad/codigo";
 import type { Prefactibilidad } from "@/lib/prefactibilidad/tipos";
 
 // LEYENDA vive en lib/prefactibilidad/criollo.ts (la ficha pública, server component, la necesita
@@ -57,7 +58,7 @@ export function FichaLote({ p }: { p: Prefactibilidad }) {
         ) : (
           <dl>
             <Dato k="m² construibles (rango)" v={e.rango ? `${m2(e.rango.piso)} a ${m2(e.rango.techo)}` : "sin dato"} />
-            <Dato k="m² vendibles (80 %)" v={e.rango ? `${m2(e.rango.piso * 0.8)} a ${m2(e.rango.techo * 0.8)}` : "sin dato"} />
+            <Dato k="m² vendibles (80 %)" v={e.rango ? `${m2(e.rango.piso * FACTOR_VENDIBLE)} a ${m2(e.rango.techo * FACTOR_VENDIBLE)}` : "sin dato"} />
           </dl>
         )}
         {p.avisos.filter((a) => !a.fuerte).map((a) => <p key={a.clave} className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">{a.texto}</p>)}

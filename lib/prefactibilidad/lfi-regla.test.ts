@@ -60,6 +60,19 @@ describe("la línea de frente interno a ¼ (art. 6.4.2)", () => {
   });
 });
 
+describe("el rango no queda invertido cuando el ¼ de la manzana es más angosto que la banda mínima", () => {
+  it("semisuma de 63 m (típica, ≥ 62) pero ¼ = 15,75 m < 16 m, en una unidad sin retirados: piso <= techo", () => {
+    // Manzana 70 × 63: el lado de 63 m es típico (semisuma ≥ 62) pero su ¼ da 15,75 m, menos que
+    // la banda mínima de 16 m con la que se mide `piso`. En USAB1 (sin retirados) `techo` no tiene
+    // el ×1,6 que en las demás unidades tapa esta diferencia, así que antes de la corrección
+    // `piso` podía terminar por encima de `techo`.
+    const manzana = rect(0, 0, 70, 63);
+    const lote = rect(30, 0, 8.66, 30);
+    const e = edificabilidadPorRegla(lote, manzana, "USAB1");
+    expect(e.rango!.piso).toBeLessThanOrEqual(e.rango!.techo);
+  });
+});
+
 describe("contra la capa oficial: Roosevelt 4554 (manzana 053-050)", () => {
   it("la regla da 242 ± 6 m² (la oficial da 261 por las extensiones del espacio libre; es un control, no la fuente)", () => {
     const fx = (n: string) => JSON.parse(readFileSync(path.join(__dirname, "__fixtures__", n), "utf8")).features[0].geometry as Poligono;

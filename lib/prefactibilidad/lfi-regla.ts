@@ -124,9 +124,13 @@ export function edificabilidadPorRegla(lote: Poligono, manzana: Poligono, unidad
   const h = huellaPorRegla(lote, manzana, unidad);
   const { a, b } = frenteYFondo(lote, manzana);
   const h16 = recortarAlLote(lote, franjaLonLat(manzana, a, b, BANDA_MINIMA_M));
-  const piso = (h16 ? medirM2(h16, origen) : 0) * def.pisosCuerpo;
-  const m2Cuerpo = h.m2 > 0 ? h.m2 : piso / def.pisosCuerpo;
-  const techo = m2Cuerpo * def.pisosCuerpo + (def.retirados ? m2Cuerpo * (RETIRADO_1_PROP + RETIRADO_2_PROP) : 0);
+  const piso0 = (h16 ? medirM2(h16, origen) : 0) * def.pisosCuerpo;
+  const m2Cuerpo = h.m2 > 0 ? h.m2 : piso0 / def.pisosCuerpo;
+  const techo0 = m2Cuerpo * def.pisosCuerpo + (def.retirados ? m2Cuerpo * (RETIRADO_1_PROP + RETIRADO_2_PROP) : 0);
+  // En unidades sin retirados (USAB0/1/2), techo0 = m2Cuerpo × pisosCuerpo sin el ×1,6 que en las
+  // demás unidades garantiza que el techo quede por encima del piso (banda mínima de 16 m). Si el
+  // ¼ de la manzana da menos de 16 m de profundidad, piso0 puede terminar superando a techo0.
+  const piso = Math.min(piso0, techo0), techo = Math.max(piso0, techo0);
   return {
     modo: "regla", unidades: [unidad], alturaMaxima: def.alturaMaxima, planoLimite: def.planoLimite,
     plantas: [{ nombre: `Planta baja y ${def.pisosCuerpo - 1} pisos`, unidad, m2PorNivel: m2Cuerpo, niveles: def.pisosCuerpo, desdeM: 0, hastaM: def.alturaMaxima }],

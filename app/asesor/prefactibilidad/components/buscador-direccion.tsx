@@ -32,17 +32,21 @@ export function BuscadorDireccion({ onElegir, deshabilitado, texto }: { onElegir
     if (q.trim().length < MINIMO) { setOpciones([]); setAviso(null); return; }
     const t = setTimeout(async () => {
       ctrl.current?.abort();
-      ctrl.current = new AbortController();
+      const miCtrl = new AbortController();
+      ctrl.current = miCtrl;
       try {
-        const r = await fetch(`/api/prefactibilidad/direcciones?q=${encodeURIComponent(q.trim())}`, { signal: ctrl.current.signal });
+        const r = await fetch(`/api/prefactibilidad/direcciones?q=${encodeURIComponent(q.trim())}`, { signal: miCtrl.signal });
         const j = await r.json();
+        // Si mientras esta respuesta volaba se disparó otra búsqueda, ctrl.current ya es otro
+        // AbortController: descartar esta respuesta vieja en vez de pisar lo que el usuario ve.
+        if (ctrl.current !== miCtrl) return;
         if (!r.ok) { setAviso(j.error || "No se pudo buscar."); setOpciones([]); return; }
         setOpciones(j.direcciones || []);
         setAviso(j.fueraDeCaba ? "Por ahora solo Ciudad de Buenos Aires" : null);
         setAbierto(true);
-      } catch (e: any) { if (e?.name !== "AbortError") setAviso("No se pudo buscar."); }
+      } catch (e: any) { if (e?.name !== "AbortError" && ctrl.current === miCtrl) setAviso("No se pudo buscar."); }
     }, ESPERA_MS);
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); ctrl.current?.abort(); };
   }, [q]);
 
   return (
