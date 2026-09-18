@@ -36,12 +36,13 @@ function nombreCuerpo(niveles: number): string {
 export function calcularEdificabilidadOficial(volumenes: VolumenOficial[], lote: Poligono): Edificabilidad | null {
   if (!volumenes.some((v) => v.tipo === "cuerpo principal")) return null;
   const origen = anillosDe(lote)[0][0] as [number, number];
-  const unidades = Array.from(new Set(volumenes.map((v) => v.unidad))) as Unidad[];
+  const todasUnidades = Array.from(new Set(volumenes.map((v) => v.unidad))) as Unidad[];
+  const unidadesConPlantas = new Set<Unidad>();
   const plantas: Planta[] = [];
   const huellas: Poligono[] = [];
   let alturaMaxima = 0, planoLimite = 0;
 
-  for (const unidad of unidades) {
+  for (const unidad of todasUnidades) {
     const def = UNIDADES[unidad];
     const de = (tipo: VolumenOficial["tipo"]) => {
       const vs = volumenes.filter((v) => v.unidad === unidad && v.tipo === tipo);
@@ -52,6 +53,7 @@ export function calcularEdificabilidadOficial(volumenes: VolumenOficial[], lote:
     };
     const cuerpo = de("cuerpo principal");
     if (!cuerpo) continue;
+    unidadesConPlantas.add(unidad);
     const bas = def.basamento ? de("basamento") : null;
     const nivelesCuerpo = bas ? def.pisosCuerpo - 2 : def.pisosCuerpo;
     if (bas) plantas.push({ nombre: "Basamento (PB y 1º piso)", unidad, m2PorNivel: Math.max(0, bas.m2), niveles: 2, desdeM: bas.desde, hastaM: bas.hasta });
@@ -66,7 +68,7 @@ export function calcularEdificabilidadOficial(volumenes: VolumenOficial[], lote:
   if (plantas.length === 0) return null;
   const m2Construibles = plantas.reduce((s, p) => s + p.m2PorNivel * p.niveles, 0);
   return {
-    modo: "oficial", unidades, alturaMaxima, planoLimite, plantas,
+    modo: "oficial", unidades: Array.from(unidadesConPlantas), alturaMaxima, planoLimite, plantas,
     m2Construibles, m2Vendibles: m2Construibles * FACTOR_VENDIBLE,
     huella: unirPedazos(huellas),
   };

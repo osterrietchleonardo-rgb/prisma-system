@@ -19,6 +19,7 @@ export function dependenciasSupabase(admin: SupabaseClient): Dependencias {
     },
     async terrenosCerca(lat, lng, radioM) {
       const { data, error } = await admin.rpc("prefactibilidad_terrenos_cerca", { p_lat: lat, p_lng: lng, p_radio_m: radioM, p_limit: 200 });
+      if (error) console.error("Prefactibilidad: falló prefactibilidad_terrenos_cerca", lat, lng, error.message);
       if (error || !data) return [];
       return (data as any[]).map((r): TerrenoCerca => ({ id: r.id, titulo: r.titulo, direccion: r.direccion, barrio: r.barrio, precioUsd: Number(r.precio_usd), superficieM2: Number(r.superficie_total_m2), distanciaM: Number(r.distancia_m), url: r.url_publica, foto: r.foto_portada }));
     },

@@ -66,6 +66,13 @@ describe("analizarParcela: de la parcela al informe", () => {
     expect(r.edificabilidad.rango!.piso).toBeGreaterThan(0);
     expect(r.avisos.map((a) => a.clave)).toContain("sin_envolvente");
   });
+  it("sin envolvente oficial y sin fila CUR → sin rango, no '0 m² a 0 m²'", async () => {
+    const gcba = crearClienteGcba(fetchFalso);
+    const r = await analizarParcela("053-050-006", "x", deps({ gcba: { ...gcba, volumenes: async () => [] }, curDe: async () => null }));
+    expect(r.edificabilidad.modo).toBe("regla");
+    expect(r.edificabilidad.rango).toBeUndefined();
+    expect(r.edificabilidad.m2Construibles).toBe(0);
+  });
   it("parcela inexistente → ParcelaNoEncontrada", async () => {
     const gcba = crearClienteGcba(fetchFalso);
     await expect(analizarParcela("999-999-999", "x", deps({ gcba: { ...gcba, parcela: async () => null } }))).rejects.toBeInstanceOf(ParcelaNoEncontrada);

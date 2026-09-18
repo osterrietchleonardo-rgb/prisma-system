@@ -51,7 +51,10 @@ export async function analizarParcela(smp: string, direccion: string, deps: Depe
   }
   const avisos = armarAvisos({ cur, lote: datos.catastro, manzanaTipo: datos.manzanaTipo, esEsquina: Boolean(esquinaPuerta) || datos.esquinaOficial, edificabilidad: oficial ? edificabilidad : null });
   if (!edificabilidad) {
-    edificabilidad = { modo: "regla", unidades: [], alturaMaxima: 0, planoLimite: 0, plantas: [], m2Construibles: 0, m2Vendibles: 0, huella: null, rango: { piso: 0, techo: 0 } };
+    // Sin envolvente oficial y sin regla (sin fila de CUR o sin geometría de manzana): no hay
+    // rango que mostrar. Dejar `rango` sin definir para que la ficha diga "sin dato" en vez de
+    // "0 m² a 0 m²" (Important 2 del review final).
+    edificabilidad = { modo: "regla", unidades: [], alturaMaxima: 0, planoLimite: 0, plantas: [], m2Construibles: 0, m2Vendibles: 0, huella: null };
   }
 
   const [lng, lat] = datos.catastro.centroide;
