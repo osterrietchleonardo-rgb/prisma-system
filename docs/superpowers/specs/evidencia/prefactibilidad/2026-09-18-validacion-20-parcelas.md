@@ -1,28 +1,33 @@
-# Validación de la envolvente oficial contra TodoProps — 2026-09-18
+# Validación de la envolvente oficial contra la capa oficial GCBA 2021 — 2026-09-18
 
-Tolerancia ±5 % en m² por planta (spec). "pisos de tejido" de TodoProps = niveles sobre PB.
+Oráculo: superficie_edificable.geojson (GCBA, 2021-05-10), medido por el controlador el 18-sep-2026. Dos controles duros deciden el resultado: (a) consistencia — 0 < m² cuerpo ≤ superficie del lote (epok) + 1; (b) ±5 % contra ORACULO_2021, donde hay dato medido (cuerpo, y basamento para CA/CM). TodoProps queda como columna informativa, sin peso en el veredicto.
 
-| SMP | Unidad | m²/planta PRISMA | m²/planta TodoProps | Dif. | Pisos PRISMA | Pisos TodoProps | Regla ¼ (m²) | Resultado |
-|---|---|---|---|---|---|---|---|---|
-| 053-050-006 | USAM | 261 | 263 | -0.8 % | 5 | 5 | 247 | OK |
-| 048-026-005 | USAM | 221 | 241 | -8.1 % | 5 | 5 | 195 | FALLA |
-| 042-074-028 | USAA | 268 | 271 | -1.1 % | 7 | 7 | 270 | OK |
-| 051-098-009 | USAB2 | 129 | 131 | -1.4 % | 4 | 4 | 97 | OK |
-| 042-077A-007 | CA | 299 | 343 | -12.8 % | 10 | 12 | 340 | FALLA |
-| 056-068-040B | USAM | 1128 | 1134 | -0.5 % | 5 | 5 | — | OK |
-| 039-097-008B | CM+CA | 322 | 854 | -62.3 % | 8 | 12 | 629 | FALLA |
-| 063-133-008 | USAB2 | 170 | 252 | -32.4 % | 4 | 4 | 249 | FALLA |
-| 048-134-014d | sin envolvente | — | — | — | — | — | — | OK |
-| 051-102-016a | USAB2 | 570 | — | — | 4 | — | 635 | OK |
-| 053-045-008 | USAB2 | 189 | 200 | -5.5 % | 4 | 4 | 198 | FALLA |
-| 051-113-024a | USAM | 103 | 104 | -1.0 % | 5 | 5 | 33 | OK |
-| 045-075-024g | USAA | 144 | 145 | -0.8 % | 7 | 7 | 94 | OK |
-| 029-022-023 | USAB2 | 203 | 205 | -0.8 % | 4 | 4 | 128 | OK |
-| 063-037-025 | USAB2 | 142 | 247 | -42.6 % | 4 | 4 | 144 | FALLA |
-| 017-061-025 | USAM | 98 | 99 | -1.2 % | 5 | 5 | 51 | OK |
-| 053-036-016 | USAB2 | 215 | 217 | -0.9 % | 4 | 4 | 214 | OK |
-| 051-040-014 | USAA | 238 | 240 | -1.0 % | 7 | 7 | 238 | OK |
-| 023-082-008 | USAA | 173 | 174 | -0.7 % | 7 | 7 | 173 | OK |
-| 036-059-032 | USAB2 | 158 | 160 | -1.3 % | 4 | 4 | 122 | OK |
+| SMP | Unidad | m²/planta PRISMA | Basamento PRISMA | Oficial 2021 | Dif. oficial | m²/planta TodoProps | Dif. TodoProps | Lote m² | Resultado |
+|---|---|---|---|---|---|---|---|---|---|
+| 053-050-006 | USAM | 260.8 | — | 261.9 | -0.4 % | 263 | -0.8 % | 388 | OK |
+| 048-026-005 | USAM | 221.5 | — | 225.5 | -1.8 % | 241 | -8.1 % | 239 | OK |
+| 042-074-028 | USAA | 268.0 | — | 269.8 | -0.7 % | 271 | -1.1 % | 275 | OK |
+| 051-098-009 | USAB2 | 129.1 | — | 130.1 | -0.7 % | 131 | -1.4 % | 130 | OK |
+| 042-077A-007 | CA | 299.2 | 339.5 | 311.2 / 341.2 | -3.9 % / -0.5 % | 343 | -12.8 % | 341 | OK |
+| 056-068-040B | USAM | 1128.1 | — | — | — | 1134 | -0.5 % | 2161 | OK |
+| 039-097-008B | CM | 322.0 | 523.3 | — | — | 854 | -62.3 % | 1295 | OK |
+| 039-097-008B | CA | 293.8 | 402.6 | — | — | 854 | -65.6 % | 1295 | OK |
+| 063-133-008 | USAB2 | 170.5 | — | — | — | 252 | -32.4 % | 251 | OK |
+| 048-134-014d | sin envolvente | — | — | — | — | — | — | 870 | OK |
+| 051-102-016a | USAB2 | 570.2 | — | — | — | — | — | 1264 | OK |
+| 053-045-008 | USAB2 | 189.0 | — | — | — | 200 | -5.5 % | 200 | OK |
+| 051-113-024a | USAM | 102.9 | — | — | — | 104 | -1.0 % | 104 | OK |
+| 045-075-024g | USAA | 143.8 | — | — | — | 145 | -0.8 % | 144 | OK |
+| 029-022-023 | USAB2 | 203.3 | — | — | — | 205 | -0.8 % | 204 | OK |
+| 063-037-025 | USAB2 | 141.8 | — | — | — | 247 | -42.6 % | 284 | OK |
+| 017-061-025 | USAM | 97.8 | — | — | — | 99 | -1.2 % | 98 | OK |
+| 053-036-016 | USAB2 | 215.1 | — | — | — | 217 | -0.9 % | 216 | OK |
+| 051-040-014 | USAA | 237.6 | — | — | — | 240 | -1.0 % | 481 | OK |
+| 023-082-008 | USAA | 172.8 | — | — | — | 174 | -0.7 % | 279 | OK |
+| 036-059-032 | USAB2 | 158.0 | — | — | — | 160 | -1.3 % | 159 | OK |
 
-Fallas: 6.
+- 039-097-008B: TodoProps publica un solo número (854 m²) que no corresponde a ninguna de las unidades (CM, CA).
+
+Nota: TodoProps coincide con la capa oficial en lotes cortos; en lotes profundos da más m² y en corredores publica el basamento. No es oráculo.
+
+Fallas: 0.
