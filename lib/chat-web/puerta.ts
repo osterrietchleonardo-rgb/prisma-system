@@ -61,6 +61,39 @@ function salida(whatsapp: string | null): string {
     : "Para seguir bien esta charla necesito que te contacte alguien del equipo. Dejame tu teléfono o tu email y te escriben."
 }
 
+/**
+ * De qué web viene el pedido, de verdad.
+ *
+ * La ventana del chat la sirve PRISMA y se muestra DENTRO de un marco en el sitio de la
+ * inmobiliaria. Por eso el pedido sale con el origen de PRISMA, no con el del cliente: mirar solo
+ * el origen dejaría afuera al visitante de verdad. Lo que dice de qué web viene es la página que
+ * la ventana informa (el referente del marco).
+ *
+ * Sigue fallando cerrado: si no se puede saber de qué página viene, no se atiende.
+ *
+ * Lo que este control NO puede evitar, y conviene tenerlo escrito: alguien decidido puede armar
+ * un pedido a mano diciendo que viene del sitio del cliente. No consigue datos de nadie —solo
+ * hablar con el asistente— y lo frenan los topes: 30 mensajes por conversación y US$3 por día
+ * por agencia. Para cerrarlo del todo hace falta que la ventana traiga una firma nuestra, y eso
+ * va cuando haya que abrirlo a más clientes.
+ */
+export function revisarProcedencia(opts: {
+  origin: string | null | undefined
+  /** El origen del propio PRISMA que atendió este pedido (local, copia de prueba o producción). */
+  propio: string
+  /** La página del sitio donde está puesto el chat, informada por la ventana. */
+  pagina: string | null | undefined
+  dominios: string[]
+}): boolean {
+  const { origin, propio, pagina, dominios } = opts
+  if (!origin) return false
+  // Pedido hecho directamente desde la web del cliente (sin marco).
+  if (revisarOrigen(origin, dominios)) return true
+  // Pedido hecho desde nuestra ventana: manda la página que la contiene.
+  if (origin.replace(/\/$/, "") !== propio.replace(/\/$/, "")) return false
+  return revisarOrigen(pagina ? (() => { try { return new URL(pagina).origin } catch { return "" } })() : "", dominios)
+}
+
 export function decidirAtencion(opts: {
   widget: WidgetPublico
   conversacion: EstadoConversacion

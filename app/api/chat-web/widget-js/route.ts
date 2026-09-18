@@ -60,7 +60,9 @@ export async function GET(req: Request) {
   boton.addEventListener("click", function () {
     if (marco) { var v = marco.style.display === "none"; marco.style.display = v ? "block" : "none"; return; }
     marco = document.createElement("iframe");
-    marco.src = ORIGEN + "/chat/" + W;
+    // La pagina donde esta puesto el chat viaja explicita: algunos sitios no mandan el
+    // referente (Referrer-Policy: no-referrer) y sin este dato el servidor no atiende.
+    marco.src = ORIGEN + "/chat/" + W + "?p=" + encodeURIComponent(location.origin);
     marco.title = "Chat";
     marco.style.cssText = "position:fixed;right:20px;bottom:88px;width:min(380px,calc(100vw - 40px));"
       + "height:min(560px,calc(100vh - 120px));border:0;border-radius:16px;z-index:2147483000;"

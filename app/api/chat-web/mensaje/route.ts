@@ -18,7 +18,7 @@ import { conversar, type Herramientas, type Mensaje } from "@/lib/chat-web/agent
 import { armarContexto, resumenParaElAgente } from "@/lib/chat-web/buscar"
 import { buscarPaginas } from "@/lib/chat-web/almacen-supabase"
 import { armarAvisoDerivacion, enviarDerivacionPorEmail, telefonoUsable, type ObjetivoDerivacion } from "@/lib/chat-web/derivar"
-import { decidirAtencion, revisarOrigen, type WidgetPublico } from "@/lib/chat-web/puerta"
+import { decidirAtencion, revisarOrigen, revisarProcedencia, type WidgetPublico } from "@/lib/chat-web/puerta"
 import { derivarDentroDePrisma } from "@/lib/chat-web/derivar-a-prisma"
 import { avisarPorWhatsApp } from "@/lib/chat-web/avisar-a-quien-atiende"
 import { linkAlChat } from "@/lib/seguimiento/avisos"
@@ -75,8 +75,16 @@ export async function POST(req: Request) {
     .eq("id", widgetId)
     .maybeSingle()
 
-  // 1. ¿De qué web viene? Sin Origin válido no se contesta NADA, ni siquiera que el widget existe.
-  if (!fila || !revisarOrigen(origin, (fila.dominios as string[]) ?? []))
+  // 1. ¿De qué web viene? La ventana la sirve PRISMA, así que el pedido puede venir del sitio del
+  // cliente (sin marco) o de nuestra propia ventana informando en qué página está puesta.
+  // Sin poder saberlo, no se contesta NADA, ni siquiera que el widget existe.
+  const procede = revisarProcedencia({
+    origin,
+    propio: new URL(req.url).origin,
+    pagina: paginaOrigen,
+    dominios: (fila?.dominios as string[]) ?? [],
+  })
+  if (!fila || !procede)
     return new NextResponse(JSON.stringify({ error: "No autorizado." }), { status: 403, headers: cors(origin, false) })
 
   const widget: WidgetPublico = {

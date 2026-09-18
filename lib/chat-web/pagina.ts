@@ -110,6 +110,13 @@ export function paginaDelChat(o: OpcionesPagina): string {
 <script>
 (function () {
   var WIDGET = ${JSON.stringify(o.widgetId)};
+  // De que pagina del sitio viene: lo pasa el script que se pego en la web, y si no,
+  // el referente del marco. Sin esto el servidor no puede saber de que sitio se trata.
+  var PAGINA = "";
+  try {
+    PAGINA = new URLSearchParams(location.search).get("p") || document.referrer || "";
+  } catch (e) { PAGINA = document.referrer || ""; }
+
   var charla = document.getElementById("charla");
   var form = document.getElementById("envio");
   var campo = document.getElementById("texto");
@@ -159,7 +166,7 @@ export function paginaDelChat(o: OpcionesPagina): string {
         visitanteId: visitante,
         texto: texto,
         // La página del sitio donde está puesto el chat. La manda el marco de afuera.
-        paginaOrigen: (document.referrer || "")
+        paginaOrigen: PAGINA
       })
     })
       .then(function (r) { return r.json().catch(function () { return {}; }); })

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
   LIMITES_CHAT,
+  revisarProcedencia,
   decidirAtencion,
   revisarOrigen,
   type EstadoConversacion,
@@ -105,5 +106,57 @@ describe("decidirAtencion: hasta dónde se conversa", () => {
     expect(r.ok).toBe(false)
     if (r.ok) return
     expect(r.paraElVisitante.toLowerCase()).not.toContain("whatsapp")
+  })
+})
+
+/**
+ * 17/9. La ventana del chat la sirve PRISMA, asi que cuando esta dentro de un marco en el sitio
+ * del cliente, el pedido sale con el origen de PRISMA, no con el de la inmobiliaria. Mirar solo
+ * el origen rechazaria al visitante de verdad. Lo que dice de que web viene es la pagina que la
+ * ventana informa (el referente del marco).
+ */
+describe("revisarProcedencia: la ventana vive en PRISMA pero atiende para el sitio del cliente", () => {
+  const dominios = ["central.com", "www.central.com"]
+  const propio = "https://prisma.vakdor.com"
+
+  it("desde la ventana, con la pagina del cliente, SI", () => {
+    expect(
+      revisarProcedencia({ origin: propio, propio, pagina: "https://central.com/tasaciones", dominios })
+    ).toBe(true)
+  })
+
+  it("desde la ventana pero con una pagina ajena, NO", () => {
+    expect(
+      revisarProcedencia({ origin: propio, propio, pagina: "https://otro.com/x", dominios })
+    ).toBe(false)
+  })
+
+  it("desde la ventana sin decir de que pagina viene, NO: falla cerrado", () => {
+    for (const pagina of ["", null, "no es una url"])
+      expect(revisarProcedencia({ origin: propio, propio, pagina, dominios }), String(pagina)).toBe(false)
+  })
+
+  it("el pedido hecho directamente desde la web del cliente tambien sirve", () => {
+    expect(
+      revisarProcedencia({ origin: "https://central.com", propio, pagina: "", dominios })
+    ).toBe(true)
+  })
+
+  it("desde cualquier otro lado, NO", () => {
+    expect(
+      revisarProcedencia({ origin: "https://otro.com", propio, pagina: "https://central.com/x", dominios })
+    ).toBe(false)
+    expect(revisarProcedencia({ origin: null, propio, pagina: "https://central.com/x", dominios })).toBe(false)
+  })
+
+  it("en local y en las copias de prueba tambien funciona: el origen propio se pasa, no se adivina", () => {
+    expect(
+      revisarProcedencia({
+        origin: "http://localhost:3000",
+        propio: "http://localhost:3000",
+        pagina: "https://central.com/x",
+        dominios,
+      })
+    ).toBe(true)
   })
 })
