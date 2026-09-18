@@ -48,6 +48,12 @@ export function normBarrio(t: string | null | undefined): string {
     .join("");
 }
 
+/** Palabras que aparecen en el nombre de muchos lugares y por eso no identifican ninguno. */
+const PALABRAS_GENERICAS_DE_LUGAR = new Set([
+  "barrio", "country", "club", "golf", "cerrado", "privado", "villa", "parque", "santa", "chacras",
+  "lago", "lomas", "jardin", "jardines", "residencial", "housing", "estancia",
+]);
+
 /**
  * El puntaje de zona, con la misma tabla que usa la búsqueda (`acm_barrio_relacion`).
  *
@@ -62,6 +68,8 @@ export async function zonaScore(
   admin: SupabaseClient,
   barrioSujeto: string,
   barriosAviso: (string | null | undefined)[],
+  /** Título y dirección del aviso: a veces nombran el lugar que el campo barrio no dice. */
+  textoAviso = "",
 ): Promise<number | null> {
   const key = normBarrio(barrioSujeto);
   if (!key) return null;
@@ -76,7 +84,16 @@ export async function zonaScore(
   const relaciones = data || [];
   if (relaciones.length === 0) {
     const mismo = claves.some((c) => c === key || c.includes(key) || key.includes(c));
-    return mismo ? null : 0;
+    if (mismo) return null;
+    // Un country o un barrio cerrado es más fino que lo que el portal carga como barrio:
+    // Zonaprop publica una casa de "Arelauquen Golf & Country Club" con barrio "San Carlos de
+    // Bariloche" (queja de un asesor, 18-sep). Si el título o la dirección nombran el lugar por
+    // su nombre propio, es el mismo lugar. Lo genérico del nombre no cuenta: "Country Club" lo
+    // tienen todos.
+    const texto = normBarrio(textoAviso);
+    const propias = key.split(/[^a-z0-9ñ]+/).filter((w) => w.length >= 4 && !PALABRAS_GENERICAS_DE_LUGAR.has(w));
+    if (propias.some((w) => new RegExp(`(^|[^a-z0-9ñ])${w}([^a-z0-9ñ]|$)`).test(texto))) return null;
+    return 0;
   }
   if (claves.includes(key)) return 100;
   const scores = relaciones.filter((r: any) => claves.includes(r.relacionado)).map((r: any) => Number(r.zona_score));
@@ -168,7 +185,7 @@ export async function comparableDesdeLink(args: {
         cocheras: num(r.cocheras),
         texto: `${r.descripcion ?? ""} ${r.titulo ?? ""} ${(r.amenities || []).join(" ")}`,
       };
-      const zona = await zonaScore(admin, sujeto.barrio || "", [r.barrio, r.sub_barrio, r.ciudad]);
+      const zona = await zonaScore(admin, sujeto.barrio || "", [r.barrio, r.sub_barrio, r.ciudad], `${r.titulo ?? ""} ${r.direccion ?? ""}`);
       const { match_pct, sub, valores } = puntuarCandidato(ps, candidato, zona);
       const fotos = normalizarImagenes(r.fotos).slice(0, 16);
       const enLaRed = r.estado === "activo" && r.calidad === "ok" && r.operacion === "venta";
@@ -255,7 +272,11 @@ export async function comparableDesdeLink(args: {
     cocheras: amenFlags.cochera_cubierta || amenFlags.cochera_descubierta ? 1 : null,
     texto: `${descripcion} ${S.direccion ?? ""} ${amenLabels.join(" ")}`,
   };
-  const zona = await zonaScore(admin, sujeto.barrio || "", [S.barrio]);
+  const zona = await zonaScore(admin, sujeto.barrio || "", [S.barrio],
+    // El link entra sin lo que va después del "?" (seguimiento del portal): los portales arman
+    // la ruta con la ubicación ("…-casa-venta-arelauquen-54246180"), y a veces es el único lugar
+    // que la nombra.
+    `${S.direccion ?? ""} ${url.split(/[?#]/)[0]}`);
   const { match_pct, sub, valores } = puntuarCandidato(ps, candidato, zona);
   const checklist = buildChecklist({
     sub, operacion, pesoSemantica, sujeto: sujetoChecklist,

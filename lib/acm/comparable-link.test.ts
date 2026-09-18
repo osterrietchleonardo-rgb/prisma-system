@@ -72,6 +72,19 @@ describe("zonaScore", () => {
     expect(await zonaScore(admin, "Luján", ["Mendoza"])).toBe(0);
   });
 
+  it("un country que el portal publica con el nombre de la ciudad: si el título lo nombra, es el mismo lugar", async () => {
+    // Caso real (queja del 18-sep): Zonaprop pone "San Carlos de Bariloche" como barrio de una
+    // casa en Arelauquen. El título lo dice; el barrio no.
+    const arelauquen = "Arelauquen Golf & Country Club";
+    expect(await zonaScore(admin, arelauquen, ["San Carlos de Bariloche"], "Casa en Arelauquen")).toBeNull();
+    // El link del portal también cuenta (el título de uno de sus avisos era solo "Lenga").
+    expect(await zonaScore(admin, arelauquen, ["San Carlos de Bariloche"], "https://www.zonaprop.com.ar/propiedades/clasificado/veclcain-casa-venta-arelauquen-54246180.html")).toBeNull();
+    // Lo genérico del nombre ("golf", "country", "club") no alcanza para decir que es el mismo.
+    expect(await zonaScore(admin, arelauquen, ["San Carlos de Bariloche"], "Casa en Cumelen Country Club")).toBe(0);
+    // Y sin texto que lo nombre, sigue siendo otro lugar.
+    expect(await zonaScore(admin, arelauquen, ["San Carlos de Bariloche"])).toBe(0);
+  });
+
   it("si el aviso no dice el barrio (solo la ciudad), la zona no se compara: no es 'otro barrio'", async () => {
     expect(await zonaScore(admin, "Belgrano", ["CABA, Argentina"])).toBeNull();
     expect(await zonaScore(admin, "Belgrano", ["Capital Federal", ""])).toBeNull();

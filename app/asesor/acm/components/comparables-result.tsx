@@ -1019,9 +1019,14 @@ export function ComparablesResult({
           (si no, "fixed" queda anclado a la Card y hay que scrollear hasta el final para verla). */}
       {selecting && mounted &&
         createPortal(
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-5 py-3 rounded-2xl bg-card border border-accent/30 shadow-2xl shadow-black/30">
-            <span className="text-sm font-semibold whitespace-nowrap">
-              {selected.size} {selected.size === 1 ? "comparable" : "comparables"} seleccionado{selected.size === 1 ? "" : "s"}
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] w-[calc(100vw-2rem)] sm:w-auto flex items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3 rounded-2xl bg-card border border-accent/30 shadow-2xl shadow-black/30">
+            {/* Con cero marcados, la barra dice qué hacer en vez de "0 seleccionados": una
+                asesora apretó "Crear ficha", no vio las casillas y reportó que no respondía
+                (queja del 18-sep). */}
+            <span className="text-sm font-semibold flex-1 sm:flex-none">
+              {selected.size === 0
+                ? "Marcá los comparables para la ficha"
+                : `${selected.size} ${selected.size === 1 ? "comparable" : "comparables"} seleccionado${selected.size === 1 ? "" : "s"}`}
             </span>
             <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={cancelar}>
               Cancelar
@@ -1029,7 +1034,9 @@ export function ComparablesResult({
             <Button
               size="sm"
               className="bg-accent text-accent-foreground hover:bg-accent/90"
-              disabled={cargandoPrev || selected.size === 0}
+              // Sin marcados NO se deshabilita: apretarlo explica qué falta (el aviso lo da
+              // `revisarConclusiones`). Un botón gris que no hace nada se lee como que no anda.
+              disabled={cargandoPrev}
               onClick={revisarConclusiones}
             >
               {cargandoPrev ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileText className="w-4 h-4 mr-1" />}

@@ -491,11 +491,12 @@ async function procesarBusqueda(
     // se caiga. Sin zona, `match_roomix_ia` no tiene ningún índice que enganchar y termina leyendo
     // las 356.314 filas de roomix_properties: 25 s medidos contra el statement_timeout de 8 s del
     // rol authenticated. La búsqueda se corta y el asesor recibe "no encontré resultados", que es
-    // falso. Por eso operación, zona y ambientes NO se saltean ni cuando el usuario pide ver igual:
+    // falso. Por eso operación y zona NO se saltean ni cuando el usuario pide ver igual:
     // sin ellos la búsqueda no falla "un poco", falla entera. La migración
     // 20260821191200_buscador_ia_timeout_roomix.sql tiene los números.
     //
-    // El tipo y el presupuesto sí se saltean: acotan el resultado, pero su ausencia no rompe nada.
+    // El tipo, el presupuesto y los ambientes sí se saltean: acotan el resultado, pero su ausencia
+    // no rompe nada.
 
     /** Sin estos la consulta escanea la tabla entera y se cae por timeout. No son negociables. */
     const missingCritical: string[] = [];
@@ -505,14 +506,15 @@ async function procesarBusqueda(
     // motivo por el que la zona era obligatoria (sin ella la consulta escaneaba la tabla entera
     // y moría por timeout) acá no aplica.
     if (locationKeywords.length === 0 && !zonaElegida) missingCritical.push("la zona o barrio");
-    // Los ambientes tampoco se exigen cuando hay una zona dibujada, y por el mismo motivo que la
-    // zona: eran obligatorios para que la consulta no escanease la tabla entera. Un dibujo la
-    // acota a un puñado de manzanas por índice geográfico. Pedirle los ambientes a quien dijo
-    // "mostrame lo que hay en mi zona" es ponerle un trámite sin razón.
-    if (!roomsFilter && !bedroomsFilter && !zonaElegida) missingCritical.push("la cantidad de ambientes o dormitorios");
 
     /** Estos mejoran el resultado, pero si el usuario dice "mostrame lo que haya", se busca igual. */
     const missingNiceToHave: string[] = [];
+    // Los ambientes eran críticos, pero ya no hacen falta para que la consulta termine: el índice
+    // que la hace rápida es el de la ZONA, y la red va por service_role y frena a las 8.000
+    // candidatas. Medido el 18-sep-2026 en producción, venta sin ambientes: Puerto Madero 1,7 s,
+    // Palermo (el peor barrio) 7,7 s — lento, pero termina. Como críticos dejaban al asesor en
+    // un bucle: dijo "los que haya" y el chat nunca buscó (queja de un asesor del 18-sep).
+    if (!roomsFilter && !bedroomsFilter && !zonaElegida) missingNiceToHave.push("la cantidad de ambientes o dormitorios");
     if (typeKeywords.length === 0) missingNiceToHave.push("el tipo de propiedad (depto, casa, PH, etc.)");
     if (!priceMax && !priceMin) missingNiceToHave.push("el presupuesto y la moneda (USD o ARS)");
 
@@ -969,6 +971,7 @@ INSTRUCCIÓN SOBRE NOTAS: Interpretá las notas y directivas de arriba. Si algun
     - Si no hay resultados: explicá por qué y sugerí 2-3 alternativas concretas.
     - Si el usuario pide más detalle de una propiedad específica, ahí sí describí sus características.
     - REGLA ANTI-ERROR (no negociable): NUNCA digas "mirá las tarjetas de abajo", "te muestro las opciones" ni des a entender que hay propiedades en pantalla si NO se encontró ninguna o si todavía no buscaste. Solo mencionás tarjetas/resultados cuando el contexto confirma que SÍ hay propiedades.
+    - REGLA ANTI-ERROR (no negociable): NO existe la búsqueda "en segundo plano". Cada respuesta tuya es de una sola vez: o la búsqueda ya corrió y el contexto trae el resultado, o NO corrió. Si no corrió, NUNCA digas "ya estoy buscando", "voy de una", "arranco ahora", "te aviso apenas vea" ni nada que prometa resultados después — el asesor se queda esperando algo que no va a llegar. Decí qué dato te falta, o que no buscaste todavía.
 
     PERSONALIDAD Y ESTILO CONVERSACIONAL:
     - Sos un colega inmobiliario con calle, cálido y directo. Voseo rioplatense natural ("tenés", "podés", "dale", "mirá"). Hablás como se habla en una inmobiliaria de Buenos Aires, no como un sistema.
@@ -990,7 +993,7 @@ INSTRUCCIÓN SOBRE NOTAS: Interpretá las notas y directivas de arriba. Si algun
 Tu tarea AHORA: pedile esos datos de forma natural, cálida y profesional (como un asesor experto que quiere entender bien la necesidad antes de mostrar). Reconocé lo que YA te dijo para no repreguntarlo. Podés agrupar 2-3 preguntas en una sola intervención fluida (no como formulario). Explicale en una frase por qué te sirve (para acotar y no hacerle perder tiempo). NO inventes ni menciones propiedades, y NO digas "mirá las tarjetas", "te muestro las opciones" ni nada que sugiera que hay resultados en pantalla: TODAVÍA NO HAY.${
           wantsAnyway
             ? `
-OJO: el usuario YA te pidió ver resultados igual, y aun así le estás preguntando. Reconocé ese pedido antes que nada ("dale, vamos") y pedile SOLO lo que falta de arriba, que es lo mínimo indispensable para poder buscar — sin eso no hay búsqueda posible, no es que quede peor. Una sola pregunta corta y al hueso. No le pidas nada que no esté en esa lista, y no suene a que lo estás frenando.`
+OJO: el usuario YA te pidió ver resultados igual, y aun así le estás preguntando. Reconocé ese pedido en media frase y pedile SOLO lo que falta de arriba, que es lo mínimo indispensable para poder buscar — sin eso no hay búsqueda posible, no es que quede peor. Decile claro que con ese dato buscás en el acto. Una sola pregunta corta y al hueso. No le pidas nada que no esté en esa lista.`
             : ""
         }`
       : isRetrieval
