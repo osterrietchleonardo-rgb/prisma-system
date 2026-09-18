@@ -1,7 +1,10 @@
 "use client"
 
 /**
- * Chat web · La tarjeta donde el director configura el chat de su sitio.
+ * Chat web · El formulario donde el director configura el chat de su sitio.
+ *
+ * Vive dentro del popup de `tarjeta-integracion-chat-web.tsx` (Configuración → Integraciones); el
+ * título y la explicación los pone ese popup.
  *
  * Tres cosas y nada más: a dónde van los contactos, qué sitio tiene que conocer el asistente, y
  * qué secciones son las importantes. Todo lo demás (logo, colores, tipografía) sale solo de
@@ -215,14 +218,6 @@ export function ConfiguracionChatWeb({ alGuardar }: { alGuardar?: () => void } =
 
   return (
     <div className="w-full space-y-6">
-      <header>
-        <h2 className="text-lg font-semibold">Asesor IA Web</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          El asistente atiende a quien entra a tu sitio, entiende qué necesita y te pasa el contacto.
-          Los colores y el logo los toma de Marketing IA → Configuración.
-        </p>
-      </header>
-
       {aviso && (
         <div
           role="status"
@@ -528,7 +523,7 @@ export function ConfiguracionChatWeb({ alGuardar }: { alGuardar?: () => void } =
             </p>
           </div>
 
-          <pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 text-xs">
+          <pre className="max-w-full whitespace-pre-wrap break-all rounded-lg border bg-muted/50 p-3 text-xs">
             <code>{codigoParaLaWeb}</code>
           </pre>
 

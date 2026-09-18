@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { ConfiguracionChatWeb } from "@/components/chat-web/configuracion-chat-web"
+import { TarjetaIntegracionChatWeb } from "@/components/chat-web/tarjeta-integracion-chat-web"
 import { 
   User, 
   Lock, 
@@ -796,10 +796,11 @@ export default function DirectorConfiguracionPage() {
             </CardContent>
           </Card>
 
-          {/* El Asesor IA Web se configura ACA (Leonardo, 18/9): la pantalla del asesor es para
-              mirar los chats y las metricas, no para cargar datos. Al guardar, lleva alla. */}
+          {/* El Asesor IA Web se configura ACA (Leonardo, 18/9), como una tarjeta igual a la de
+              Google Calendar: el formulario entero vive en un popup para no ocuparle lugar a las
+              otras integraciones. Al guardar, lleva a la pantalla de chats. */}
           <div className="mt-6">
-            <ConfiguracionChatWeb alGuardar={() => router.push("/director/chat-web")} />
+            <TarjetaIntegracionChatWeb alConectar={() => router.push("/director/chat-web")} />
           </div>
         </TabsContent>
       </Tabs>
