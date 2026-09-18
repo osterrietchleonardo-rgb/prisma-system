@@ -1,9 +1,13 @@
 import type { Metadata } from "next"
-import { ConfiguracionChatWeb } from "@/components/chat-web/configuracion-chat-web"
+import { BandejaChatWeb } from "@/components/chat-web/bandeja-chat-web"
 
-export const metadata: Metadata = { title: "Chat de la web | PRISMA" }
+export const metadata: Metadata = { title: "Asesor IA Web | PRISMA" }
 
-/** La tarjeta donde el director configura el chat de su sitio. Solo el director. */
-export default function ChatWebPage() {
-  return <ConfiguracionChatWeb />
+/**
+ * Asesor IA Web, para el director: lo primero que se ve son los chats y las métricas
+ * (Leonardo, 18/9). La configuración vive en Configuración → Integraciones, junto con Google
+ * Calendar: se carga una vez y no tiene por qué estar en el medio del trabajo diario.
+ */
+export default function AsesorIaWebPage() {
+  return <BandejaChatWeb rol="director" />
 }

@@ -66,6 +66,7 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([])
   const [soloMias, setSoloMias] = useState(false)
   const [resumen, setResumen] = useState<Resumen | null>(null)
+  const [configurado, setConfigurado] = useState(true)
   const [abierta, setAbierta] = useState<Conversacion | null>(null)
   const [mensajes, setMensajes] = useState<MensajeGuardado[]>([])
 
@@ -80,6 +81,7 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
       }
       setConversaciones(d.conversaciones ?? [])
       setResumen(d.resumen ?? null)
+      setConfigurado(d.configurado !== false)
       setSoloMias(Boolean(d.soloMias))
     } catch {
       setError("No se pudo abrir la bandeja.")
@@ -107,7 +109,7 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
     <div className="mx-auto w-full max-w-5xl space-y-4 p-4 sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Chat de la web</h1>
+          <h1 className="text-xl font-semibold">Asesor IA Web</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {soloMias
               ? "Vas a ver las consultas de quienes quieren sumarse al equipo."
@@ -116,10 +118,27 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
         </div>
         {rol === "director" && (
           <Button variant="outline" asChild className="h-11">
-            <a href="/director/chat-web">Configurar el chat</a>
+            <a href="/director/configuracion?tab=integraciones">Configuración</a>
           </Button>
         )}
       </header>
+
+      {!configurado && (
+        <Card className="border-amber-500/30 bg-amber-500/5 p-4 sm:p-5">
+          <p className="font-medium">Todavía falta configurarlo</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Para que el asistente atienda en tu web, completá el formulario de integración en{" "}
+            <a
+              href="/director/configuracion?tab=integraciones"
+              className="font-medium underline underline-offset-2"
+            >
+              Configuración → Integraciones
+            </a>
+            . Se carga una vez: a dónde van los contactos, cuál es tu sitio y qué consulta le toca
+            a cada uno.
+          </p>
+        </Card>
+      )}
 
       {resumen && resumen.total > 0 && (
         <Card className="p-4">
@@ -147,7 +166,7 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
         </Card>
       )}
 
-      {!conversaciones.length && (
+      {!conversaciones.length && configurado && (
         <Card className="p-6 text-sm text-muted-foreground">
           Todavía no hay conversaciones. Van a aparecer acá apenas alguien escriba desde tu sitio.
         </Card>

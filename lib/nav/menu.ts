@@ -118,9 +118,9 @@ const RENGLONES: Renglon[] = [
     director: { name: "Leads Tokko", href: "/director/leads" },
     asesor:   { name: "Leads Tokko", href: "/asesor/leads" } },
   { id: "chat-web", icon: Globe, grupo: "bandejas",
-    director: { name: "Chat de la web", href: "/director/chat-web" },
+    director: { name: "Asesor IA Web", href: "/director/chat-web" },
     // El asesor solo lo ve si el director lo eligió: se filtra en visibleParaPersona().
-    asesor:   { name: "Chat de la web", href: "/asesor/chat-web" } },
+    asesor:   { name: "Asesor IA Web", href: "/asesor/chat-web" } },
 
   { id: "leads-whatsapp", icon: MessageCircle, grupo: "contactos",
     director: { name: "Leads WhatsApp", href: "/director/leads-whatsapp" },

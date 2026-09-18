@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
+import { TarjetaIntegracionChatWeb } from "@/components/chat-web/tarjeta-integracion-chat-web"
 import { 
   User, 
   Lock, 
@@ -63,6 +65,7 @@ import { MetaTokenManager } from "@/components/whatsapp/MetaTokenManager"
 import { NuevoCodigoDialog } from "@/components/director/NuevoCodigoDialog"
 
 export default function DirectorConfiguracionPage() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const defaultTab = searchParams.get('tab') || 'perfil'
   
@@ -792,6 +795,13 @@ export default function DirectorConfiguracionPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* El Asesor IA Web se configura ACA (Leonardo, 18/9), como una tarjeta igual a la de
+              Google Calendar: el formulario entero vive en un popup para no ocuparle lugar a las
+              otras integraciones. Al guardar, lleva a la pantalla de chats. */}
+          <div className="mt-6">
+            <TarjetaIntegracionChatWeb alConectar={() => router.push("/director/chat-web")} />
+          </div>
         </TabsContent>
       </Tabs>
 
