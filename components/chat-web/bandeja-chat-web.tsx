@@ -173,7 +173,18 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
       )}
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,360px)_1fr]">
-        <ul className="space-y-2">
+        {/* La lista scrollea adentro de su caja: con 100 conversaciones la pantalla no se hace
+            infinita y el chat abierto queda siempre a la vista (Leonardo, 18/9). */}
+        <div className="flex min-h-0 flex-col gap-2">
+          {conversaciones.length > 0 && (
+            <p className="px-1 text-xs text-muted-foreground">
+              {conversaciones.length === 1
+                ? "1 conversación"
+                : `${conversaciones.length} conversaciones`}
+              {conversaciones.length >= 100 ? " (las últimas 100)" : ""}
+            </p>
+          )}
+          <ul className="max-h-[60vh] space-y-2 overflow-y-auto overscroll-contain pr-1">
           {conversaciones.map((c) => {
             const d = c.datos ?? {}
             return (
@@ -199,7 +210,8 @@ export function BandejaChatWeb({ rol }: { rol: "director" | "asesor" }) {
               </li>
             )
           })}
-        </ul>
+          </ul>
+        </div>
 
         {abierta && (
           <Card className="space-y-4 p-4">
