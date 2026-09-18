@@ -76,7 +76,7 @@ for (const smp of PARCELAS) {
       let oficialOk = true; let oficialTxt = "—"; let difOficialTxt = "—";
       if (oraculo) {
         const difCuerpo = (cuerpo.m2PorNivel - oraculo.cuerpo) / oraculo.cuerpo;
-        let okCuerpo = Math.abs(difCuerpo) <= TOLERANCIA;
+        const okCuerpo = Math.abs(difCuerpo) <= TOLERANCIA;
         let okBasamento = true; let difBasTxt = "";
         if (oraculo.basamento !== undefined) {
           const difBas = basamento ? (basamento.m2PorNivel - oraculo.basamento) / oraculo.basamento : null;
