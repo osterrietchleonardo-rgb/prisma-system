@@ -337,8 +337,12 @@ export async function correrEscalamiento(
             nombreAgencia: nombreAgencia.get(c.agency_id) ?? "PRISMA",
             nombreBot: bot(c.agency_id),
             ahoraMs, fetchFn: opts.fetchFn, llamar: opts.llamarNota,
+            // El presupuesto se descuenta cuando la IA PIENSA de verdad, no cuando hay nota.
+            // Antes (hasta el 17/9) sumaba por cada caso con nota, incluidas las ya evaluadas
+            // días atrás: con 140 casos esperando en Central se agotaba en el caso 27 y las
+            // notas de los siguientes no se leían nunca (queja de Carolina Grossi, 16/9).
+            alLlamarIA: () => { llamadasIA++ },
           })
-          if (rNota !== "sin_nota") llamadasIA++
         } catch (e) {
           // La escalera es lo que corre en producción: si la feature nueva explota, se anota
           // y el caso sigue el camino de siempre. Nunca se cae la barrida entera.
