@@ -326,9 +326,20 @@ consistencia y respaldo** si una parcela no tiene envolvente en la capa. Consecu
 - El servidor pide 1 a 4 teselas de zoom 17 que cubren el lote, une los pedazos de un mismo
   polígono partido entre teselas y los recorta al contorno del lote. Se guardan en la caché
   de la parcela junto con el contorno.
-- La validación de 20 parcelas compara **nuestra medición de la envolvente oficial** contra
-  TodoProps (m² por planta, ±5 %), y la regla del cuarto contra la capa oficial en manzanas
-  típicas (informativo).
+- La validación de 20 parcelas (corrida el 18-sep-2026, evidencia en
+  `docs/superpowers/specs/evidencia/prefactibilidad/`) mostró que **TodoProps no es un oráculo
+  fiable**: coincide con la capa oficial en lotes cortos, pero en lotes profundos da más m²
+  (hasta +42 %: 063-037-025) y en corredores publica la huella del **basamento**, no la del
+  cuerpo (042-077A-007: 343 vs 341 del basamento oficial). Se verificó contra el dataset oficial
+  de 2021 "Superficie edificable en planta", que es una exportación independiente de la misma
+  capa: Roosevelt 4554 cuerpo 261,9 m² (nosotros 260,85), Lafuente 917 225,5 (nosotros 221,5;
+  TodoProps 241), Hortiguera 355 269,8 (271), Mariano Acha 2377 130,1 (131), Rivadavia 5858
+  basamento 341 y cuerpo 311 (nosotros 340 y 299 con la capa 2024).
+  **Criterio definitivo:** el oráculo es la **capa oficial** (la actual, y la exportación 2021
+  como control independiente en las parcelas donde se midió). Una parcela FALLA si nuestra
+  medición difiere más de 5 % de la exportación oficial 2021, o si la huella supera el lote o
+  da cero en modo oficial. La columna de TodoProps queda como referencia de mercado, informativa,
+  y la ficha no la menciona.
 - Dependencias nuevas: `@mapbox/vector-tile` 3.0.0 y `pbf` 5.1.2 (ESM; `import { PbfReader }
   from "pbf"`). Las teselas vienen gzip aunque el servidor no lo declare: hay que
   descomprimir si empiezan con `1f 8b`.

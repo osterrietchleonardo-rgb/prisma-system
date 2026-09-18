@@ -3341,6 +3341,12 @@ console.log(fallas ? `\nX ${fallas} parcelas fuera de tolerancia. NO habilitar e
 process.exit(fallas ? 1 : 0);
 ```
 
+- [ ] **Step 1b (ruling 18-sep): el oráculo es la capa oficial, no TodoProps.** La corrida del 18-sep dio 14 OK / 6 FALLA contra TodoProps, y la investigación mostró que TodoProps se aparta de la capa oficial en lotes profundos y publica el basamento en corredores. El script pasa a tener DOS controles duros y una columna informativa:
+  - **Consistencia (todas las parcelas en modo oficial):** `0 < m² cuerpo ≤ superficie del lote (epok) + 1`. Si no, FALLA.
+  - **Oráculo oficial 2021 (donde se midió):** una tabla fija en el script, con la fuente `"superficie_edificable.geojson (GCBA, 2021-05-10), medido por el controlador el 18-sep-2026"`: `053-050-006` cuerpo 261,9 · `048-026-005` cuerpo 225,5 · `042-074-028` cuerpo 269,8 · `051-098-009` cuerpo 130,1 · `042-077A-007` cuerpo 311,2 y basamento 341,2. Nuestra medición (cuerpo; para CA/CM también el basamento) tiene que estar a ±5 % de ese valor. Si no, FALLA. (Rivadavia 5858 cuerpo: 299 contra 311 = −3,9 %, pasa; la capa 2024 pudo cambiar.)
+  - **TodoProps:** columna informativa `m²/planta TodoProps` y `Dif.`, sin efecto en el veredicto. En el pie del Markdown, una nota: "TodoProps coincide con la capa oficial en lotes cortos; en lotes profundos da más m² y en corredores publica el basamento. No es oráculo."
+  - Para `039-097-008B` (dos unidades) se listan las dos filas (CM y CA) con su cuerpo y basamento; TodoProps publica un solo número que no corresponde a ninguna: se anota.
+  El exit code es 1 solo si hay FALLA en los dos controles duros.
 - [ ] **Step 2: Correr** — `npm i -D tsx` (una vez) y `npx tsx scripts/gcba/validar-20-parcelas.mts`. Expected: `OK: las 20 dentro de tolerancia`. Si alguna falla, investigar (¿tesela partida sin unir? ¿lote de epok distinto al de TodoProps?), arreglar con test de regresión, volver a correr. **Si no se llega a 0 fallas, no se habilita el menú** (la Task 15 se revierte con `git revert` del commit del menú).
 
 - [ ] **Step 3: Commit**
