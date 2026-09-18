@@ -60,7 +60,7 @@ export function PrefactibilidadModule({ esDirector = false }: { esDirector?: boo
       if (!id) return;
       const r = await fetch(`/api/prefactibilidad/${id}/compartir`, { method: "POST" });
       const j = await r.json();
-      if (r.ok) setLink(`${window.location.origin}${j.path}`); else setError(j.error || "No se pudo compartir.");
+      if (r.ok) { setLink(`${window.location.origin}${j.path}`); setRecargar((n) => n + 1); } else setError(j.error || "No se pudo compartir.");
     } finally {
       setOcupado(false);
     }
