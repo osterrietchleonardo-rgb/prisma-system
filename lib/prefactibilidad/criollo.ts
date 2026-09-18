@@ -4,6 +4,11 @@ import type { Planta, Unidad } from "./tipos";
 const fmtM = (n: number) => n.toLocaleString("es-AR", { maximumFractionDigits: 1 });
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+// Vive acá (y no en ficha-lote.tsx, que es "use client") porque un export de un módulo cliente
+// llega al servidor como referencia opaca, no como string: la ficha pública (server component)
+// necesita el texto en sí. ficha-lote.tsx la importa de acá y la re-exporta para no romper nada.
+export const LEYENDA = "Estudio orientativo elaborado con datos públicos del Gobierno de la Ciudad de Buenos Aires. No reemplaza el informe de un profesional matriculado ni el certificado urbanístico oficial.";
+
 export function describirUnidad(u: Unidad): string {
   const d = UNIDADES[u];
   const pisos = d.pisosCuerpo - 1;

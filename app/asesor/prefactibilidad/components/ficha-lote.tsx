@@ -1,10 +1,13 @@
 "use client";
 
-import { describirPlanta, describirUnidad, m2, usd } from "@/lib/prefactibilidad/criollo";
+import { describirPlanta, describirUnidad, m2, usd, LEYENDA } from "@/lib/prefactibilidad/criollo";
 import { requiereEstudio } from "@/lib/prefactibilidad/avisos";
 import type { Prefactibilidad } from "@/lib/prefactibilidad/tipos";
 
-export const LEYENDA = "Estudio orientativo elaborado con datos públicos del Gobierno de la Ciudad de Buenos Aires. No reemplaza el informe de un profesional matriculado ni el certificado urbanístico oficial.";
+// LEYENDA vive en lib/prefactibilidad/criollo.ts (la ficha pública, server component, la necesita
+// como string; un módulo "use client" solo exporta referencias del lado del servidor). Se
+// re-exporta para no romper a quien ya la importaba desde acá.
+export { LEYENDA };
 
 function Bloque({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
