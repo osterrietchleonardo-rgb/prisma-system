@@ -101,6 +101,18 @@ export default async function AsesorLayout({
   const agencyData = profile?.agencies as { name: string } | null
   const agencyName = agencyData?.name || "PRISMA IA"
 
+  // La bandeja del chat web la ve el asesor SOLO si el director lo eligió en el desplegable del
+  // widget (Leonardo, 17/9): adentro hay teléfonos de gente que todavía no es cliente de nadie.
+  let verChatWeb = false
+  if (profile?.agency_id && profile?.id) {
+    const { data: widget } = await supabase
+      .from("web_widgets")
+      .select("perfil_equipo_id")
+      .eq("agency_id", profile.agency_id)
+      .maybeSingle()
+    verChatWeb = widget?.perfil_equipo_id === profile.id
+  }
+
   return (
     <div className="h-screen flex overflow-hidden bg-muted/40 font-plus-jakarta">
       {/* Sidebar - desktop. Se cierra con el botón de la barra; el estado se lee del
@@ -113,6 +125,7 @@ export default async function AsesorLayout({
           agencyId={profile?.agency_id}
           userName={profile?.full_name || "Usuario"}
           userRole="Asesor"
+          verChatWeb={verChatWeb}
         />
       </aside>
 
@@ -124,6 +137,7 @@ export default async function AsesorLayout({
           agencyName={agencyName}
           agencyId={profile?.agency_id}
           userRole="Asesor"
+          verChatWeb={verChatWeb}
           aiCredits={aiCredits ? { allocated: aiCredits.credits_total, consumed: aiCredits.credits_used } : null}
         />
         <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-accent/20 flex flex-col min-h-0">

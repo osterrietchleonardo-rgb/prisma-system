@@ -38,7 +38,20 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/(.*)',
+        // La ventana del chat web se muestra DENTRO del sitio del cliente, asi que es la unica
+        // ruta que no lleva el X-Frame-Options: DENY de abajo ni la CSP general. No queda
+        // abierta: la ruta manda su propia CSP con `frame-ancestors` = los dominios de ESA
+        // agencia (lib/chat-web/pagina.ts), asi que cada chat solo se puede enmarcar en su
+        // propio sitio. Todo lo demas de PRISMA sigue igual.
+        source: '/chat/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
+        ],
+      },
+      {
+        source: '/((?!chat/).*)',
         headers: [
           {
             key: 'X-Frame-Options',

@@ -24,6 +24,7 @@ import {
   Inbox,
   LayoutGrid,
   Users,
+  Globe,
   MessageCircle,
   BookUser,
   FileText,
@@ -116,6 +117,11 @@ const RENGLONES: Renglon[] = [
   { id: "leads-tokko", icon: Users, grupo: "contactos",
     director: { name: "Leads Tokko", href: "/director/leads" },
     asesor:   { name: "Leads Tokko", href: "/asesor/leads" } },
+  { id: "chat-web", icon: Globe, grupo: "bandejas",
+    director: { name: "Chat de la web", href: "/director/chat-web" },
+    // El asesor solo lo ve si el director lo eligió: se filtra en visibleParaPersona().
+    asesor:   { name: "Chat de la web", href: "/asesor/chat-web" } },
+
   { id: "leads-whatsapp", icon: MessageCircle, grupo: "contactos",
     director: { name: "Leads WhatsApp", href: "/director/leads-whatsapp" },
     asesor:   { name: "Leads WhatsApp", href: "/asesor/leads-whatsapp" } },
@@ -209,6 +215,12 @@ const PIE: Renglon[] = [
 export interface OpcionesMenu {
   /** La agencia de quien mira: decide qué módulos por agencia se muestran (hoy: Contratos IA). */
   agencyId?: string | null
+  /**
+   * Si esta persona puede ver la bandeja del chat web. Para el director es siempre sí; para un
+   * asesor, solo si el director lo eligió en el desplegable del widget (Leonardo, 17/9). Lo
+   * calcula quien dibuja la barra, que es el único que sabe quién está mirando.
+   */
+  verChatWeb?: boolean
 }
 
 function grupoDelRenglon(r: Renglon, rol: Rol): string {
@@ -226,6 +238,15 @@ function visibleParaAgencia(r: Renglon, agencyId?: string | null): boolean {
   return true
 }
 
+/**
+ * Renglones que dependen de QUIÉN mira, no de la agencia. La bandeja del chat web tiene datos de
+ * contacto de gente que todavía no es cliente: la ve el director y el asesor que él eligió.
+ */
+function visibleParaPersona(r: Renglon, rol: Rol, opciones: OpcionesMenu): boolean {
+  if (r.id === "chat-web" && rol === "asesor") return opciones.verChatWeb === true
+  return true
+}
+
 /** Los grupos del menú para un rol, sin los grupos vacíos. */
 export function menuPara(rol: Rol, opciones: OpcionesMenu = {}): NavGrupo[] {
   return GRUPOS.map((g) => ({
@@ -233,6 +254,7 @@ export function menuPara(rol: Rol, opciones: OpcionesMenu = {}): NavGrupo[] {
     titulo: g.titulo,
     items: RENGLONES.filter((r) => grupoDelRenglon(r, rol) === g.id)
       .filter((r) => visibleParaAgencia(r, opciones.agencyId))
+      .filter((r) => visibleParaPersona(r, rol, opciones))
       .map((r) => aItem(r, rol))
       .filter((it): it is NavItem => it !== null),
   })).filter((g) => g.items.length > 0)
