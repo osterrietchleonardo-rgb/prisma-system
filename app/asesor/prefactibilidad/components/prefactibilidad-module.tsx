@@ -17,6 +17,7 @@ export function PrefactibilidadModule({ esDirector = false }: { esDirector?: boo
   const [idGuardada, setIdGuardada] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [abriendo, setAbriendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recargar, setRecargar] = useState(0);
 
@@ -47,12 +48,17 @@ export function PrefactibilidadModule({ esDirector = false }: { esDirector?: boo
     const j = await r.json();
     if (r.ok) setLink(`${window.location.origin}${j.path}`); else setError(j.error || "No se pudo compartir.");
   };
+  // Mientras se abre una guardada el buscador queda deshabilitado: si el asesor pudiera escribir,
+  // la respuesta tardía pisaría lo que está tecleando (el buscador sincroniza su texto con `p.direccion`).
   const abrir = async (id: string) => {
-    const r = await fetch(`/api/prefactibilidad/${id}`);
-    const j = await r.json();
-    if (!r.ok) { setError(j.error); return; }
-    setP(j.prefactibilidad); setIdGuardada(id); setLink(j.token ? `${window.location.origin}/prefactibilidad/${j.token}` : null);
-    setPin({ lat: j.prefactibilidad.lote.centroide[1], lng: j.prefactibilidad.lote.centroide[0] });
+    setError(null); setAbriendo(true);
+    try {
+      const r = await fetch(`/api/prefactibilidad/${id}`);
+      const j = await r.json();
+      if (!r.ok) { setError(j.error || "No se pudo abrir."); return; }
+      setP(j.prefactibilidad); setIdGuardada(id); setLink(j.token ? `${window.location.origin}/prefactibilidad/${j.token}` : null);
+      setPin({ lat: j.prefactibilidad.lote.centroide[1], lng: j.prefactibilidad.lote.centroide[0] });
+    } catch { setError("No se pudo abrir."); } finally { setAbriendo(false); }
   };
 
   return (
@@ -61,7 +67,7 @@ export function PrefactibilidadModule({ esDirector = false }: { esDirector?: boo
         <h1 className="text-2xl font-semibold">Prefactibilidad</h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">Escribí una dirección de la Ciudad de Buenos Aires: el mapa marca el lote oficial y la ficha dice cuánto se puede construir y cuánto vale la tierra.</p>
       </header>
-      <BuscadorDireccion onElegir={analizar} deshabilitado={cargando} texto={p?.direccion} />
+      <BuscadorDireccion onElegir={analizar} deshabilitado={cargando || abriendo} texto={p?.direccion} />
       {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">{error}</p>}
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="relative isolate h-[45dvh] overflow-hidden rounded-xl border border-zinc-200 lg:h-[calc(100dvh-16rem)] lg:min-h-[520px] dark:border-zinc-800">
