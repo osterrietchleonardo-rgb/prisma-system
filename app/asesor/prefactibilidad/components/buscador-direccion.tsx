@@ -55,7 +55,9 @@ export function BuscadorDireccion({ onElegir, deshabilitado, texto }: { onElegir
         className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-base text-zinc-900 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
       />
       {aviso && <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">{aviso}</p>}
-      {abierto && opciones.length > 0 && (
+      {/* Mientras el módulo está cargando (analizando o abriendo una guardada) no se muestran opciones:
+          un clic en una sugerencia vieja dispararía otro análisis encima del que está en vuelo. */}
+      {abierto && !deshabilitado && opciones.length > 0 && (
         <ul role="listbox" className="absolute z-[700] mt-1 w-full overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
           {opciones.map((d) => (
             <li key={`${d.codCalle}-${d.altura}`}>
