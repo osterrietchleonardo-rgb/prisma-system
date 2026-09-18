@@ -1,6 +1,6 @@
 "use client";
 
-import { describirPlanta, describirUnidad, m2, usd, LEYENDA } from "@/lib/prefactibilidad/criollo";
+import { describirPlanta, describirUnidad, m2, usd, fechaCorta, LEYENDA } from "@/lib/prefactibilidad/criollo";
 import { requiereEstudio } from "@/lib/prefactibilidad/avisos";
 import type { Prefactibilidad } from "@/lib/prefactibilidad/tipos";
 
@@ -86,7 +86,7 @@ export function FichaLote({ p }: { p: Prefactibilidad }) {
         )}
       </Bloque>
 
-      <p className="text-xs leading-relaxed text-zinc-500">{LEYENDA}{p.fuentes.curPublicado ? ` Código Urbanístico por parcela publicado por el GCBA el ${new Date(p.fuentes.curPublicado).toLocaleDateString("es-AR")}.` : ""}</p>
+      <p className="text-xs leading-relaxed text-zinc-500">{LEYENDA}{p.fuentes.curPublicado ? ` Código Urbanístico por parcela publicado por el GCBA el ${fechaCorta(p.fuentes.curPublicado)}.` : ""}</p>
     </div>
   );
 }

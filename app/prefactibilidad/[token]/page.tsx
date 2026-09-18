@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logoParaDestino } from "@/lib/marketing-ia/logo-variante";
 import { planoSvg } from "@/lib/prefactibilidad/plano-svg";
-import { describirPlanta, describirUnidad, m2, usd } from "@/lib/prefactibilidad/criollo";
+import { describirPlanta, describirUnidad, m2, usd, fechaCorta } from "@/lib/prefactibilidad/criollo";
 import { requiereEstudio } from "@/lib/prefactibilidad/avisos";
 import { LEYENDA } from "@/lib/prefactibilidad/criollo"; // vive en lib: un export de un módulo "use client" llega al servidor como referencia, no como string
 import type { Prefactibilidad } from "@/lib/prefactibilidad/tipos";
@@ -13,6 +13,15 @@ import PrintButton from "./PrintButton";
 
 export const dynamic = "force-dynamic";
 const DEFAULT_COLORS = ["#0a1f33", "#c8a061", "#f4f1ea"];
+
+// Copiada de app/ficha-acm/[token]/page.tsx (no se importa: es una página, no exporta helpers).
+function readableOn(hex: string): string {
+  const h = (hex || "").replace("#", "");
+  if (h.length < 6) return "#ffffff";
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? "#0c0c0c" : "#ffffff";
+}
 
 async function cargar(token: string) {
   const admin = createAdminClient();
@@ -42,7 +51,7 @@ export default async function FichaPrefactibilidad({ params }: { params: { token
   const svg = planoSvg({ lote: p.geomLote, huella: e.huella, manzana: p.geomManzana, colorLote: accent, colorHuella: accent, ancho: 700, alto: 420 });
   return (
     <div className="pref-root" style={{ ["--primary" as any]: primary, ["--accent" as any]: accent }}>
-      <style>{CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <article className="hoja">
         <header className="cabecera">
           {brand.logo ? <img src={`/api/brand-logo?url=${encodeURIComponent(brand.logo)}`} alt={agencia} className="logo" /> : <strong>{agencia}</strong>}
@@ -52,13 +61,13 @@ export default async function FichaPrefactibilidad({ params }: { params: { token
         <div className="plano" dangerouslySetInnerHTML={{ __html: svg }} />
         <section><h2>El lote</h2><dl>
           <div><dt>Superficie</dt><dd>{p.lote.superficieTotal != null ? m2(p.lote.superficieTotal) : "sin dato"}</dd></div>
-          <div><dt>Frente × fondo</dt><dd>{p.lote.frente != null && p.lote.fondo != null ? `${p.lote.frente} × ${p.lote.fondo} m` : "sin dato"}</dd></div>
-          <div><dt>Construido hoy</dt><dd>{p.lote.pisosSobreRasante ?? "?"} pisos{p.lote.propiedadHorizontal ? " · PH" : ""}</dd></div>
+          <div><dt>Frente × fondo</dt><dd>{p.lote.frente != null && p.lote.fondo != null ? `${p.lote.frente.toLocaleString("es-AR")} × ${p.lote.fondo.toLocaleString("es-AR")} m` : "sin dato"}</dd></div>
+          <div><dt>Construido hoy</dt><dd>{p.lote.pisosSobreRasante != null ? `${p.lote.pisosSobreRasante} ${p.lote.pisosSobreRasante === 1 ? "piso" : "pisos"}` : "?"}{p.lote.propiedadHorizontal ? " · PH" : ""}</dd></div>
         </dl></section>
         <section><h2>Qué se puede construir</h2>
           {e.unidades.map((u) => <p key={u}>{describirUnidad(u)}</p>)}
           {e.modo === "oficial" ? (<><ul>{e.plantas.map((pl, i) => <li key={i}>{describirPlanta(pl)}</li>)}</ul>
-            <dl><div><dt>m² construibles</dt><dd>{m2(e.m2Construibles)}</dd></div><div><dt>m² vendibles (80 %)</dt><dd>{m2(e.m2Vendibles)}</dd></div><div><dt>Altura máxima / plano límite</dt><dd>{e.alturaMaxima} m / {e.planoLimite} m</dd></div></dl></>)
+            <dl><div><dt>m² construibles</dt><dd>{m2(e.m2Construibles)}</dd></div><div><dt>m² vendibles (80 %)</dt><dd>{m2(e.m2Vendibles)}</dd></div><div><dt>Altura máxima / plano límite</dt><dd>{e.alturaMaxima.toLocaleString("es-AR")} m / {e.planoLimite.toLocaleString("es-AR")} m</dd></div></dl></>)
             : (<dl><div><dt>m² construibles (rango)</dt><dd>{e.rango ? `${m2(e.rango.piso)} a ${m2(e.rango.techo)}` : "sin dato"}</dd></div></dl>)}
         </section>
         <section><h2>Cuánto vale la tierra</h2>
@@ -67,10 +76,10 @@ export default async function FichaPrefactibilidad({ params }: { params: { token
         </section>
         <footer>
           <p className="contacto">{autor?.full_name}{autor?.phone ? ` · ${autor.phone}` : ""}{autor?.email ? ` · ${autor.email}` : ""} · {agencia}</p>
-          <p className="leyenda">{LEYENDA}{p.fuentes.curPublicado ? ` Código Urbanístico por parcela publicado por el GCBA el ${new Date(p.fuentes.curPublicado).toLocaleDateString("es-AR")}.` : ""} {brand.legal}</p>
+          <p className="leyenda">{LEYENDA}{p.fuentes.curPublicado ? ` Código Urbanístico por parcela publicado por el GCBA el ${fechaCorta(p.fuentes.curPublicado)}.` : ""} {brand.legal}</p>
         </footer>
       </article>
-      <PrintButton accent={accent} onAccent="#111111" fileName={`Prefactibilidad - ${p.direccion}`} />
+      <PrintButton accent={accent} onAccent={readableOn(accent)} fileName={`Prefactibilidad - ${p.direccion}`} />
     </div>
   );
 }

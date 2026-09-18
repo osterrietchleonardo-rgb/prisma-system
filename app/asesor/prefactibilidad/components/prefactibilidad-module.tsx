@@ -61,7 +61,7 @@ export function PrefactibilidadModule({ esDirector = false }: { esDirector?: boo
         <h1 className="text-2xl font-semibold">Prefactibilidad</h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">Escribí una dirección de la Ciudad de Buenos Aires: el mapa marca el lote oficial y la ficha dice cuánto se puede construir y cuánto vale la tierra.</p>
       </header>
-      <BuscadorDireccion onElegir={analizar} deshabilitado={cargando} />
+      <BuscadorDireccion onElegir={analizar} deshabilitado={cargando} texto={p?.direccion} />
       {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">{error}</p>}
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="relative isolate h-[45dvh] overflow-hidden rounded-xl border border-zinc-200 lg:h-[calc(100dvh-16rem)] lg:min-h-[520px] dark:border-zinc-800">

@@ -28,3 +28,10 @@ export function m2(n: number): string {
 export function usd(n: number): string {
   return `USD ${Math.round(n).toLocaleString("es-AR")}`;
 }
+
+/** "2025-05-14" → "14/5/2025" sin pasar por Date (evita el corrimiento de zona horaria). */
+export function fechaCorta(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
+  if (!m) return "";
+  return `${Number(m[3])}/${Number(m[2])}/${m[1]}`;
+}

@@ -20,4 +20,8 @@ describe("la ficha pública de prefactibilidad", () => {
   it("el plano es un SVG generado, no una captura", () => {
     expect(src).toContain("planoSvg(");
   });
+  it("el CSS va por dangerouslySetInnerHTML, no como hijo de texto (rompe la hidratación)", () => {
+    expect(src).toContain('<style dangerouslySetInnerHTML={{ __html: CSS }} />');
+    expect(src).not.toContain("<style>{CSS}</style>");
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { describirUnidad, describirPlanta, m2, usd } from "./criollo";
+import { describirUnidad, describirPlanta, m2, usd, fechaCorta } from "./criollo";
 
 describe("los textos que lee el dueño del lote", () => {
   it("unidad en criollo", () => {
@@ -13,5 +13,10 @@ describe("los textos que lee el dueño del lote", () => {
   it("números en es-AR", () => {
     expect(m2(1567.4)).toBe("1.567 m²");
     expect(usd(150000)).toBe("USD 150.000");
+  });
+  it("fecha corta sin corrimiento de zona horaria", () => {
+    expect(fechaCorta("2025-05-14")).toBe("14/5/2025");
+    expect(fechaCorta("2026-09-18T12:00:00Z")).toBe("18/9/2026");
+    expect(fechaCorta(null)).toBe("");
   });
 });
