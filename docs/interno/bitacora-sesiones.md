@@ -62,8 +62,15 @@ sin plusvalía ni IA; huella real en manzana típica y rango con aviso en el res
 siempre; PostgREST no escribe JSON en columnas `geometry` (por eso `jsonb`); `next lint` no revisa
 los `.mts`; los agentes de exploración no ven el worktree y leen el repo principal.
 
-**Abierto:** el OK de Leonardo para el merge (la revisión final de la rama corrió antes de este
-commit; sus hallazgos, si los hubo, están en el commit siguiente). Descartado: la revisión automática
+**Revisión final de la rama (opus, 46 commits):** 0 críticos, 4 importantes y 15 menores; informe en
+`docs/superpowers/specs/evidencia/prefactibilidad/2026-09-18-revision-final.md`. Se arreglaron los 4
+importantes (unidades sin plantas en la ficha, "0 m² a 0 m²" en el caso degradado, test del basamento
+que no probaba nada, error de la RPC de terrenos tragado) y 5 menores baratos; re-revisión aprobada.
+Quedan 10 menores anotados en ese informe, ninguno bloqueante (el más visible: el contador de vistas
+de la ficha pública lo puede incrementar cualquier anónimo, igual que las 4 fichas compartidas que ya
+existen; cambiarlo es DDL en producción).
+
+**Abierto:** el OK de Leonardo para el merge. Descartado: la revisión automática
 marcó un SSRF potencial en `app/api/acm/comparable-link/route.ts` (de main, 16-sep); verificado que
 esa ruta llama a `comparableDesdeLink` → `extractFromUrl` (`lib/acm/extract.ts`), que ya pasa por
 `lib/acm/url-segura.ts` desde la entrada del 16-sep. Falsa alarma.
