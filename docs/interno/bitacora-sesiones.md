@@ -16,6 +16,75 @@
 
 ---
 
+## 2026-09-17 — Farming etapa 3-B: el tablero, el historial que se escribe solo y los nueve números
+
+**Qué se entregó** (rama `feat/farming-tablero`, 17 commits (más el de docs) desde `7263a22`): las seis columnas
+con `@dnd-kit` y el menú «Mover a…» (el camino real en el celular), el diálogo obligatorio al
+mover, `farming_contactos` llenándose solo con cada movimiento, los nueve indicadores del punto 8
+calculados en el servidor, el botón que pasa un propietario al pipeline de Tracking, y las tres
+trampas que había dejado la 3-A.
+
+**Migración aplicada** (`20260917180000_farming_tablero.sql`, con el OK de Leonardo, verificada en
+`pg_indexes`): UN índice, `farming_contactos_propietario_idx (propietario_id) where propietario_id
+is not null`. Ninguna tabla, ninguna columna, ninguna política. El segundo índice del plan se
+descartó con el razonamiento escrito adentro de la migración: los indicadores filtran solo por
+`direccion_id` y cuentan en JS.
+
+**Las reglas que sostiene el código** (no cambiarlas sin preguntar):
+- **Sin la fecha del próximo paso no se guarda el movimiento.** La pantalla y el servidor corren
+  la MISMA `validarMovimiento` — no hay una segunda copia que se despegue.
+- **El movimiento y su historial van en UN pedido.** Si el historial falla, `mover` revierte los
+  CINCO campos que pisó, no solo la etapa; y si el revert también falla, lo dice con otras
+  palabras en vez de mentir.
+- **`etapa` NO está en `COLUMNAS_EDITABLES` del PATCH.** Cambiar de columna es trabajo exclusivo
+  de `/mover`, que es el que firma el historial.
+- **Una persona, una sola actividad en Tracking.** Tres capas: la tarjeta ya enlazada; la
+  actividad colgada que se busca por `metadata->>farming_propietario_id` y se repara; y el enlace
+  condicional, donde el que pierde la carrera borra su propia actividad.
+- **Las escrituras de `mover` son condicionales** (`.eq("etapa", …)` + `count` exacto estricto):
+  si alguien movió la tarjeta antes, es 409, no una pisada silenciosa.
+
+**Errores propios que valen más que el código:**
+1. **Puse la lista como vista por default.** En el celular eso dejaba al asesor sin «Mover a…» ni
+   historial: podía ver sus tarjetas y no trabajarlas. Lo revirtió la revisión final. Arranca el
+   tablero.
+2. **Di por buena una advertencia del implementador sin verificarla:** dijo que
+   `performance_logs` no tenía dónde guardar el nombre. Tiene `nombre_cliente`. Lo verifiqué
+   contra `information_schema` — no contra su palabra.
+3. **Un revisor propuso rechazar `lat: null`.** La pantalla lo manda de verdad
+   (`direccion-dialog.tsx` borra el punto cuando el asesor reescribe la calle tras elegir una
+   sugerencia): un 400 ahí rompía el alta. El agujero real era otro — un geojson ilegible se
+   trataba igual que «no hay punto» y estampaba un `false` que nadie calculó, borrando la fecha
+   de cuándo se cayó afuera.
+4. **Dos pruebas que no mataban su bug:** la de «no recalcula si no toca lat/lng» tenía un fixture
+   coherente (recalcular o no daba lo mismo), y la de la fecha de Buenos Aires solo fallaba tres
+   horas por día. Las dos corregidas con sabotaje verificado.
+
+**Verificado de verdad:**
+- `scripts/farming-rls-ataque.mjs` extendido a **43 ataques** (los nuevos: mover la tarjeta ajena,
+  firmar un contacto como otro, estampar un `tracking_log_id` ajeno). Corrido contra producción:
+  todos fallan, los controles positivos pasan, ninguna fila cambió, limpieza automática, exit 0.
+- **En el navegador** (asesor de prueba, dev en 3011): el movimiento completo escribió su historial
+  firmado («Carta 1 · 17/9/2026 · Relevado → Presentado · Lo anotó Prueba Farming A») y los nueve
+  números **se actualizaron solos** (0 → 1 → 2 en «Contactos realizados»). «Anotar sin moverla»
+  deja la tarjeta en su columna. «vencida» sale como palabra. A 390 px: **0 px de desborde
+  horizontal** y **ningún elemento tocable por debajo de 44 px** (la tira de «Descartadas»,
+  54×442). Los dos temas mirados.
+
+**Deuda anotada, no escondida:**
+- `proxima_accion` y `proxima_accion_en` se pueden corregir desde el diálogo de editar **sin dejar
+  historial**. Decisión consciente: forzar un movimiento falso para arreglar un typo ensuciaría el
+  historial. Costo: en zona compartida un colega corre esa fecha sin firma.
+- No hay tercera compensación si el revert de `mover` también falla: se avisa en castellano.
+- `actividadYaCreada` consulta `performance_logs` por un campo JSONB sin índice. Hoy son decenas
+  de filas; si el Tracking del cliente crece, conviene una columna propia.
+- `farming_contactos.propietario_id` **no lo llena nadie todavía**: el historial no se asocia a la
+  persona concreta de la puerta. El índice ya está aplicado y sirve para el DELETE de personas.
+- El widget de chat flotante tapa la esquina inferior derecha del tablero. Es global, no de esta
+  rama.
+
+---
+
 ## 2026-09-16 — ACM: el link ya no puede abrir direcciones internas, y el barrio de los links
 
 **Link seguro (pedido de Leonardo, con el requisito "si el ataque no falla, no está hecho").**
