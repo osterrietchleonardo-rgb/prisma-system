@@ -3385,3 +3385,9 @@ la clave actual resolvía 27. La clave pasa a palabras ordenadas sin partículas
 calles distintas comparten clave, el route de analizar desempata por la distancia entre el punto de USIG
 (`lat`/`lng`, que el módulo ahora manda) y el centroide de cada parcela candidata. Después del commit, el
 controlador recarga `gcba_puertas` con el cargador aprobado.
+
+### Task 19b (agregada el 18-sep, prueba real en navegador): siete arreglos
+
+Ver `.superpowers/sdd/2026-09-17-prefactibilidad/task-19b-brief.md`: fecha del Código un día antes (UTC),
+desplegable que se reabre tras elegir, buscador vacío al reabrir una guardada, `<style>` escapado en la
+ficha pública (error de hidratación), decimales con punto, "1 pisos", botón de PDF sin contraste.
