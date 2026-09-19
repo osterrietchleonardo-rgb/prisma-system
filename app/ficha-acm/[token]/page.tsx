@@ -10,6 +10,7 @@ import { Playfair_Display, Inter } from "next/font/google";
 import type { Metadata } from "next";
 import PrintButton from "./PrintButton";
 import AjusteAncho from "./AjusteAncho";
+import ImpresionSafari from "./ImpresionSafari";
 import type { AcmFichaSnapshot, FichaBrand, FichaComparable, FichaZona } from "@/lib/acm/ficha";
 import { condensarDescripcion } from "@/lib/acm/descripcion";
 import { fmtAntiguedad } from "@/lib/acm/antiguedad";
@@ -142,6 +143,7 @@ export default async function FichaAcmPage({ params }: { params: { token: string
           Seguro: `CSS` es una constante de este mismo archivo, no entra nada del usuario. */}
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <AjusteAncho />
+      <ImpresionSafari />
       <PrintButton accent={accent} onAccent={onAccent} fileName={nombreArchivo} />
 
       {/* ══════════ PORTADA ══════════ */}
@@ -952,5 +954,12 @@ const CSS = `
     page-break-after: always; break-after: page; overflow: hidden;
   }
   .sheet:last-of-type { page-break-after: auto; break-after: auto; }
+  /* SAFARI (Mac y cualquier navegador del iPhone). No respeta el margin 0 de arriba: suma sus
+     márgenes y la hoja fija de 210 x 297 mm no entra. Se cortaba a la derecha y cada hoja se
+     partía en dos páginas (queja de Ramiro Villegas, 18-sep-2026: 9 hojas, PDF de 18 páginas).
+     Achicamos la hoja ENTERA, sin reacomodar nada adentro, igual que en el celular: 0.84 deja
+     176 x 250 mm, que entra en A4 y también en Carta con encabezados. La clase la pone
+     ImpresionSafari.tsx solo en ese motor: Chrome, Edge, Firefox y Android no la reciben. */
+  .acm-safari .sheet { zoom: 0.84; margin: 0 auto; }
 }
 `;
