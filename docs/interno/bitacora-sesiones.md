@@ -16,6 +16,51 @@
 
 ---
 
+## 2026-09-19 — Alquiler: sin avisos repetidos al equipo y con handoff inmediato (pedido de Kevin)
+
+**El pedido (Kevin, por WhatsApp a Leonardo):** «Apaguemos el reporting de cada tantas horas
+para los alquileres y que haga el Handoff lo más rápido posible; recién leí una conversación en
+un perfil que fue bastante larga». Leonardo: filtrar los avisos de alquiler, dejar los de venta,
+y ver qué pasa con el handoff.
+
+**Lo medido en producción antes de tocar nada (Central, 30 días):**
+
+| | compra | alquiler |
+|---|---|---|
+| conversaciones | 267 | 175 |
+| terminaron derivadas | 27 % | **13 %** |
+| mediana hasta derivar | 11 min | **77 min** |
+
+Y en 7 días, de los 240 avisos al equipo del agente de seguimiento, **63 eran de alquileres**
+(los otros 85 `aviso_equipo` del período los manda n8n al derivar: esos NO se tocaron).
+
+**El caso que lo explica** (Rosario, 14/9, oficina de Serrano al 1000, 51 mensajes): preguntó
+las condiciones de alquiler a las 14:02, Sofía contestó «eso lo precisa Carolina» y **siguió
+calificando** (urgencia, hace cuánto busca); volvió a preguntar a las 14:16 y otra vez a las
+15:51, cuando entró la asesora 1 h 45 después. Nunca hubo handoff.
+
+**Causa real: se lo estábamos pidiendo al prompt.** Decía «NO derives… que pregunte un dato que
+no está en la ficha… y avanzá con la siguiente pregunta». Bien para una venta; en alquiler las
+condiciones (garantía, caución, honorarios, depósito) **nunca** están en la ficha.
+
+**Lo hecho:**
+1. `lib/seguimiento/operacion.ts` (nuevo) + filtro en `escalamiento.ts` y en `avisarPorEscalar`
+   de `avisos.ts`: en alquiler no salen la escalera (2/5/10/20 h) ni el aviso suelto. Ante la
+   duda **avisa**: si `tipo_operacion` falta o es ilegible, el aviso sale igual. Nuevo contador
+   `ResumenEscalamiento.sinAvisoPorOperacion`. Merge a main `c9397c8`.
+2. **Prompt de n8n (nodo `Agente IA CEO`)**: párrafo nuevo «EN ALQUILER, LAS CONDICIONES SON DEL
+   ASESOR» + la excepción en el «NO derives». 70.972 → 71.808 caracteres, 31 expresiones `{{ }}`
+   intactas, 89 nodos, `active: true`, `binaryMode`/`timeSavedMode` conservados. Backup previo en
+   el scratchpad de la sesión (`backup-PRISMA-antes-alquiler-*.json`).
+
+**Qué mirar mañana:** los avisos de alquiler del agente tienen que caer a ~0 (la línea de base
+fueron **21 en las últimas 24 h**), y la mediana de minutos hasta el handoff en alquiler tiene
+que bajar de 77. Ojo con el efecto esperado: **más emails de derivación en alquiler**, que es el
+canje buscado (uno a tiempo en vez de cuatro tarde).
+
+**Pendiente:** el `.md` del prompt en `docs/interno/agente-conversacional/` sigue siendo el del
+25-ago y ya no refleja lo vivo (le faltan los cambios del 16-sep y este).
+
 ## 2026-09-18 — Prefactibilidad: cualquier dirección de CABA → lote oficial, cuánto se puede construir y cuánto vale la tierra
 
 **Qué se construyó (rama `feat/prefactibilidad`, worktree propio, 19 tareas + 19a + 19b por
