@@ -11,6 +11,7 @@ import type { Metadata } from "next";
 import PrintButton from "./PrintButton";
 import AjusteAncho from "./AjusteAncho";
 import ImpresionSafari from "./ImpresionSafari";
+import HojaFinal from "./HojaFinal";
 import type { AcmFichaSnapshot, FichaBrand, FichaComparable, FichaZona } from "@/lib/acm/ficha";
 import { condensarDescripcion } from "@/lib/acm/descripcion";
 import { fmtAntiguedad } from "@/lib/acm/antiguedad";
@@ -218,7 +219,9 @@ export default async function FichaAcmPage({ params }: { params: { token: string
       ))}
 
       {/* ══════════ PÁGINA FINAL: MATRIZ + CONCLUSIONES + CONTACTO ══════════ */}
-      <section className="sheet">
+      {/* Una hoja o dos, según lo que entre: lo decide HojaFinal midiendo. */}
+      <HojaFinal
+        cabecera={
         <div className="pulso" style={{ backgroundColor: primary, color: onPrimary }}>
           <div>
             <span className="pulso-eyebrow" style={{ color: accent }}>ANÁLISIS CONSOLIDADO</span>
@@ -232,8 +235,8 @@ export default async function FichaAcmPage({ params }: { params: { token: string
             </span>
           </div>
         </div>
-
-        <div className="sheet-body">
+        }
+        principal={<>
           <table className="matrix">
             <thead>
               <tr style={{ color: primary }}>
@@ -265,7 +268,8 @@ export default async function FichaAcmPage({ params }: { params: { token: string
           </table>
 
           <PiramidePrecios primary={primary} accent={accent} desvio={comparison.desvio_prom_pct} />
-
+        </>}
+        roles={<>
           {/* Quién define qué. Refuerza la pirámide: el precio final no lo pone ni el
               propietario ni la agencia. Solo si la agencia lo cargó. */}
           {snap.material?.roles_venta ? (
@@ -278,7 +282,8 @@ export default async function FichaAcmPage({ params }: { params: { token: string
               ))}
             </div>
           ) : null}
-
+        </>}
+        cierre={<>
           {comparison.conclusiones.length > 0 && (
             <div className="conclusiones">
               <h3 style={{ fontFamily: "var(--font-display)", color: primary }}>Conclusiones del estudio</h3>
@@ -330,10 +335,9 @@ export default async function FichaAcmPage({ params }: { params: { token: string
               </div>
             </div>
           </div>
-        </div>
-
-        <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
-      </section>
+        </>}
+        pie={<SheetFooter brand={brand} agencyName={agencyName} primary={primary} />}
+      />
 
       {/* ══════════ CÓMO COMERCIALIZAMOS · CÓMO PREPARAR ══════════ */}
       {/* Después del precio: primero la valuación, después el servicio. Cada una sale solo si
@@ -896,6 +900,9 @@ const CSS = `
 .conclusiones ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 .conclusiones li { position: relative; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: #3d3d3d; }
 .conclusiones .bullet { position: absolute; left: 0; top: 6px; width: 7px; height: 7px; border-radius: 2px; }
+/* Segunda hoja del cierre, cuando no entró todo en una (ver HojaFinal.tsx): no tiene la banda
+   de color arriba, así que el texto necesita más aire para no quedar pegado al borde. */
+.hoja-cierre { padding-top: 13mm; }
 .disclaimer { margin-top: 12px; font-size: 10px; color: #9a9a9a; line-height: 1.5; }
 
 /* Contacto */
