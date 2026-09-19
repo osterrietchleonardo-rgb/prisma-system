@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { avisaPorEstaOperacion } from "./operacion"
 import { dentroDeVentanaEnvio, horasHabiles } from "@/lib/whatsapp/sending-window"
 import { BOT_GENERICO, enviarAviso, linkAlChat, nombreCliente, nombresDeBot, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
 import { bloqueContextoHtml, contextoDelLead, lineaContextoWhatsApp, type ContextoLead } from "./contexto"
@@ -209,6 +210,8 @@ export interface ResumenEscalamiento {
   atendidos: number
   avisos: number
   simulados: number
+  /** Leads de alquiler que quedaron fuera de la escalera (Kevin, 19/9). Ver `operacion.ts`. */
+  sinAvisoPorOperacion: number
   /** Casos en los que la IA leyó que el cliente cerró la conversación: no se avisó a nadie. */
   despedidas: number
   /** true si la corrida no evaluó nada por estar fuera de la ventana 6-23 AR. */
@@ -258,7 +261,7 @@ export async function correrEscalamiento(
 ): Promise<ResumenEscalamiento> {
   const appUrl = opts.appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://prisma.vakdor.com"
   const ahoraMs = opts.ahoraMs ?? Date.now()
-  const resumen: ResumenEscalamiento = { esperando: 0, atendidos: 0, avisos: 0, simulados: 0, despedidas: 0 }
+  const resumen: ResumenEscalamiento = { esperando: 0, atendidos: 0, avisos: 0, simulados: 0, despedidas: 0, sinAvisoPorOperacion: 0 }
 
   // Nada de avisos de madrugada (Kevin, 2/9): fuera de 6-23 AR la corrida entera se saltea.
   // No se pierde nada: el reloj cada 30 min vuelve a pasar, y los niveles se miden en horas
@@ -304,7 +307,13 @@ export async function correrEscalamiento(
     // niveles ya mandados) viene en una sola llamada (`escalera_casos`). Antes eran 3 consultas
     // por caso, una atrás de la otra: con 72 casos la barrida tardaba 107 s y el reloj de n8n
     // la cortaba a los 120. Los casos que no aparecen no tienen mensaje del lead en la ventana.
-    const esperan = ((candidatos ?? []) as Conv[]).filter(esperandoHumano)
+    // Kevin (19/9): en alquiler no se persigue al equipo con avisos cada 2, 5, 10 y 20 h. El
+    // email del momento de la derivación (que manda n8n) sale igual; esto corta las repeticiones.
+    const esperan = ((candidatos ?? []) as Conv[]).filter(esperandoHumano).filter((c) => {
+      if (avisaPorEstaOperacion(c.metricas as Record<string, unknown>)) return true
+      resumen.sinAvisoPorOperacion++
+      return false
+    })
     const estados = await estadosDeCasos(db, esperan.map((c) => c.id), desde)
 
     for (const c of esperan) {

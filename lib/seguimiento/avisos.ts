@@ -3,6 +3,7 @@ import { enviarPlantillaAlTelefono } from "@/lib/whatsapp/enviar-plantilla"
 import { registrarEvento } from "./eventos"
 import { bloqueContextoHtml, contextoDelLead, lineaContextoWhatsApp, type ContextoLead } from "./contexto"
 import { nombreValido } from "./semilla"
+import { avisaPorEstaOperacion } from "./operacion"
 import { esperandoHumano } from "./escalamiento"
 import type { Candidato, ConfigAgencia, DecisionAgente } from "./tipos"
 
@@ -344,6 +345,10 @@ export async function avisarPorEscalar(
   appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://prisma.vakdor.com",
   fetchFn: FetchFn = fetch
 ): Promise<string> {
+  // Kevin (19/9): en alquiler no se avisa al equipo. Va antes que todo lo demás para que no
+  // salga ni el aviso ni el evento: lo que se pidió apagar es el ruido, no solo el envío.
+  if (!avisaPorEstaOperacion(c.metricas as Record<string, unknown>)) return "sin_aviso_por_operacion"
+
   // Regla 27/8: si el lead está esperando a un humano, avisa la ESCALERA (2 h, 5 h, 10 h, 20 h,
   // verificada contra el chat), no este aviso suelto: así el asesor no recibe dos por lo mismo.
   if (esperandoHumano(c)) {

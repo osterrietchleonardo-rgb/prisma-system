@@ -129,7 +129,7 @@ describe("correrEscalamiento: nada de madrugada (Kevin, 2/9)", () => {
       get() { throw new Error("la corrida de madrugada no debería tocar la base") },
     }) as never
     const r = await correrEscalamiento(dbQueNoSePuedeUsar, { ahoraMs: ar("2026-09-03T03:30:00") })
-    expect(r).toEqual({ esperando: 0, atendidos: 0, avisos: 0, simulados: 0, despedidas: 0, fueraDeVentana: true })
+    expect(r).toEqual({ esperando: 0, atendidos: 0, avisos: 0, simulados: 0, despedidas: 0, sinAvisoPorOperacion: 0, fueraDeVentana: true })
   })
 
   it("a las 23:00 en punto tampoco (la ventana cierra 22:59)", async () => {
@@ -164,7 +164,7 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
   const fetchOk = (async () => ({ ok: true, json: async () => ({ id: "r-1" }) })) as never
 
   /** `tablasQueTiran` simula una tabla que revienta al leerla (permiso, timeout, columna que no está). */
-  function armarDbCorrida(tablasQueTiran: string[] = [], extra: { nota?: unknown; niveles?: number[]; rpcTira?: boolean } = {}) {
+  function armarDbCorrida(tablasQueTiran: string[] = [], extra: { nota?: unknown; niveles?: number[]; rpcTira?: boolean; metricas?: Record<string, unknown> } = {}) {
     const inserts: Array<{ tabla: string; fila: Record<string, unknown> }> = []
     const rpcs: Array<{ fn: string; args: Record<string, unknown> }> = []
     const lecturas: string[] = []
@@ -173,7 +173,7 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
       agencies: [{ id: "ag-1", name: "Central" }],
       wa_conversations: [{
         id: "conv-1", agency_id: "ag-1", contact_phone: "5491136299626",
-        metricas: { nombre: "Nicolás" }, agent_id: "p-1", bot_active: false,
+        metricas: extra.metricas ?? { nombre: "Nicolás" }, agent_id: "p-1", bot_active: false,
         last_message_at: "2026-09-03T20:09:43Z", visit_scheduled_at: null,
       }],
       profiles: [{ id: "p-1", full_name: "Eric Zambrana", role: "asesor", email: "e@x.com", phone: null }],
@@ -245,6 +245,30 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
     // wa_messages se lee solo para la nota, para que la IA lea la conversación y para el
     // contexto del aviso que sale (antes eran 5 lecturas)
     expect(lecturas.filter((t) => t === "wa_messages").length).toBeLessThanOrEqual(3)
+  })
+
+  /**
+   * KEVIN, 19/9/2026: "Apaguemos el reporting de cada tantas horas para los alquileres".
+   * Medido en producción: en alquiler el bot deriva 13% de las veces (vs 27% en compra) y tarda
+   * 77 minutos (vs 11). Perseguir al equipo por un alquiler no cambia el final y tapa las ventas.
+   */
+  it("un ALQUILER que espera no genera ningún aviso, ni evento, ni llamada a la IA", async () => {
+    const { db, inserts, lecturas } = armarDbCorrida([], { nota: null, metricas: { nombre: "Rosario", tipo_operacion: "alquiler" } })
+    const llamarNota = async () => { throw new Error("no debería llamar a la IA") }
+    const llamarDespedida = async () => { throw new Error("no debería llamar a la IA") }
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, llamarDespedida, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.avisos).toBe(0)
+    expect(r.sinAvisoPorOperacion).toBe(1)
+    expect(inserts).toHaveLength(0)
+    expect(lecturas.filter((t) => t === "wa_messages")).toHaveLength(0)
+  })
+
+  it("la misma situación en COMPRA sí avisa: el filtro no se lleva puesto lo que importa", async () => {
+    const { db, inserts } = armarDbCorrida([], { nota: null, metricas: { nombre: "Nicolás", tipo_operacion: "compra" } })
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarDespedida: async () => ({ requiere_respuesta: true, razon: "espera" }), fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.avisos).toBe(1)
+    expect(r.sinAvisoPorOperacion).toBe(0)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && String(i.fila.tipo) === "escalera")).toBe(true)
   })
 
   it("un caso ya en el tope (20 h mandado) y sin nota nueva: no se lee, no se llama a la IA, cuenta como esperando", async () => {
