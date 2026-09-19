@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { armarAvisoEscalar, elegirDestinatario, linkAlChat, nombreCliente, unaLinea, type PerfilEquipo } from "./avisos"
+import { armarAvisoEscalar, avisarPorEscalar, elegirDestinatario, linkAlChat, nombreCliente, unaLinea, type PerfilEquipo } from "./avisos"
 
 const asesor: PerfilEquipo = { id: "p-asesor", full_name: "Martín Pérez", role: "asesor", email: "m@x.com", phone: "5491100000001" }
 const director: PerfilEquipo = { id: "p-dir", full_name: "Víctor López", role: "director", email: "v@x.com", phone: null }
@@ -98,5 +98,31 @@ describe("armarAvisoEscalar con contexto (regla 27/8: todos los avisos con valor
   it("sin contexto sigue funcionando (compatibilidad)", () => {
     const a = armarAvisoEscalar(asesor, true, conv, decision, APP, "Central")
     expect(a.variables[1]).toBe("Belen (+5491155550000). Qué pasa: Pidió coordinar una visita el 1/8 y hace 3 semanas que nadie le escribe.")
+  })
+})
+
+/**
+ * KEVIN, 19/9/2026: en alquiler no se avisa al equipo. El testigo es duro a propósito: la base
+ * es un proxy que revienta si alguien la toca. Así, si mañana el filtro se corre dos líneas más
+ * abajo —después de escribir el evento o de buscar destinatario—, esta prueba se pone roja.
+ */
+describe("avisarPorEscalar: los alquileres no molestan al equipo", () => {
+  const baseDeDatosQueNoSePuedeTocar = new Proxy({}, {
+    get() { throw new Error("un alquiler no debería tocar la base para avisar") },
+  }) as never
+
+  const escalar = { accion: "escalar", razon: "pide condiciones", evidencia: "", frase_cierre: "", plantilla: "seg_pendiente" } as never
+
+  it("en alquiler corta antes de todo y lo dice", async () => {
+    const alquiler = { id: "c-1", agency_id: "ag-1", contact_phone: "5491155550000", metricas: { tipo_operacion: "alquiler" } } as never
+    const r = await avisarPorEscalar(baseDeDatosQueNoSePuedeTocar, alquiler, escalar, { modo: "activo" }, null, "Central")
+    expect(r).toBe("sin_aviso_por_operacion")
+  })
+
+  it("en compra NO corta: sigue su camino (y por eso toca la base)", async () => {
+    const compra = { id: "c-2", agency_id: "ag-1", contact_phone: "5491155550000", metricas: { tipo_operacion: "compra" } } as never
+    await expect(
+      avisarPorEscalar(baseDeDatosQueNoSePuedeTocar, compra, escalar, { modo: "activo" }, null, "Central")
+    ).rejects.toThrow(/no debería tocar la base/)
   })
 })
